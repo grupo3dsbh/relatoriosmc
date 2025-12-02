@@ -255,9 +255,9 @@ if (verificarConsultores() && !verificarAdmin()) {
         <div class="container">
             <div class="row">
                 <div class="col-md-6 text-center text-md-left">
-                    <h5 class="mb-2">MCAQUABEAT CONSULTORIA LTDA</h5>
+                    <h5 class="mb-2">GRUPO 3DS</h5>
                     <p class="mb-1">
-                        <small>CNPJ: 01.453.236/0001-60</small>
+                        <small>CNPJ: 21.620.221/0001-32</small>
                     </p>
                     <p class="mb-0">
                         <small>&copy; <?= date('Y') ?> Todos os direitos reservados.</small>
@@ -268,7 +268,7 @@ if (verificarConsultores() && !verificarAdmin()) {
                         <i class="fas fa-trophy"></i> <strong>Sistema de Gestão de Vendas Aquabeat</strong>
                     </p>
                     <p class="mb-0">
-                        <small class="text-muted">Versão 1.0 | Desenvolvido com <i class="fas fa-heart text-danger"></i></small>
+                        <small class="text-muted">Versão 1.0 | Desenvolvido com <i class="fas fa-heart text-danger"></i> pelo <a href="https://grupo3ds.com.br">Grupo 3DS</a></small>
                     </p>
                 </div>
             </div>
@@ -492,4 +492,5 @@ if (verificarConsultores() && !verificarAdmin()) {
     </script>
 </body>
 </html>
+
 <?php ob_end_flush(); // Flush buffer de saída ?>
