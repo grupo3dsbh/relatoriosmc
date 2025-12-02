@@ -146,6 +146,11 @@ if (isset($_POST['salvar_config_premiacoes'])) {
         'vendas_para_dip' => intval($_POST['vendas_para_dip']),
         'vendas_acima_2vagas_para_dip' => intval($_POST['vendas_acima_2vagas_para_dip'])
     ];
+
+    // IMPORTANTE: Salva no config.json para persistir entre sessões
+    $_SESSION['config_sistema']['premiacoes'] = $_SESSION['config_premiacoes'];
+    salvarConfiguracoes($_SESSION['config_sistema']);
+
     $mensagem_sucesso = "Configurações de premiação atualizadas com sucesso!";
 }
 
