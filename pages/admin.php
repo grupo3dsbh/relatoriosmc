@@ -1,6 +1,22 @@
 <?php
 // pages/admin.php - Painel administrativo (COMPLETO)
 
+/**
+ * Garante que todos os ranges tenham a chave 'ativo'
+ * Preserva se já existir, adiciona true por padrão se não existir
+ */
+function garantirChaveAtivoRanges(&$ranges) {
+    if (!is_array($ranges)) {
+        return;
+    }
+
+    foreach ($ranges as &$range) {
+        if (!isset($range['ativo'])) {
+            $range['ativo'] = true; // Ativo por padrão
+        }
+    }
+}
+
 // Processa login
 if (isset($_POST['login_admin'])) {
     $senha = $_POST['senha'] ?? '';
@@ -86,6 +102,7 @@ if (isset($_POST['adicionar_range'])) {
         'nome' => $_POST['nome_range'],
         'data_inicio' => $_POST['data_inicio_range'],
         'data_fim' => $_POST['data_fim_range'],
+        'ativo' => true, // IMPORTANTE: Range ativo por padrão
         'pontos' => [
             '1vaga' => intval($_POST['range_1vaga'] ?? 1),
             '2vagas' => intval($_POST['range_2vagas'] ?? 2),
@@ -105,6 +122,7 @@ if (isset($_POST['adicionar_range'])) {
     $_SESSION['ranges_pontuacao'][] = $novo_range;
 
     // Salva no config.json
+    garantirChaveAtivoRanges($_SESSION['ranges_pontuacao']);
     $_SESSION['config_sistema']['ranges'] = $_SESSION['ranges_pontuacao'];
     salvarConfiguracoes($_SESSION['config_sistema']);
 
@@ -120,6 +138,7 @@ if (isset($_POST['remover_range'])) {
     $_SESSION['ranges_pontuacao'] = array_values($_SESSION['ranges_pontuacao']);
 
     // Salva no config.json
+    garantirChaveAtivoRanges($_SESSION['ranges_pontuacao']);
     $_SESSION['config_sistema']['ranges'] = $_SESSION['ranges_pontuacao'];
     salvarConfiguracoes($_SESSION['config_sistema']);
 
@@ -149,6 +168,13 @@ if (isset($_POST['salvar_config_premiacoes'])) {
 
     // IMPORTANTE: Salva no config.json para persistir entre sessões
     $_SESSION['config_sistema']['premiacoes'] = $_SESSION['config_premiacoes'];
+
+    // IMPORTANTE: Preserva ranges com chave 'ativo' antes de salvar
+    if (isset($_SESSION['ranges_pontuacao'])) {
+        garantirChaveAtivoRanges($_SESSION['ranges_pontuacao']);
+        $_SESSION['config_sistema']['ranges'] = $_SESSION['ranges_pontuacao'];
+    }
+
     salvarConfiguracoes($_SESSION['config_sistema']);
 
     $mensagem_sucesso = "Configurações de premiação atualizadas com sucesso!";
