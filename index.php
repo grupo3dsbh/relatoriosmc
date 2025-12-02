@@ -22,8 +22,10 @@ $paginas_disponiveis = [
     'admin' => 'pages/admin.php',
     'consultores' => 'pages/consultores.php',
     'relatorio' => 'pages/relatorio.php',
-    'top20' => 'pages/top20.php',  // ADICIONAR ESTA LINHA
+    'top20' => 'pages/top20.php',
+    'ranking_completo' => 'pages/ranking_completo.php',
     'detalhes_vendas' => 'pages/detalhes_vendas.php',
+    'configuracoes' => 'pages/configuracoes.php',
     'logout' => 'pages/logout.php'
 ];
 
@@ -41,12 +43,42 @@ if (!isset($paginas_disponiveis[$page])) {
 // Verifica autenticação se necessário
 if (isset($rotas_protegidas[$page])) {
     $tipo_auth = $rotas_protegidas[$page];
-    
+
     if ($tipo_auth === 'admin' && !verificarAdmin()) {
         $page = 'admin';
     } elseif ($tipo_auth === 'consultores' && !verificarConsultores()) {
         $_SESSION['redirect_after_login'] = $page;
         $page = 'consultores';
+    }
+}
+
+// ===== REDIRECIONAMENTO DE CONSULTORES PARA RELATÓRIO PADRÃO =====
+// Consultores logados são redirecionados para o relatório padrão,
+// EXCETO se tiverem acesso godmode ou filtro especial
+if (verificarConsultores() && !verificarAdmin()) {
+    // Verifica se tem acesso especial (godmode ou filtro)
+    $tem_acesso_especial = isGodMode() || temAcessoFiltros();
+
+    // Lista de páginas que consultores PODEM acessar sem bypass
+    $paginas_liberadas = ['consultores', 'logout', 'detalhes_vendas'];
+
+    // Se a página atual não é liberada E não tem acesso especial
+    if (!in_array($page, $paginas_liberadas) && !$tem_acesso_especial) {
+        // Carrega configurações para pegar relatório padrão
+        $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+        $relatorio_padrao = $config['acesso']['relatorio_padrao'] ?? 'top20';
+
+        // Redireciona para o relatório padrão
+        if ($page !== $relatorio_padrao && $page !== 'home') {
+            header("Location: ?page=" . $relatorio_padrao);
+            exit;
+        }
+
+        // Se está na home, redireciona também
+        if ($page === 'home') {
+            header("Location: ?page=" . $relatorio_padrao);
+            exit;
+        }
     }
 }
 ?>
@@ -107,51 +139,70 @@ if (isset($rotas_protegidas[$page])) {
             
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ml-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="?page=home">
-                            <i class="fas fa-home"></i> Incio
-                        </a>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a class="nav-link" href="?page=relatorio">
-                            <i class="fas fa-chart-line"></i> Relatórios
-                        </a>
-                    </li>
-                    
-                    <?php if (isGodMode()): ?>
-                    <li class="nav-item">
-                        <a class="nav-link text-danger" href="?page=admin">
-                            <i class="fas fa-user-shield"></i> Admin
-                        </a>
-                    </li>
+                    <?php
+                    // Verifica nível de acesso
+                    $tem_acesso_especial = isGodMode() || temAcessoFiltros();
+                    $e_consultor = verificarConsultores() && !verificarAdmin();
+                    ?>
+
+                    <?php if (!$e_consultor || $tem_acesso_especial): ?>
+                        <!-- Menu completo para admin e consultores com acesso especial -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="?page=home">
+                                <i class="fas fa-home"></i> Início
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="?page=relatorio">
+                                <i class="fas fa-chart-line"></i> Relatórios
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="?page=top20">
+                                <i class="fas fa-trophy"></i> Top 20
+                            </a>
+                        </li>
+
+                        <?php if (isGodMode()): ?>
+                        <li class="nav-item">
+                            <a class="nav-link text-danger" href="?page=admin">
+                                <i class="fas fa-user-shield"></i> Admin
+                            </a>
+                        </li>
+                        <?php endif; ?>
+
+                        <?php if (!verificarConsultores()): ?>
+                        <li class="nav-item">
+                            <a class="nav-link" href="?page=consultores">
+                                <i class="fas fa-users"></i> Consultores
+                            </a>
+                        </li>
+                        <?php endif; ?>
                     <?php endif; ?>
-                    
-                    <li class="nav-item">
-                        <a class="nav-link" href="?page=consultores">
-                            <i class="fas fa-users"></i> Consultores
-                        </a>
-                    </li>
-                    
+
+                    <!-- Sempre visível -->
                     <li class="nav-item">
                         <a class="nav-link" href="?page=detalhes_vendas">
                             <i class="fas fa-search"></i> Consultar Vendas
                         </a>
                     </li>
-                    
-                    <!-- Adicionar no navbar, após o link de Relatórios -->
-                    <li class="nav-item">
-                        <a class="nav-link" href="?page=top20">
-                            <i class="fas fa-trophy"></i> Top 20
-                        </a>
-                    </li>
-                    
+
                     <?php if (verificarAdmin() || verificarConsultores()): ?>
                     <li class="nav-item">
                         <a class="nav-link text-warning" href="?page=logout">
                             <i class="fas fa-sign-out-alt"></i> Sair
                         </a>
                     </li>
+                    <?php endif; ?>
+
+                    <?php if ($tem_acesso_especial && $e_consultor): ?>
+                        <li class="nav-item">
+                            <a class="nav-link text-success" href="#" title="Acesso especial ativado">
+                                <i class="fas fa-star"></i> VIP
+                            </a>
+                        </li>
                     <?php endif; ?>
                 </ul>
             </div>

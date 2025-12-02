@@ -1,0 +1,29 @@
+# Arquivos de configuração e dados do usuário
+data/
+
+# Logs
+*.log
+
+# Arquivos temporários
+temp/
+*.tmp
+
+# Arquivos de sessão PHP
+*.sess
+
+# Cache
+cache/
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*~
