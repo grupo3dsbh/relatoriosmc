@@ -590,7 +590,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
         <div class="modal-content">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title">
-                    <i class="fas fa-lock"></i> Validaço Necessária
+                    <i class="fas fa-lock"></i> Validação Necessária
                 </h5>
                 <button type="button" class="close" data-dismiss="modal">
                     <span>&times;</span>
@@ -598,22 +598,87 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             </div>
             <div class="modal-body">
                 <p><strong id="nomeConsultorValidacao"></strong></p>
-                <p>Para ver seus detalhes, informe sua identificação:</p>
-                
-                <div class="form-group">
-                    <label>CPF ou Telefone</label>
-                    <input type="text" class="form-control" id="inputValidacaoConsultor" 
-                           placeholder="4 dígitos do CPF ou telefone completo" 
-                           pattern="[0-9]{4,11}" maxlength="11">
-                    <small class="text-muted">Digite 4 dgitos do CPF (incio ou fim) ou telefone completo</small>
+
+                <!-- Modo PIN -->
+                <div id="modoPin">
+                    <p>Digite seu PIN de 4 dígitos:</p>
+                    <div class="form-group">
+                        <label>PIN</label>
+                        <input type="password" class="form-control" id="inputPIN"
+                               placeholder="••••"
+                               pattern="[0-9]{4}" maxlength="4" inputmode="numeric">
+                        <small class="text-muted">Digite o PIN de 4 dígitos que você cadastrou</small>
+                    </div>
+                    <div class="text-center mt-2">
+                        <button type="button" class="btn btn-link btn-sm" id="btnUsarCPF">
+                            <i class="fas fa-id-card"></i> Usar CPF ou Telefone
+                        </button>
+                    </div>
                 </div>
-                
+
+                <!-- Modo CPF/Telefone -->
+                <div id="modoCPF" style="display: none;">
+                    <p>Informe sua identificação:</p>
+                    <div class="form-group">
+                        <label>CPF ou Telefone</label>
+                        <input type="text" class="form-control" id="inputValidacaoConsultor"
+                               placeholder="4 dígitos do CPF ou telefone completo"
+                               pattern="[0-9]{4,11}" maxlength="11" inputmode="numeric">
+                        <small class="text-muted">Digite 4 dígitos do CPF (início ou fim) ou telefone completo</small>
+                    </div>
+                    <div class="text-center mt-2">
+                        <button type="button" class="btn btn-link btn-sm" id="btnUsarPIN">
+                            <i class="fas fa-key"></i> Usar PIN
+                        </button>
+                    </div>
+                </div>
+
                 <div id="erroValidacao" class="alert alert-danger" style="display: none;"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="btnValidarAcesso">
                     <i class="fas fa-check"></i> Validar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Criação de PIN -->
+<div class="modal fade" id="modalCriarPIN" tabindex="-1" role="dialog" data-backdrop="static">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-key"></i> Criar PIN de Acesso
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p><strong id="nomeConsultorPIN"></strong></p>
+                <p>Crie um PIN de 4 dígitos para facilitar seus próximos acessos:</p>
+
+                <div class="form-group">
+                    <label>Novo PIN</label>
+                    <input type="password" class="form-control" id="inputNovoPIN"
+                           placeholder="••••"
+                           pattern="[0-9]{4}" maxlength="4" inputmode="numeric">
+                </div>
+
+                <div class="form-group">
+                    <label>Confirmar PIN</label>
+                    <input type="password" class="form-control" id="inputConfirmarPIN"
+                           placeholder="••••"
+                           pattern="[0-9]{4}" maxlength="4" inputmode="numeric">
+                </div>
+
+                <div id="erroCriarPIN" class="alert alert-danger" style="display: none;"></div>
+                <div id="sucessoCriarPIN" class="alert alert-success" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnPularPIN">Pular (usar CPF/Tel nas próximas vezes)</button>
+                <button type="button" class="btn btn-success" id="btnSalvarPIN">
+                    <i class="fas fa-save"></i> Criar PIN
                 </button>
             </div>
         </div>
@@ -835,18 +900,23 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.btn-ver-detalhes', function(e) {
         e.preventDefault();
         console.log('Botão VER clicado!');
-        
+
         const consultorJson = $(this).attr('data-consultor-json');
-        
+
         try {
             consultorParaValidar = JSON.parse(consultorJson);
             console.log('Consultor:', consultorParaValidar.consultor);
-            
+
             // Preenche modal de validação
             $('#nomeConsultorValidacao').text(consultorParaValidar.consultor);
+            $('#inputPIN').val('');
             $('#inputValidacaoConsultor').val('');
             $('#erroValidacao').hide();
-            
+
+            // Reseta para modo PIN
+            $('#modoPin').show();
+            $('#modoCPF').hide();
+
             // Verifica se é GODMODE - libera direto
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('godmode') === 'on') {
@@ -855,51 +925,201 @@ jQuery(document).ready(function($) {
             } else {
                 // Abre modal de validação
                 $('#modalValidarConsultor').modal('show');
+                // Foca no campo PIN
+                setTimeout(function() { $('#inputPIN').focus(); }, 500);
             }
-            
+
         } catch(error) {
             console.error('Erro ao processar consultor:', error);
             alert('Erro ao carregar dados do consultor');
         }
     });
-    
+
+    // ========================================
+    // EVENTO: Toggle entre PIN e CPF
+    // ========================================
+    $('#btnUsarCPF').click(function() {
+        $('#modoPin').hide();
+        $('#modoCPF').show();
+        $('#erroValidacao').hide();
+        setTimeout(function() { $('#inputValidacaoConsultor').focus(); }, 100);
+    });
+
+    $('#btnUsarPIN').click(function() {
+        $('#modoCPF').hide();
+        $('#modoPin').show();
+        $('#erroValidacao').hide();
+        setTimeout(function() { $('#inputPIN').focus(); }, 100);
+    });
+
+    // ========================================
+    // EVENTO: Enter nos campos
+    // ========================================
+    $('#inputPIN, #inputValidacaoConsultor').keypress(function(e) {
+        if (e.which === 13) { // Enter
+            $('#btnValidarAcesso').click();
+        }
+    });
+
     // ========================================
     // EVENTO: Validar acesso do consultor
     // ========================================
     $('#btnValidarAcesso').click(function() {
-        const identificacao = $('#inputValidacaoConsultor').val().replace(/\D/g, '');
-        
-        if (identificacao.length < 4) {
-            $('#erroValidacao').text('Digite pelo menos 4 dígitos').show();
+        $('#erroValidacao').hide();
+
+        // Verifica qual modo está ativo
+        if ($('#modoPin').is(':visible')) {
+            // Validação com PIN
+            const pin = $('#inputPIN').val().replace(/\D/g, '');
+
+            if (pin.length !== 4) {
+                $('#erroValidacao').text('Digite 4 dígitos').show();
+                return;
+            }
+
+            console.log('Validando PIN...');
+
+            $.ajax({
+                url: 'ajax/validar_pin.php',
+                method: 'POST',
+                data: {
+                    consultor: consultorParaValidar.consultor,
+                    pin: pin
+                },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Resposta PIN:', response);
+
+                    if (response.success && response.valido) {
+                        $('#modalValidarConsultor').modal('hide');
+                        mostrarDetalhamento(consultorParaValidar);
+                    } else if (response.sem_pin || response.bloqueado) {
+                        // Não tem PIN ou está bloqueado - força CPF
+                        $('#modoPin').hide();
+                        $('#modoCPF').show();
+                        $('#erroValidacao').text(response.mensagem).show();
+                        setTimeout(function() { $('#inputValidacaoConsultor').focus(); }, 100);
+                    } else {
+                        $('#erroValidacao').text(response.mensagem || 'PIN incorreto!').show();
+                        $('#inputPIN').val('').focus();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro na validação PIN:', error);
+                    $('#erroValidacao').text('Erro ao validar. Tente novamente.').show();
+                }
+            });
+
+        } else {
+            // Validação com CPF/Telefone
+            const identificacao = $('#inputValidacaoConsultor').val().replace(/\D/g, '');
+
+            if (identificacao.length < 4) {
+                $('#erroValidacao').text('Digite pelo menos 4 dígitos').show();
+                return;
+            }
+
+            console.log('Validando CPF/Telefone...');
+
+            $.ajax({
+                url: 'ajax/validar_consultor.php',
+                method: 'POST',
+                data: {
+                    consultor: consultorParaValidar.consultor,
+                    identificacao: identificacao
+                },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Resposta CPF:', response);
+
+                    if (response.success && response.valido) {
+                        $('#modalValidarConsultor').modal('hide');
+                        // Abre modal para criar PIN
+                        abrirModalCriarPIN();
+                    } else {
+                        $('#erroValidacao').text(response.mensagem || 'Identificação inválida!').show();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro na validação CPF:', error);
+                    $('#erroValidacao').text('Erro ao validar. Tente novamente.').show();
+                }
+            });
+        }
+    });
+
+    // ========================================
+    // FUNÇÃO: Abrir modal de criar PIN
+    // ========================================
+    function abrirModalCriarPIN() {
+        $('#nomeConsultorPIN').text(consultorParaValidar.consultor);
+        $('#inputNovoPIN').val('');
+        $('#inputConfirmarPIN').val('');
+        $('#erroCriarPIN').hide();
+        $('#sucessoCriarPIN').hide();
+        $('#modalCriarPIN').modal('show');
+        setTimeout(function() { $('#inputNovoPIN').focus(); }, 500);
+    }
+
+    // ========================================
+    // EVENTO: Salvar PIN
+    // ========================================
+    $('#btnSalvarPIN').click(function() {
+        const pin = $('#inputNovoPIN').val().replace(/\D/g, '');
+        const pinConf = $('#inputConfirmarPIN').val().replace(/\D/g, '');
+
+        $('#erroCriarPIN').hide();
+        $('#sucessoCriarPIN').hide();
+
+        if (pin.length !== 4) {
+            $('#erroCriarPIN').text('O PIN deve ter 4 dígitos').show();
             return;
         }
-        
-        console.log('Validando identificação:', identificacao);
-        
-        // Faz validação via AJAX
+
+        if (pin !== pinConf) {
+            $('#erroCriarPIN').text('Os PINs não conferem').show();
+            return;
+        }
+
         $.ajax({
-            url: 'ajax/validar_consultor.php',
+            url: 'ajax/criar_pin.php',
             method: 'POST',
             data: {
                 consultor: consultorParaValidar.consultor,
-                identificacao: identificacao
+                pin: pin,
+                pin_confirmacao: pinConf
             },
             dataType: 'json',
             success: function(response) {
-                console.log('Resposta validaão:', response);
-                
-                if (response.success && response.valido) {
-                    $('#modalValidarConsultor').modal('hide');
-                    mostrarDetalhamento(consultorParaValidar);
+                if (response.success) {
+                    $('#sucessoCriarPIN').text(response.mensagem).show();
+                    setTimeout(function() {
+                        $('#modalCriarPIN').modal('hide');
+                        mostrarDetalhamento(consultorParaValidar);
+                    }, 1500);
                 } else {
-                    $('#erroValidacao').text(response.mensagem || 'Identificaço inválida!').show();
+                    $('#erroCriarPIN').text(response.mensagem).show();
                 }
             },
-            error: function(xhr, status, error) {
-                console.error('Erro na validação:', error);
-                $('#erroValidacao').text('Erro ao validar. Tente novamente.').show();
+            error: function() {
+                $('#erroCriarPIN').text('Erro ao criar PIN').show();
             }
         });
+    });
+
+    // ========================================
+    // EVENTO: Pular criação de PIN
+    // ========================================
+    $('#btnPularPIN').click(function() {
+        $('#modalCriarPIN').modal('hide');
+        mostrarDetalhamento(consultorParaValidar);
+    });
+
+    // Enter nos campos do PIN
+    $('#inputNovoPIN, #inputConfirmarPIN').keypress(function(e) {
+        if (e.which === 13) {
+            $('#btnSalvarPIN').click();
+        }
     });
     
     // ========================================
