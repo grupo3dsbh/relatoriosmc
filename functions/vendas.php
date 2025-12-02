@@ -452,11 +452,12 @@ function calcularPremiacoes($consultor) {
     
     // Calcula SAPs
     $saps = floor($pontos / $config['pontos_por_sap']);
-    
+
     // Calcula DIPs (se atingir qualquer um dos critérios)
-    $dip_por_total = ($vendas_total >= $config['vendas_para_dip']) ? 1 : 0;
-    $dip_por_acima_2vagas = ($vendas_acima_2vagas >= $config['vendas_acima_2vagas_para_dip']) ? 1 : 0;
-    
+    // IMPORTANTE: Se o valor configurado for 0, desativa esse critério
+    $dip_por_total = ($config['vendas_para_dip'] > 0 && $vendas_total >= $config['vendas_para_dip']) ? 1 : 0;
+    $dip_por_acima_2vagas = ($config['vendas_acima_2vagas_para_dip'] > 0 && $vendas_acima_2vagas >= $config['vendas_acima_2vagas_para_dip']) ? 1 : 0;
+
     $dips = max($dip_por_total, $dip_por_acima_2vagas);
     
     return [
@@ -811,6 +812,21 @@ function validarIdentificacaoConsultor($consultor_nome, $identificacao, $vendas)
 // Adicionar no arquivo functions/vendas.php
 
 /**
+ * Obtém pontos padrão do config.json (não hardcoded)
+ */
+function obterPontosPadrao() {
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+
+    // Tenta obter do config.json primeiro
+    if (isset($config['pontos_padrao']) && !empty($config['pontos_padrao'])) {
+        return $config['pontos_padrao'];
+    }
+
+    // Fallback para constante se não houver no config.json
+    return PONTOS_PADRAO;
+}
+
+/**
  * Determina qual configuração de pontos usar baseado na data da venda
  */
 function obterConfiguracaoPontosPorData($data_venda) {
@@ -832,16 +848,21 @@ function obterConfiguracaoPontosPorData($data_venda) {
     }
 
     if (!$data) {
-        return PONTOS_PADRAO; // Retorna padrão se não conseguir parsear
+        return obterPontosPadrao(); // Retorna padrão se não conseguir parsear
     }
 
     // Verifica se há ranges configurados
     if (!isset($_SESSION['ranges_pontuacao']) || empty($_SESSION['ranges_pontuacao'])) {
-        return PONTOS_PADRAO;
+        return obterPontosPadrao();
     }
 
-    // Procura range que contenha esta data
+    // Procura range que contenha esta data E que esteja ativo
     foreach ($_SESSION['ranges_pontuacao'] as $range) {
+        // IMPORTANTE: Verifica se o range está ativo
+        if (!isset($range['ativo']) || $range['ativo'] !== true) {
+            continue; // Pula ranges inativos
+        }
+
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59); // Fim do dia
@@ -850,9 +871,38 @@ function obterConfiguracaoPontosPorData($data_venda) {
             return $range['pontos'];
         }
     }
-    
+
     // Se não encontrou range especfico, usa padrão
-    return PONTOS_PADRAO;
+    return obterPontosPadrao();
+}
+
+/**
+ * Converte pontos do formato config.json (1vaga, 2vagas, etc) para formato esperado
+ */
+function converterFormatoRange($pontos_range) {
+    // Se já está no formato correto (com chaves como '2a3_vagas'), retorna direto
+    if (isset($pontos_range['2a3_vagas']) || isset($pontos_range['1vaga_vista'])) {
+        return $pontos_range;
+    }
+
+    // Converte do formato config.json (1vaga, 2vagas, etc) para formato esperado
+    return [
+        '1vaga_vista' => $pontos_range['1vaga'] ?? $pontos_range['1vagas'] ?? 1,
+        '2a3_vagas' => max($pontos_range['2vagas'] ?? 2, $pontos_range['3vagas'] ?? 2),
+        '4a7_vagas' => max(
+            $pontos_range['4vagas'] ?? 3,
+            $pontos_range['5vagas'] ?? 3,
+            $pontos_range['6vagas'] ?? 3,
+            $pontos_range['7vagas'] ?? 3
+        ),
+        '8a10_vagas' => max(
+            $pontos_range['8vagas'] ?? 4,
+            $pontos_range['9vagas'] ?? 4,
+            $pontos_range['10vagas'] ?? 4
+        ),
+        'acima_10' => $pontos_range['acima_10'] ?? 4,
+        'acima_5_vista' => $pontos_range['vista_acima_5'] ?? $pontos_range['acima_5_vista'] ?? 5
+    ];
 }
 
 /**
@@ -880,13 +930,16 @@ function calcularPontosComRanges($vendas_detalhes) {
         // Obtm configuração de pontos baseada na data da venda
         $config_pontos_raw = obterConfiguracaoPontosPorData($detalhe['data_venda']);
         
-        // Converte para formato compatvel se necessário
-        if (isset($config_pontos_raw[1])) {
-            // É formato PONTOS_PADRAO
+        // Converte para formato compatível se necessário
+        // Detecta se é formato antigo com índices numéricos (1, 2, 3...) ou novo com strings
+        $tem_indices_numericos = isset($config_pontos_raw[1]) && is_numeric(key($config_pontos_raw));
+
+        if ($tem_indices_numericos) {
+            // É formato PONTOS_PADRAO antigo (índices numéricos: 1=>1, 2=>2, etc)
             $config_pontos = converterPontosPadrao($config_pontos_raw);
         } else {
-            // Já est no formato correto
-            $config_pontos = $config_pontos_raw;
+            // É formato config.json/range (strings: "1vaga", "2vagas", etc)
+            $config_pontos = converterFormatoRange($config_pontos_raw);
         }
         
         // Determina categoria
@@ -967,6 +1020,11 @@ function identificarRange($data_venda) {
     }
 
     foreach ($_SESSION['ranges_pontuacao'] as $range) {
+        // IMPORTANTE: Verifica se o range está ativo
+        if (!isset($range['ativo']) || $range['ativo'] !== true) {
+            continue; // Pula ranges inativos
+        }
+
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59);
