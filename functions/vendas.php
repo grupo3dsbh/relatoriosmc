@@ -811,6 +811,21 @@ function validarIdentificacaoConsultor($consultor_nome, $identificacao, $vendas)
 // Adicionar no arquivo functions/vendas.php
 
 /**
+ * Obtém pontos padrão do config.json (não hardcoded)
+ */
+function obterPontosPadrao() {
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+
+    // Tenta obter do config.json primeiro
+    if (isset($config['pontos_padrao']) && !empty($config['pontos_padrao'])) {
+        return $config['pontos_padrao'];
+    }
+
+    // Fallback para constante se não houver no config.json
+    return PONTOS_PADRAO;
+}
+
+/**
  * Determina qual configuração de pontos usar baseado na data da venda
  */
 function obterConfiguracaoPontosPorData($data_venda) {
@@ -832,16 +847,21 @@ function obterConfiguracaoPontosPorData($data_venda) {
     }
 
     if (!$data) {
-        return PONTOS_PADRAO; // Retorna padrão se não conseguir parsear
+        return obterPontosPadrao(); // Retorna padrão se não conseguir parsear
     }
 
     // Verifica se há ranges configurados
     if (!isset($_SESSION['ranges_pontuacao']) || empty($_SESSION['ranges_pontuacao'])) {
-        return PONTOS_PADRAO;
+        return obterPontosPadrao();
     }
 
-    // Procura range que contenha esta data
+    // Procura range que contenha esta data E que esteja ativo
     foreach ($_SESSION['ranges_pontuacao'] as $range) {
+        // IMPORTANTE: Verifica se o range está ativo
+        if (!isset($range['ativo']) || $range['ativo'] !== true) {
+            continue; // Pula ranges inativos
+        }
+
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59); // Fim do dia
@@ -850,9 +870,9 @@ function obterConfiguracaoPontosPorData($data_venda) {
             return $range['pontos'];
         }
     }
-    
+
     // Se não encontrou range especfico, usa padrão
-    return PONTOS_PADRAO;
+    return obterPontosPadrao();
 }
 
 /**
@@ -967,6 +987,11 @@ function identificarRange($data_venda) {
     }
 
     foreach ($_SESSION['ranges_pontuacao'] as $range) {
+        // IMPORTANTE: Verifica se o range está ativo
+        if (!isset($range['ativo']) || $range['ativo'] !== true) {
+            continue; // Pula ranges inativos
+        }
+
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59);

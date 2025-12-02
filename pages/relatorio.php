@@ -1255,8 +1255,8 @@ jQuery(document).ready(function($) {
                                 <td><small class="text-muted">${venda.id}</small></td>
                                 <td>
                                     <small>${venda.produto_atual}</small>
-                                    ${venda.produto_alterado ? 
-                                        '<br><span class="badge badge-warning badge-sm">Alterado</span>' : 
+                                    ${venda.produto_alterado ?
+                                        `<br><span class="badge badge-warning badge-sm">Alterado de ${venda.produto_original}</span>` :
                                         ''}
                                 </td>
                                 <td><small>${venda.data_venda_formatada}</small></td>
