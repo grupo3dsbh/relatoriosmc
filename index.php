@@ -275,12 +275,194 @@ if (verificarConsultores() && !verificarAdmin()) {
         </div>
     </footer>
     
+    <!-- Botão Flutuante para Limpar Cache do Navegador -->
+    <button id="btnLimparCache" class="btn-limpar-cache"
+            onclick="limparCacheNavegador()"
+            title="Limpar cache do navegador e recarregar página">
+        <i class="fas fa-sync-alt"></i>
+        <span class="btn-text">Limpar Cache</span>
+    </button>
+
+    <style>
+        .btn-limpar-cache {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-limpar-cache:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-limpar-cache:active {
+            transform: translateY(0);
+        }
+
+        .btn-limpar-cache i {
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .btn-limpar-cache {
+                bottom: 10px;
+                right: 10px;
+                padding: 10px 16px;
+                font-size: 12px;
+            }
+
+            .btn-limpar-cache .btn-text {
+                display: none;
+            }
+
+            .btn-limpar-cache {
+                width: 45px;
+                height: 45px;
+                border-radius: 50%;
+                justify-content: center;
+                padding: 0;
+            }
+        }
+
+        /* Animação de rotação */
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-limpar-cache.loading i {
+            animation: rotate 1s linear infinite;
+        }
+    </style>
+
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- DataTables JS -->
-<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+    <!-- SweetAlert2 para alertas bonitos -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+    /**
+     * Limpa COMPLETAMENTE o cache do navegador e força reload
+     */
+    function limparCacheNavegador() {
+        Swal.fire({
+            title: 'Limpar Cache do Navegador?',
+            html: `
+                <p>Isso vai:</p>
+                <ul style="text-align: left; display: inline-block;">
+                    <li>Limpar localStorage e sessionStorage</li>
+                    <li>Limpar Service Workers</li>
+                    <li>Forçar recarregamento completo da página</li>
+                    <li>Aplicar todas as atualizações do sistema</li>
+                </ul>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#667eea',
+            cancelButtonColor: '#d33',
+            confirmButtonText: '<i class="fas fa-sync-alt"></i> Sim, limpar!',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                executarLimpezaCache();
+            }
+        });
+    }
+
+    function executarLimpezaCache() {
+        // Adiciona classe loading ao botão
+        const btn = document.getElementById('btnLimparCache');
+        btn.classList.add('loading');
+        btn.disabled = true;
+
+        // 1. Limpa localStorage
+        try {
+            localStorage.clear();
+            console.log('✓ localStorage limpo');
+        } catch (e) {
+            console.warn('Erro ao limpar localStorage:', e);
+        }
+
+        // 2. Limpa sessionStorage
+        try {
+            sessionStorage.clear();
+            console.log('✓ sessionStorage limpo');
+        } catch (e) {
+            console.warn('Erro ao limpar sessionStorage:', e);
+        }
+
+        // 3. Limpa Service Workers
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log('✓ Service Worker removido');
+                }
+            });
+        }
+
+        // 4. Limpa Cache API
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                for (let name of names) {
+                    caches.delete(name);
+                    console.log('✓ Cache removido:', name);
+                }
+            });
+        }
+
+        // 5. Mostra mensagem e recarrega
+        Swal.fire({
+            title: 'Cache Limpo!',
+            text: 'Recarregando página...',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+        }).then(() => {
+            // Force hard reload (equivalente a Ctrl+F5)
+            // Adiciona timestamp para forçar reload de todos os recursos
+            const url = new URL(window.location.href);
+            url.searchParams.set('_cache_bust', Date.now());
+
+            // Recarrega SEM usar cache
+            window.location.href = url.toString();
+
+            // Fallback: força reload do cache
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 100);
+        });
+    }
+
+    // Atalho de teclado: Ctrl+Shift+R para limpar cache
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+            e.preventDefault();
+            limparCacheNavegador();
+        }
+    });
+
+    console.log('%c💡 Dica: Pressione Ctrl+Shift+R para limpar o cache rapidamente!',
+                'background: #667eea; color: white; padding: 5px 10px; border-radius: 3px;');
+    </script>
 </body>
 </html>
 <?php ob_end_flush(); // Flush buffer de saída ?>
