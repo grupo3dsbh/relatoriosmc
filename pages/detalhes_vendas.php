@@ -39,13 +39,27 @@ if (isset($_POST['selecionar_arquivo'])) {
     }
 }
 
-// Validação com PIN
+// Validação com PIN (ou bypass para admins)
 if (isset($_POST['validar_com_pin'])) {
     $consultor_nome = $_POST['consultor_nome'];
     $pin = preg_replace('/\D/', '', $_POST['pin'] ?? '');
 
+    // BYPASS: Se está logado como admin, não precisa validar PIN
+    if (verificarAdmin()) {
+        // Filtra vendas do consultor
+        $vendas_consultor = array_filter($_SESSION['detalhes_vendas']['vendas'], function($v) use ($consultor_nome) {
+            return $v['consultor'] === $consultor_nome;
+        });
+
+        $_SESSION['detalhes_vendas']['consultor_selecionado'] = $consultor_nome;
+        $_SESSION['detalhes_vendas']['vendas_consultor'] = array_values($vendas_consultor);
+        $_SESSION['detalhes_vendas']['passo'] = 3;
+
+        $passo_atual = 3;
+        $mensagem_sucesso = "Acesso administrativo concedido! " . count($vendas_consultor) . " vendas encontradas.";
+    }
     // Verifica se PIN está bloqueado
-    if (consultorPINBloqueado($consultor_nome)) {
+    elseif (consultorPINBloqueado($consultor_nome)) {
         revogarPINConsultor($consultor_nome);
         $mensagem_erro = "PIN bloqueado após 3 tentativas erradas. Você precisará validar novamente com CPF/Telefone e criar um novo PIN.";
         $_SESSION['detalhes_vendas']['modo_validacao'] = 'cpf';
@@ -104,7 +118,7 @@ if (isset($_POST['definir_pin'])) {
     }
 }
 
-// Validação com CPF/Telefone
+// Validação com CPF/Telefone (ou bypass para admins)
 if (isset($_POST['validar_consultor'])) {
     $consultor_nome = $_POST['consultor_nome'];
     $identificacao = preg_replace('/[^0-9]/', '', $_POST['identificacao']); // Limpa identificação
@@ -116,8 +130,17 @@ if (isset($_POST['validar_consultor'])) {
 
     $vendas_consultor = array_values($vendas_consultor);
 
+    // BYPASS: Se está logado como admin, não precisa validar CPF/Telefone
+    if (verificarAdmin()) {
+        $_SESSION['detalhes_vendas']['consultor_selecionado'] = $consultor_nome;
+        $_SESSION['detalhes_vendas']['vendas_consultor'] = $vendas_consultor;
+        $_SESSION['detalhes_vendas']['passo'] = 3;
+
+        $passo_atual = 3;
+        $mensagem_sucesso = "Acesso administrativo concedido! " . count($vendas_consultor) . " vendas encontradas.";
+    }
     // Verifica se encontrou vendas
-    if (empty($vendas_consultor)) {
+    elseif (empty($vendas_consultor)) {
         $mensagem_erro = "Nenhuma venda encontrada para este consultor no período selecionado.";
     } else {
         // Validação com arquivo de promotores
