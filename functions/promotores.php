@@ -93,25 +93,24 @@ function processarPromotoresCSV($arquivo) {
                  "<!-- PROMOTORES: CSV SEM CABEÇALHO - processando desde primeira linha -->";
 
                 // Processa a primeira linha como dado
-                // Mapeamento correto: codigo | nome | codigo | cpf | rg | data_nasc | estado_civil |
-                // dependentes | data_admissao | logradouro | numero | bairro | complemento |
-                // cidade | UF | telefone | email | comissao | status | endereco_completo
+                // MAPEAMENTO PROVISÓRIO - ajustar com linha exemplo real do CSV
                 if (count($primeira_linha_dados) >= 14) {
                     $promotores[] = [
-                        'codigo' => trim($primeira_linha_dados[0] ?? ''),
-                        'nome' => trim($primeira_linha_dados[1] ?? ''),
-                        'cpf' => trim($primeira_linha_dados[3] ?? ''),
-                        'rg' => trim($primeira_linha_dados[4] ?? ''),
-                        'rua' => trim($primeira_linha_dados[9] ?? ''),
-                        'numero' => trim($primeira_linha_dados[10] ?? ''),
-                        'bairro' => trim($primeira_linha_dados[11] ?? ''),
-                        'complemento' => trim($primeira_linha_dados[12] ?? ''),
-                        'cidade' => trim($primeira_linha_dados[13] ?? ''),
-                        'estado' => trim($primeira_linha_dados[14] ?? ''),
-                        'telefone' => trim($primeira_linha_dados[15] ?? ''),
-                        'comissao' => floatval(trim($primeira_linha_dados[17] ?? 0)),
-                        'status' => trim($primeira_linha_dados[18] ?? ''),
-                        'endereco_completo' => trim($primeira_linha_dados[19] ?? '')
+                        'nome' => trim($primeira_linha_dados[0]),
+                        'codigo' => trim($primeira_linha_dados[1] ?? ''),
+                        'comissao' => floatval(trim($primeira_linha_dados[2] ?? 0)),
+                        'status' => trim($primeira_linha_dados[3] ?? ''),
+                        'cpf' => trim($primeira_linha_dados[4] ?? ''),
+                        'rg' => trim($primeira_linha_dados[5] ?? ''),
+                        'rua' => trim($primeira_linha_dados[6] ?? ''),
+                        'numero' => trim($primeira_linha_dados[7] ?? ''),
+                        'complemento' => trim($primeira_linha_dados[8] ?? ''),
+                        'bairro' => trim($primeira_linha_dados[9] ?? ''),
+                        'cidade' => trim($primeira_linha_dados[10] ?? ''),
+                        'estado' => trim($primeira_linha_dados[11] ?? ''),
+                        'cep' => trim($primeira_linha_dados[12] ?? ''),
+                        'telefone' => trim($primeira_linha_dados[13] ?? ''),
+                        'endereco_completo' => trim($primeira_linha_dados[6] ?? '') . ', ' . trim($primeira_linha_dados[7] ?? '') . ' - ' . trim($primeira_linha_dados[9] ?? '') . ', ' . trim($primeira_linha_dados[10] ?? '') . '/' . trim($primeira_linha_dados[11] ?? '')
                     ];
                 }
             } else {
@@ -137,24 +136,23 @@ function processarPromotoresCSV($arquivo) {
                 continue;
             }
             
-            // Mapeamento correto: codigo | nome | codigo | cpf | rg | data_nasc | estado_civil |
-            // dependentes | data_admissao | logradouro | numero | bairro | complemento |
-            // cidade | UF | telefone | email | comissao | status | endereco_completo
+            // MAPEAMENTO PROVISÓRIO - ajustar com linha exemplo real do CSV
             $promotores[] = [
-                'codigo' => trim($dados[0] ?? ''),
-                'nome' => trim($dados[1] ?? ''),
-                'cpf' => trim($dados[3] ?? ''),
-                'rg' => trim($dados[4] ?? ''),
-                'rua' => trim($dados[9] ?? ''),
-                'numero' => trim($dados[10] ?? ''),
-                'bairro' => trim($dados[11] ?? ''),
-                'complemento' => trim($dados[12] ?? ''),
-                'cidade' => trim($dados[13] ?? ''),
-                'estado' => trim($dados[14] ?? ''),
-                'telefone' => trim($dados[15] ?? ''),
-                'comissao' => floatval(trim($dados[17] ?? 0)),
-                'status' => trim($dados[18] ?? ''),
-                'endereco_completo' => trim($dados[19] ?? '')
+                'nome' => trim($dados[0]),
+                'codigo' => trim($dados[1] ?? ''),
+                'comissao' => floatval(trim($dados[2] ?? 0)),
+                'status' => trim($dados[3] ?? ''),
+                'cpf' => trim($dados[4] ?? ''),
+                'rg' => trim($dados[5] ?? ''),
+                'rua' => trim($dados[6] ?? ''),
+                'numero' => trim($dados[7] ?? ''),
+                'complemento' => trim($dados[8] ?? ''),
+                'bairro' => trim($dados[9] ?? ''),
+                'cidade' => trim($dados[10] ?? ''),
+                'estado' => trim($dados[11] ?? ''),
+                'cep' => trim($dados[12] ?? ''),
+                'telefone' => trim($dados[13] ?? ''),
+                'endereco_completo' => trim($dados[6] ?? '') . ', ' . trim($dados[7] ?? '') . ' - ' . trim($dados[9] ?? '') . ', ' . trim($dados[10] ?? '') . '/' . trim($dados[11] ?? '')
             ];
         }
         
