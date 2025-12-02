@@ -469,16 +469,10 @@ function formatarBytes($bytes) {
     return $bytes . ' bytes';
 }
 
-// Funão para verificar modo God Mode
-function isGodMode() {
-    return isset($_GET['godmode']) && $_GET['godmode'] === 'on';
-}
-
 // Carrega funções
 require_once BASE_DIR . '/functions/vendas.php';
 require_once BASE_DIR . '/functions/promotores.php';
 
-/*
 // ===== CARREGA FUNÇÕES DE CONFIGURAÇÃO =====
 require_once __DIR__ . '/functions/configuracoes.php';
 
@@ -493,5 +487,4 @@ if (isGodMode()) {
 if (temAcessoFiltros()) {
     echo "<!-- ACESSO AOS FILTROS LIBERADO -->";
 }
-*/
 ?>

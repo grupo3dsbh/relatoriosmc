@@ -29,11 +29,39 @@ function carregarConfiguracoes() {
  */
 function obterConfigPadrao() {
     return [
-        'premiacoes' => [
-            'pontos_por_vaga' => 3,
-            'pontos_venda_vista' => 2,
-            'vendas_para_sap' => 21,
-            'vendas_para_dip' => 500
+        'pontos_padrao' => [
+            '1vaga' => 1,
+            '2vagas' => 2,
+            '3vagas' => 2,
+            '4vagas' => 3,
+            '5vagas' => 3,
+            '6vagas' => 3,
+            '7vagas' => 3,
+            '8vagas' => 4,
+            '9vagas' => 4,
+            '10vagas' => 4,
+            'acima_10' => 4,
+            'vista_acima_5' => 5
+        ],
+        'tipos_premiacao' => [
+            [
+                'nome' => 'SAP',
+                'pontos_necessarios' => 21,
+                'ativo' => true,
+                'descricao' => 'Sistema de Acúmulo de Pontos'
+            ],
+            [
+                'nome' => 'DIP',
+                'pontos_necessarios' => 500,
+                'ativo' => true,
+                'descricao' => 'Desafio Individual de Pontos'
+            ],
+            [
+                'nome' => 'CONVITES VIP',
+                'pontos_necessarios' => 100,
+                'ativo' => false,
+                'descricao' => 'Convites para eventos exclusivos'
+            ]
         ],
         'ranges' => [
             // Exemplo de range
@@ -41,14 +69,20 @@ function obterConfigPadrao() {
                  'nome' => 'Black Week',
                  'data_inicio' => '2025-11-22',
                  'data_fim' => '2025-11-30',
-                 'ativo' => true,
+                 'ativo' => false,
                  'pontos' => [
-                     '1vaga_vista' => 2, 
-                     '2a3_vagas' => 3,
-                     '4a7_vagas' => 4,
-                     '8a10_vagas' => 5,
-                     'acima_10' => 5,
-                     'acima_5_vista' => 7
+                     '1vaga' => 2,
+                     '2vagas' => 3,
+                     '3vagas' => 3,
+                     '4vagas' => 4,
+                     '5vagas' => 4,
+                     '6vagas' => 4,
+                     '7vagas' => 4,
+                     '8vagas' => 5,
+                     '9vagas' => 5,
+                     '10vagas' => 5,
+                     'acima_10' => 6,
+                     'vista_acima_5' => 7
                  ]
              ]
         ],
@@ -63,7 +97,8 @@ function obterConfigPadrao() {
         'acesso' => [
             'relatorio_padrao' => 'top20', // 'top20' ou 'ranking_completo'
             'senha_filtro' => '', // Senha encode/decode para liberar filtros
-            'senha_godmode' => 'admin123' // Senha para modo admin
+            'senha_godmode' => 'admin123', // Senha para modo admin
+            'senha_admin_setores' => 'aquabeat' // Senha para setores acessarem dados de consultores
         ],
         'premiacao' => [
             'mensagem' => 'Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior. Ex: vendas de Novembro até 07 de Dezembro.',

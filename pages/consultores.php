@@ -1,12 +1,18 @@
 <?php
-// pages/consultores.php - Gerenciamento de Consultores/Promotores
+// pages/consultores.php - Acesso Administrativo (Setores)
 
 require_once 'functions/promotores.php';
 
-// Processa login
+// Processa login administrativo
 if (isset($_POST['login_consultores'])) {
     $senha = $_POST['senha'] ?? '';
-    if (loginConsultores($senha)) {
+
+    // Senha administrativa configurável
+    $senha_admin = $_SESSION['config_sistema']['acesso']['senha_admin_setores'] ?? 'aquabeat';
+
+    if ($senha === $senha_admin) {
+        $_SESSION['consultores_autenticado'] = true;
+
         // Redireciona se houver página pendente
         if (isset($_SESSION['redirect_after_login'])) {
             $redirect = $_SESSION['redirect_after_login'];
@@ -40,13 +46,15 @@ if (!verificarConsultores()):
                 <form method="post">
                     <div class="form-group">
                         <label for="senha">
-                            <i class="fas fa-key"></i> Senha de Acesso
+                            <i class="fas fa-key"></i> Senha Administrativa
                         </label>
-                        <input type="password" class="form-control" id="senha" name="senha" 
-                               placeholder="Digite a senha" required autofocus>
+                        <input type="password" class="form-control form-control-lg"
+                               id="senha" name="senha"
+                               placeholder="Digite a senha administrativa"
+                               required autofocus>
                     </div>
-                    
-                    <button type="submit" name="login_consultores" class="btn btn-info btn-block">
+
+                    <button type="submit" name="login_consultores" class="btn btn-info btn-block btn-lg">
                         <i class="fas fa-sign-in-alt"></i> Entrar
                     </button>
                 </form>
@@ -56,8 +64,8 @@ if (!verificarConsultores()):
                 <div class="alert alert-info mb-0">
                     <small>
                         <i class="fas fa-info-circle"></i>
-                        <strong>Acesso restrito:</strong> Esta área é acessível apenas com senha.
-                        Entre em contato com o administrador para obter acesso.
+                        <strong>Acesso Administrativo:</strong> Esta área é restrita aos setores autorizados.
+                        Entre em contato com o administrador para obter a senha de acesso.
                     </small>
                 </div>
             </div>

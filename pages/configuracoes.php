@@ -12,15 +12,36 @@ $config = carregarConfiguracoes();
 
 // ===== PROCESSAR SALVAMENTO =====
 if (isset($_POST['salvar_configuracoes'])) {
-    
-    // Atualiza configurações de premiação
-    $config['premiacoes'] = [
-        'pontos_por_vaga' => intval($_POST['pontos_por_vaga']),
-        'pontos_venda_vista' => intval($_POST['pontos_venda_vista']),
-        'vendas_para_sap' => intval($_POST['vendas_para_sap']),
-        'vendas_para_dip' => intval($_POST['vendas_para_dip'])
+
+    // Atualiza pontos padrão
+    $config['pontos_padrao'] = [
+        '1vaga' => intval($_POST['pontos_1vaga'] ?? 1),
+        '2vagas' => intval($_POST['pontos_2vagas'] ?? 2),
+        '3vagas' => intval($_POST['pontos_3vagas'] ?? 2),
+        '4vagas' => intval($_POST['pontos_4vagas'] ?? 3),
+        '5vagas' => intval($_POST['pontos_5vagas'] ?? 3),
+        '6vagas' => intval($_POST['pontos_6vagas'] ?? 3),
+        '7vagas' => intval($_POST['pontos_7vagas'] ?? 3),
+        '8vagas' => intval($_POST['pontos_8vagas'] ?? 4),
+        '9vagas' => intval($_POST['pontos_9vagas'] ?? 4),
+        '10vagas' => intval($_POST['pontos_10vagas'] ?? 4),
+        'acima_10' => intval($_POST['pontos_acima_10'] ?? 4),
+        'vista_acima_5' => intval($_POST['pontos_vista_acima_5'] ?? 5)
     ];
-    
+
+    // Atualiza tipos de premiação
+    if (isset($_POST['tipos_premiacao']) && is_array($_POST['tipos_premiacao'])) {
+        $config['tipos_premiacao'] = [];
+        foreach ($_POST['tipos_premiacao'] as $index => $tipo) {
+            $config['tipos_premiacao'][] = [
+                'nome' => trim($tipo['nome']),
+                'pontos_necessarios' => intval($tipo['pontos_necessarios']),
+                'ativo' => isset($tipo['ativo']),
+                'descricao' => trim($tipo['descricao'] ?? '')
+            ];
+        }
+    }
+
     // Atualiza campos visíveis para consultores
     $config['campos_visiveis_consultores'] = [
         'pontos' => isset($_POST['campo_pontos']),
@@ -35,7 +56,8 @@ if (isset($_POST['salvar_configuracoes'])) {
     $config['acesso'] = [
         'relatorio_padrao' => $_POST['relatorio_padrao'] ?? 'top20',
         'senha_filtro' => trim($_POST['senha_filtro'] ?? ''),
-        'senha_godmode' => trim($_POST['senha_godmode'] ?? 'admin123')
+        'senha_godmode' => trim($_POST['senha_godmode'] ?? 'admin123'),
+        'senha_admin_setores' => trim($_POST['senha_admin_setores'] ?? 'aquabeat')
     ];
     
     // Atualiza configurações de premiação
@@ -72,12 +94,25 @@ if (isset($_POST['adicionar_range'])) {
         'nome' => $_POST['range_nome'],
         'data_inicio' => $_POST['range_data_inicio'],
         'data_fim' => $_POST['range_data_fim'],
-        'multiplicador' => floatval($_POST['range_multiplicador']),
-        'ativo' => isset($_POST['range_ativo'])
+        'ativo' => isset($_POST['range_ativo']),
+        'pontos' => [
+            '1vaga' => intval($_POST['range_pontos_1vaga'] ?? 1),
+            '2vagas' => intval($_POST['range_pontos_2vagas'] ?? 2),
+            '3vagas' => intval($_POST['range_pontos_3vagas'] ?? 2),
+            '4vagas' => intval($_POST['range_pontos_4vagas'] ?? 3),
+            '5vagas' => intval($_POST['range_pontos_5vagas'] ?? 3),
+            '6vagas' => intval($_POST['range_pontos_6vagas'] ?? 3),
+            '7vagas' => intval($_POST['range_pontos_7vagas'] ?? 3),
+            '8vagas' => intval($_POST['range_pontos_8vagas'] ?? 4),
+            '9vagas' => intval($_POST['range_pontos_9vagas'] ?? 4),
+            '10vagas' => intval($_POST['range_pontos_10vagas'] ?? 4),
+            'acima_10' => intval($_POST['range_pontos_acima_10'] ?? 4),
+            'vista_acima_5' => intval($_POST['range_pontos_vista_acima_5'] ?? 5)
+        ]
     ];
-    
+
     $config['ranges'][] = $novo_range;
-    
+
     $resultado = salvarConfiguracoes($config);
     if ($resultado['sucesso']) {
         $mensagem_sucesso = "Range adicionado com sucesso!";
@@ -87,13 +122,49 @@ if (isset($_POST['adicionar_range'])) {
 
 if (isset($_POST['remover_range'])) {
     $index = intval($_POST['range_index']);
-    
+
     if (isset($config['ranges'][$index])) {
         array_splice($config['ranges'], $index, 1);
-        
+
         $resultado = salvarConfiguracoes($config);
         if ($resultado['sucesso']) {
             $mensagem_sucesso = "Range removido com sucesso!";
+            $config = carregarConfiguracoes();
+        }
+    }
+}
+
+// ===== PROCESSAR TIPOS DE PREMIAÇÃO =====
+if (isset($_POST['adicionar_tipo_premiacao'])) {
+    $novo_tipo = [
+        'nome' => trim($_POST['tipo_nome']),
+        'pontos_necessarios' => intval($_POST['tipo_pontos']),
+        'ativo' => isset($_POST['tipo_ativo']),
+        'descricao' => trim($_POST['tipo_descricao'] ?? '')
+    ];
+
+    if (!isset($config['tipos_premiacao'])) {
+        $config['tipos_premiacao'] = [];
+    }
+
+    $config['tipos_premiacao'][] = $novo_tipo;
+
+    $resultado = salvarConfiguracoes($config);
+    if ($resultado['sucesso']) {
+        $mensagem_sucesso = "Tipo de premiação adicionado com sucesso!";
+        $config = carregarConfiguracoes();
+    }
+}
+
+if (isset($_POST['remover_tipo_premiacao'])) {
+    $index = intval($_POST['tipo_index']);
+
+    if (isset($config['tipos_premiacao'][$index])) {
+        array_splice($config['tipos_premiacao'], $index, 1);
+
+        $resultado = salvarConfiguracoes($config);
+        if ($resultado['sucesso']) {
+            $mensagem_sucesso = "Tipo de premiação removido com sucesso!";
             $config = carregarConfiguracoes();
         }
     }
@@ -220,19 +291,51 @@ if (isset($_POST['resetar_config'])) {
                             </div>
                         </div>
                     </div>
-                    
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-users-cog"></i> Senha Administrativa (Setores)
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="senha_admin_setores"
+                                       value="<?= htmlspecialchars($config['acesso']['senha_admin_setores'] ?? 'aquabeat') ?>"
+                                       placeholder="aquabeat">
+                                <small class="form-text text-muted">
+                                    Senha para setores administrativos acessarem dados de consultores
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-unlock-alt"></i> Gerenciar PINs de Consultores
+                                </label>
+                                <button type="button" class="btn btn-danger btn-block" id="btnRevokeAllPINs">
+                                    <i class="fas fa-trash-alt"></i> Revogar Todos os PINs
+                                </button>
+                                <small class="form-text text-muted">
+                                    Force todos os consultores a redefinir seus PINs
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>
                                     <i class="fas fa-filter"></i> Senha para Liberar Filtros
                                 </label>
-                                <input type="text" class="form-control" name="senha_filtro" 
+                                <input type="text" class="form-control" name="senha_filtro"
                                        value="<?= htmlspecialchars($config['acesso']['senha_filtro'] ?? '') ?>"
                                        placeholder="Deixe vazio para desativar">
                                 <small class="form-text text-muted">
                                     <?php if (!empty($config['acesso']['senha_filtro'])): ?>
-                                        URL com filtros liberados: 
+                                        URL com filtros liberados:
                                         <code><?= gerarUrlComFiltro('ranking_completo') ?></code>
                                     <?php else: ?>
                                         Configure uma senha para gerar URL com filtros liberados
@@ -241,6 +344,30 @@ if (isset($_POST['resetar_config'])) {
                             </div>
                         </div>
                     </div>
+
+                    <script>
+                    // Revogar todos os PINs
+                    document.getElementById('btnRevokeAllPINs').addEventListener('click', function() {
+                        if (confirm('ATENÇÃO! Isso irá revogar TODOS os PINs cadastrados. Os consultores precisarão redefinir. Confirma?')) {
+                            fetch('ajax/revoke_pins.php', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({action: 'revoke_all'})
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    alert('Todos os PINs foram revogados com sucesso!');
+                                } else {
+                                    alert('Erro: ' + (data.mensagem || 'Erro desconhecido'));
+                                }
+                            })
+                            .catch(error => {
+                                alert('Erro de comunicação: ' + error);
+                            });
+                        }
+                    });
+                    </script>
                 </div>
             </div>
             
@@ -312,9 +439,513 @@ if (isset($_POST['resetar_config'])) {
                 </div>
             </div>
             
-            <!-- Card: Configurações de Premiação (EXISTENTE - continue com o código atual) -->
-            <!-- ... resto dos cards existentes ... -->
-            
+            <!-- Card: Pontos Padrão -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-star"></i> Pontos Padrão por Faixa de Vagas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Configure quantos pontos cada venda vale de acordo com o número de vagas</p>
+
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>1 Vaga</label>
+                                <input type="number" class="form-control" name="pontos_1vaga"
+                                       value="<?= $config['pontos_padrao']['1vaga'] ?? 1 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>2 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_2vagas"
+                                       value="<?= $config['pontos_padrao']['2vagas'] ?? 2 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>3 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_3vagas"
+                                       value="<?= $config['pontos_padrao']['3vagas'] ?? 2 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>4 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_4vagas"
+                                       value="<?= $config['pontos_padrao']['4vagas'] ?? 3 ?>" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>5 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_5vagas"
+                                       value="<?= $config['pontos_padrao']['5vagas'] ?? 3 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>6 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_6vagas"
+                                       value="<?= $config['pontos_padrao']['6vagas'] ?? 3 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>7 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_7vagas"
+                                       value="<?= $config['pontos_padrao']['7vagas'] ?? 3 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>8 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_8vagas"
+                                       value="<?= $config['pontos_padrao']['8vagas'] ?? 4 ?>" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>9 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_9vagas"
+                                       value="<?= $config['pontos_padrao']['9vagas'] ?? 4 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>10 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_10vagas"
+                                       value="<?= $config['pontos_padrao']['10vagas'] ?? 4 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Acima de 10 Vagas</label>
+                                <input type="number" class="form-control" name="pontos_acima_10"
+                                       value="<?= $config['pontos_padrao']['acima_10'] ?? 4 ?>" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label>Vista (acima 5 vagas)</label>
+                                <input type="number" class="form-control" name="pontos_vista_acima_5"
+                                       value="<?= $config['pontos_padrao']['vista_acima_5'] ?? 5 ?>" min="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Tipos de Premiação -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-trophy"></i> Tipos de Premiação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Configure os tipos de premiação disponíveis (SAP, DIP, CONVITES, etc)</p>
+
+                    <?php if (!empty($config['tipos_premiacao'])): ?>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Pontos Necessários</th>
+                                        <th>Descrição</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($config['tipos_premiacao'] as $index => $tipo): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($tipo['nome']) ?></strong></td>
+                                            <td><?= $tipo['pontos_necessarios'] ?> pontos</td>
+                                            <td><?= htmlspecialchars($tipo['descricao'] ?? '') ?></td>
+                                            <td>
+                                                <?php if ($tipo['ativo']): ?>
+                                                    <span class="badge badge-success">Ativo</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">Inativo</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <form method="post" style="display: inline;">
+                                                    <input type="hidden" name="tipo_index" value="<?= $index ?>">
+                                                    <button type="submit" name="remover_tipo_premiacao" class="btn btn-sm btn-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-muted">Nenhum tipo de premiação configurado</p>
+                    <?php endif; ?>
+
+                    <hr>
+
+                    <h6>Adicionar Novo Tipo de Premiação</h6>
+                    <form method="post">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Nome *</label>
+                                    <input type="text" class="form-control" name="tipo_nome"
+                                           placeholder="Ex: SAP, DIP, CONVITES" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label>Pontos Necessários *</label>
+                                    <input type="number" class="form-control" name="tipo_pontos"
+                                           value="21" min="1" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-5">
+                                <div class="form-group">
+                                    <label>Descrição</label>
+                                    <input type="text" class="form-control" name="tipo_descricao"
+                                           placeholder="Descrição da premiação">
+                                </div>
+                            </div>
+
+                            <div class="col-md-2">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" class="form-check-input" name="tipo_ativo"
+                                           id="tipo_ativo" checked>
+                                    <label class="form-check-label" for="tipo_ativo">Ativo</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" name="adicionar_tipo_premiacao" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Adicionar Tipo de Premiação
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card: Mensagem de Premiação -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell"></i> Aviso de Premiação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Mensagem de Aviso Global</label>
+                        <textarea class="form-control" name="mensagem_premiacao" rows="3"><?= htmlspecialchars($config['premiacao']['mensagem'] ?? '') ?></textarea>
+                        <small class="form-text text-muted">Esta mensagem será exibida no topo de todas as páginas</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Dia Limite para 1ª Parcela</label>
+                                <input type="number" class="form-control" name="dia_limite_primeira_parcela"
+                                       value="<?= $config['premiacao']['dia_limite_primeira_parcela'] ?? 7 ?>"
+                                       min="1" max="31">
+                                <small class="form-text text-muted">Ex: 7 = até dia 07 do mês seguinte</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" name="exibir_aviso_premiacao"
+                                       id="exibir_aviso_premiacao"
+                                       <?= !empty($config['premiacao']['exibir_aviso']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="exibir_aviso_premiacao">
+                                    Exibir aviso nas páginas
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Campos Visíveis para Consultores -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-eye"></i> Campos Visíveis para Consultores
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_pontos"
+                                       id="campo_pontos"
+                                       <?= !empty($config['campos_visiveis_consultores']['pontos']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_pontos">Pontos</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_vendas"
+                                       id="campo_vendas"
+                                       <?= !empty($config['campos_visiveis_consultores']['vendas']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_vendas">Vendas</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_valor_total"
+                                       id="campo_valor_total"
+                                       <?= !empty($config['campos_visiveis_consultores']['valor_total']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_valor_total">Valor Total</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-2">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_valor_pago"
+                                       id="campo_valor_pago"
+                                       <?= !empty($config['campos_visiveis_consultores']['valor_pago']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_valor_pago">Valor Pago</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_detalhamento"
+                                       id="campo_detalhamento"
+                                       <?= !empty($config['campos_visiveis_consultores']['detalhamento']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_detalhamento">Detalhamento</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_cotas_sap"
+                                       id="campo_cotas_sap"
+                                       <?= !empty($config['campos_visiveis_consultores']['cotas_sap']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_cotas_sap">DIPs / Cotas SAP</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Ranges de Pontuação -->
+            <div class="card mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt"></i> Ranges de Pontuação Especial por Período
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Configure pontuações especiais para períodos específicos (ex: Black Friday, Natal, etc)</p>
+
+                    <?php if (!empty($config['ranges'])): ?>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Período</th>
+                                        <th>Pontuação Customizada</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($config['ranges'] as $index => $range): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($range['nome']) ?></strong></td>
+                                            <td>
+                                                <?= date('d/m/Y', strtotime($range['data_inicio'])) ?>
+                                                até
+                                                <?= date('d/m/Y', strtotime($range['data_fim'])) ?>
+                                            </td>
+                                            <td>
+                                                <small>
+                                                    <?php if (isset($range['pontos'])): ?>
+                                                        1v: <?= $range['pontos']['1vaga'] ?? 0 ?>,
+                                                        2-3v: <?= $range['pontos']['2vagas'] ?? 0 ?>-<?= $range['pontos']['3vagas'] ?? 0 ?>,
+                                                        4-7v: <?= $range['pontos']['4vagas'] ?? 0 ?>-<?= $range['pontos']['7vagas'] ?? 0 ?>,
+                                                        8-10v: <?= $range['pontos']['8vagas'] ?? 0 ?>-<?= $range['pontos']['10vagas'] ?? 0 ?>,
+                                                        >10v: <?= $range['pontos']['acima_10'] ?? 0 ?>,
+                                                        Vista >5v: <?= $range['pontos']['vista_acima_5'] ?? 0 ?>
+                                                    <?php else: ?>
+                                                        <span class="text-danger">Sem pontuação configurada</span>
+                                                    <?php endif; ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <?php if ($range['ativo']): ?>
+                                                    <span class="badge badge-success">Ativo</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">Inativo</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <form method="post" style="display: inline;">
+                                                    <input type="hidden" name="range_index" value="<?= $index ?>">
+                                                    <button type="submit" name="remover_range" class="btn btn-sm btn-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-muted">Nenhum range configurado</p>
+                    <?php endif; ?>
+
+                    <hr>
+
+                    <h6><i class="fas fa-plus-circle"></i> Adicionar Novo Range</h6>
+                    <form method="post">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>Nome do Range *</label>
+                                    <input type="text" class="form-control" name="range_nome"
+                                           placeholder="Ex: Black Friday 2025" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Data Início *</label>
+                                    <input type="date" class="form-control" name="range_data_inicio" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Data Fim *</label>
+                                    <input type="date" class="form-control" name="range_data_fim" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-2">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" class="form-check-input" name="range_ativo"
+                                           id="range_ativo" checked>
+                                    <label class="form-check-label" for="range_ativo">Ativo</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Pontuação para este range:</strong> Configure quantos pontos cada venda vale durante este período
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>1 Vaga</label>
+                                    <input type="number" class="form-control" name="range_pontos_1vaga" value="1" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>2 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_2vagas" value="2" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>3 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_3vagas" value="2" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>4 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_4vagas" value="3" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>5 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_5vagas" value="3" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>6 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_6vagas" value="3" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>7 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_7vagas" value="3" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>8 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_8vagas" value="4" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>9 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_9vagas" value="4" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>10 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_10vagas" value="4" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Acima de 10 Vagas</label>
+                                    <input type="number" class="form-control" name="range_pontos_acima_10" value="4" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Vista (acima 5 vagas)</label>
+                                    <input type="number" class="form-control" name="range_pontos_vista_acima_5" value="5" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" name="adicionar_range" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Adicionar Range
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <!-- Botão Salvar -->
             <div class="card">
                 <div class="card-body text-center">
