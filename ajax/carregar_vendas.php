@@ -45,6 +45,7 @@ try {
             'status' => $venda['status'],
             'titular_mascarado' => mascararNome($venda['titular']),
             'tipo_pagamento' => $venda['tipo_pagamento'],
+            'forma_pagamento' => $venda['forma_pagamento'] ?? '',
             'num_parcelas' => $venda['quantidade_parcelas_venda'], // CORRETO
             'primeira_parcela_paga' => $venda['primeira_parcela_paga'],
             'valor_pago' => $venda['valor_pago']

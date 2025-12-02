@@ -419,15 +419,36 @@ $(document).ready(function() {
                             location.reload();
                         }
 
-                        // Auto-submit ao completar 4 dígitos
-                        document.getElementById('pin_input').addEventListener('input', function(e) {
+                        // Auto-submit ao completar 4 dígitos (com delay maior)
+                        let autoSubmitTimeout = null;
+                        const pinInput = document.getElementById('pin_input');
+
+                        pinInput.addEventListener('input', function(e) {
                             this.value = this.value.replace(/\D/g, '');
+
+                            // Cancela timeout anterior se existir
+                            if (autoSubmitTimeout) {
+                                clearTimeout(autoSubmitTimeout);
+                            }
+
                             if (this.value.length === 4) {
-                                setTimeout(() => {
+                                // Aguarda 1.5 segundo antes de submeter
+                                autoSubmitTimeout = setTimeout(() => {
                                     if (this.value.length === 4) {
                                         this.form.submit();
                                     }
-                                }, 300);
+                                }, 1500);
+                            }
+                        });
+
+                        // Submit imediato ao pressionar Enter
+                        pinInput.addEventListener('keypress', function(e) {
+                            if (e.key === 'Enter' && this.value.length === 4) {
+                                // Cancela o auto-submit
+                                if (autoSubmitTimeout) {
+                                    clearTimeout(autoSubmitTimeout);
+                                }
+                                this.form.submit();
                             }
                         });
                         </script>
