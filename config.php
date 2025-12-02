@@ -445,23 +445,134 @@ function getLogoURL() {
 function listarCSVs($tipo = 'vendas') {
     $diretorio = $tipo === 'vendas' ? VENDAS_DIR : PROMOTORES_DIR;
     $arquivos = glob($diretorio . '/*.csv');
-    
+
+    // Carrega metadados do config.json
+    $config = carregarConfig();
+    $metadados = $config['arquivos_csv'][$tipo] ?? [];
+
     $lista = [];
     foreach ($arquivos as $arquivo) {
+        $nome_arquivo = basename($arquivo);
+
+        // Busca metadados do arquivo
+        $meta = null;
+        foreach ($metadados as $m) {
+            if ($m['arquivo'] === $nome_arquivo) {
+                $meta = $m;
+                break;
+            }
+        }
+
         $lista[] = [
             'caminho' => $arquivo,
-            'nome' => basename($arquivo),
+            'nome' => $nome_arquivo,
+            'nome_amigavel' => $meta['nome_amigavel'] ?? null,
+            'mes_referencia' => $meta['mes_referencia'] ?? null,
+            'slug' => $meta['slug'] ?? null,
             'data' => date('d/m/Y H:i:s', filemtime($arquivo)),
             'tamanho' => filesize($arquivo)
         ];
     }
-    
+
     // Ordena por data (mais recente primeiro)
     usort($lista, function($a, $b) {
         return filemtime($b['caminho']) - filemtime($a['caminho']);
     });
-    
+
     return $lista;
+}
+
+// Função para adicionar/atualizar metadados de arquivo CSV
+function salvarMetadadosCSV($tipo, $nome_arquivo, $nome_amigavel, $mes_referencia) {
+    $config = carregarConfig();
+
+    if (!isset($config['arquivos_csv'])) {
+        $config['arquivos_csv'] = ['vendas' => [], 'promotores' => []];
+    }
+    if (!isset($config['arquivos_csv'][$tipo])) {
+        $config['arquivos_csv'][$tipo] = [];
+    }
+
+    // Gera slug do nome amigável (para usar na URL)
+    $slug = gerarSlugArquivo($nome_amigavel);
+
+    // Remove metadados existentes do mesmo arquivo
+    $config['arquivos_csv'][$tipo] = array_filter(
+        $config['arquivos_csv'][$tipo],
+        function($m) use ($nome_arquivo) {
+            return $m['arquivo'] !== $nome_arquivo;
+        }
+    );
+
+    // Adiciona novos metadados
+    $config['arquivos_csv'][$tipo][] = [
+        'arquivo' => $nome_arquivo,
+        'nome_amigavel' => $nome_amigavel,
+        'slug' => $slug,
+        'mes_referencia' => $mes_referencia,
+        'data_cadastro' => date('Y-m-d H:i:s')
+    ];
+
+    // Reindexar array
+    $config['arquivos_csv'][$tipo] = array_values($config['arquivos_csv'][$tipo]);
+
+    return salvarConfig($config);
+}
+
+// Função para gerar slug do nome amigável
+function gerarSlugArquivo($nome) {
+    $slug = strtolower($nome);
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+    $slug = trim($slug, '-');
+    return $slug;
+}
+
+// Função para buscar arquivo por slug ou nome original
+function buscarArquivoCSV($tipo, $identificador) {
+    $arquivos = listarCSVs($tipo);
+
+    foreach ($arquivos as $arquivo) {
+        // Verifica se é o nome original
+        if ($arquivo['nome'] === $identificador) {
+            return $arquivo;
+        }
+        // Verifica se é o slug
+        if ($arquivo['slug'] === $identificador) {
+            return $arquivo;
+        }
+    }
+
+    return null;
+}
+
+// Função para calcular mensagem de data de corte automática
+function gerarMensagemDataCorte($mes_referencia) {
+    if (!$mes_referencia) {
+        return "Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior.";
+    }
+
+    // Parse do mês de referência (formato: YYYY-MM)
+    $data = DateTime::createFromFormat('Y-m', $mes_referencia);
+    if (!$data) {
+        return "Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior.";
+    }
+
+    // Adiciona 1 mês
+    $data->modify('+1 month');
+    $data->setDate($data->format('Y'), $data->format('m'), 7);
+
+    // Formata nomes dos meses em português
+    $meses = [
+        1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
+        5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
+        9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
+    ];
+
+    $mes_ref_obj = DateTime::createFromFormat('Y-m', $mes_referencia);
+    $mes_referencia_nome = $meses[(int)$mes_ref_obj->format('n')];
+    $mes_corte_nome = $meses[(int)$data->format('n')];
+
+    return "Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior. Ex: vendas de {$mes_referencia_nome} até 07 de {$mes_corte_nome}.";
 }
 
 // Função para formatar bytes
