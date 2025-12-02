@@ -869,7 +869,15 @@ function obterConfiguracaoPontosPorData($data_venda) {
         $data_fim->setTime(23, 59, 59); // Fim do dia
 
         if ($data >= $data_inicio && $data <= $data_fim) {
-            return $range['pontos'];
+            // Verifica se os pontos estão em um objeto "pontos" ou diretamente no range
+            if (isset($range['pontos']) && is_array($range['pontos'])) {
+                return $range['pontos'];
+            } else {
+                // Pontos estão diretamente no range - remove metadados
+                $pontos = $range;
+                unset($pontos['nome'], $pontos['data_inicio'], $pontos['data_fim'], $pontos['ativo'], $pontos['id']);
+                return $pontos;
+            }
         }
     }
 
