@@ -103,6 +103,11 @@ if (isset($_POST['adicionar_range'])) {
     ];
     
     $_SESSION['ranges_pontuacao'][] = $novo_range;
+
+    // Salva no config.json
+    $_SESSION['config_sistema']['ranges'] = $_SESSION['ranges_pontuacao'];
+    salvarConfiguracoes($_SESSION['config_sistema']);
+
     $mensagem_sucesso = "Range de pontuação '{$novo_range['nome']}' adicionado com sucesso!";
 }
 
@@ -113,6 +118,11 @@ if (isset($_POST['remover_range'])) {
         return $r['id'] !== $id_remover;
     });
     $_SESSION['ranges_pontuacao'] = array_values($_SESSION['ranges_pontuacao']);
+
+    // Salva no config.json
+    $_SESSION['config_sistema']['ranges'] = $_SESSION['ranges_pontuacao'];
+    salvarConfiguracoes($_SESSION['config_sistema']);
+
     $mensagem_sucesso = "Range de pontuação removido com sucesso!";
 }
 
