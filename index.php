@@ -39,6 +39,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 $paginas_disponiveis = [
     'home' => 'pages/home.php',
     'admin' => 'pages/admin.php',
+    'gestao_vendas' => 'pages/gestao_vendas.php',
     'consultores' => 'pages/consultores.php',
     'relatorio' => 'pages/relatorio.php',
     'top20' => 'pages/top20.php',
@@ -51,6 +52,7 @@ $paginas_disponiveis = [
 // Proteção de rotas
 $rotas_protegidas = [
     'admin' => 'admin',
+    'gestao_vendas' => 'admin',
     'consultores' => 'consultores'
 ];
 
@@ -188,6 +190,11 @@ if (verificarConsultores() && !verificarAdmin()) {
                         <li class="nav-item">
                             <a class="nav-link text-danger" href="?page=admin">
                                 <i class="fas fa-user-shield"></i> Admin
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-warning" href="?page=gestao_vendas">
+                                <i class="fas fa-tasks"></i> Gestão Vendas
                             </a>
                         </li>
                         <?php endif; ?>
