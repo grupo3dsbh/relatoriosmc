@@ -1,7 +1,6 @@
 <?php
-
-/*require_once 'config.php';
-
+// index.php - Router principal do sistema (ATUALIZADO)
+require_once 'config.php';
 
 // ===== CRIA DIRETÓRIO DATA SE NO EXISTIR =====
 if (!file_exists(DATA_DIR)) {
@@ -13,10 +12,6 @@ if (!file_exists(CONFIG_FILE)) {
     $config_padrao = obterConfigPadrao();
     file_put_contents(CONFIG_FILE, json_encode($config_padrao, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
-*/
-
-// index.php - Router principal do sistema (ATUALIZADO)
-require_once 'config.php';
 
 // Detecta qual página deve ser carregada
 $page = isset($_GET['page']) ? $_GET['page'] : 'home';
@@ -164,27 +159,13 @@ if (isset($rotas_protegidas[$page])) {
     </nav>
     
     <div class="container-fluid mt-4">
-        
-        <?php /*
+
+        <?php
         // ===== AVISO GLOBAL DE PREMIAÇÃO =====
         if (file_exists('includes/aviso_premiacao.php')) {
             include 'includes/aviso_premiacao.php';
         }
         ?>
-        
-        <?php
-        // Carrega a página solicitada
-        $arquivo_pagina = "pages/{$page}.php";
-        
-        if (file_exists($arquivo_pagina)) {
-            include $arquivo_pagina;
-        } else {
-            echo '<div class="alert alert-danger">';
-            echo '<i class="fas fa-exclamation-triangle"></i> ';
-            echo 'Página não encontrada!';
-            echo '</div>';
-        }
-      */  ?>
         
     </div>
     

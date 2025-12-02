@@ -312,9 +312,263 @@ if (isset($_POST['resetar_config'])) {
                 </div>
             </div>
             
-            <!-- Card: Configurações de Premiação (EXISTENTE - continue com o código atual) -->
-            <!-- ... resto dos cards existentes ... -->
-            
+            <!-- Card: Configurações de Premiação -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-trophy"></i> Configurações de Premiação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Pontos por Vaga</label>
+                                <input type="number" class="form-control" name="pontos_por_vaga"
+                                       value="<?= $config['premiacoes']['pontos_por_vaga'] ?? 3 ?>" min="1">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Pontos Venda à Vista</label>
+                                <input type="number" class="form-control" name="pontos_venda_vista"
+                                       value="<?= $config['premiacoes']['pontos_venda_vista'] ?? 2 ?>" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Vendas Necessárias para SAP</label>
+                                <input type="number" class="form-control" name="vendas_para_sap"
+                                       value="<?= $config['premiacoes']['vendas_para_sap'] ?? 21 ?>" min="1">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Vendas Necessárias para DIP</label>
+                                <input type="number" class="form-control" name="vendas_para_dip"
+                                       value="<?= $config['premiacoes']['vendas_para_dip'] ?? 500 ?>" min="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Mensagem de Premiação -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bell"></i> Aviso de Premiação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>Mensagem de Aviso Global</label>
+                        <textarea class="form-control" name="mensagem_premiacao" rows="3"><?= htmlspecialchars($config['premiacao']['mensagem'] ?? '') ?></textarea>
+                        <small class="form-text text-muted">Esta mensagem será exibida no topo de todas as páginas</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Dia Limite para 1ª Parcela</label>
+                                <input type="number" class="form-control" name="dia_limite_primeira_parcela"
+                                       value="<?= $config['premiacao']['dia_limite_primeira_parcela'] ?? 7 ?>"
+                                       min="1" max="31">
+                                <small class="form-text text-muted">Ex: 7 = até dia 07 do mês seguinte</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" name="exibir_aviso_premiacao"
+                                       id="exibir_aviso_premiacao"
+                                       <?= !empty($config['premiacao']['exibir_aviso']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="exibir_aviso_premiacao">
+                                    Exibir aviso nas páginas
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Campos Visíveis para Consultores -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-eye"></i> Campos Visíveis para Consultores
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_pontos"
+                                       id="campo_pontos"
+                                       <?= !empty($config['campos_visiveis_consultores']['pontos']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_pontos">Pontos</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_vendas"
+                                       id="campo_vendas"
+                                       <?= !empty($config['campos_visiveis_consultores']['vendas']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_vendas">Vendas</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_valor_total"
+                                       id="campo_valor_total"
+                                       <?= !empty($config['campos_visiveis_consultores']['valor_total']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_valor_total">Valor Total</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-2">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_valor_pago"
+                                       id="campo_valor_pago"
+                                       <?= !empty($config['campos_visiveis_consultores']['valor_pago']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_valor_pago">Valor Pago</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_detalhamento"
+                                       id="campo_detalhamento"
+                                       <?= !empty($config['campos_visiveis_consultores']['detalhamento']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_detalhamento">Detalhamento</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="campo_cotas_sap"
+                                       id="campo_cotas_sap"
+                                       <?= !empty($config['campos_visiveis_consultores']['cotas_sap']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="campo_cotas_sap">DIPs / Cotas SAP</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Ranges de Pontuação -->
+            <div class="card mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt"></i> Ranges de Pontuação Especial
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($config['ranges'])): ?>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Período</th>
+                                        <th>Multiplicador</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($config['ranges'] as $index => $range): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($range['nome']) ?></td>
+                                            <td>
+                                                <?= date('d/m/Y', strtotime($range['data_inicio'])) ?>
+                                                até
+                                                <?= date('d/m/Y', strtotime($range['data_fim'])) ?>
+                                            </td>
+                                            <td><?= $range['multiplicador'] ?>x</td>
+                                            <td>
+                                                <?php if ($range['ativo']): ?>
+                                                    <span class="badge badge-success">Ativo</span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">Inativo</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <form method="post" style="display: inline;">
+                                                    <input type="hidden" name="range_index" value="<?= $index ?>">
+                                                    <button type="submit" name="remover_range" class="btn btn-sm btn-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-muted">Nenhum range configurado</p>
+                    <?php endif; ?>
+
+                    <hr>
+
+                    <h6>Adicionar Novo Range</h6>
+                    <form method="post">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Nome</label>
+                                    <input type="text" class="form-control" name="range_nome" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Data Início</label>
+                                    <input type="date" class="form-control" name="range_data_inicio" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>Data Fim</label>
+                                    <input type="date" class="form-control" name="range_data_fim" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label>Multiplicador</label>
+                                    <input type="number" step="0.1" class="form-control" name="range_multiplicador"
+                                           value="1.5" min="0.1" required>
+                                </div>
+                            </div>
+
+                            <div class="col-md-1">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" class="form-check-input" name="range_ativo"
+                                           id="range_ativo" checked>
+                                    <label class="form-check-label" for="range_ativo">Ativo</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" name="adicionar_range" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Adicionar Range
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <!-- Botão Salvar -->
             <div class="card">
                 <div class="card-body text-center">
