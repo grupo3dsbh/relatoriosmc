@@ -17,6 +17,42 @@ function garantirChaveAtivoRanges(&$ranges) {
     }
 }
 
+/**
+ * Garante que todos os ranges tenham um ID único
+ * Gera ID se não existir
+ */
+function garantirIDRanges(&$ranges) {
+    if (!is_array($ranges)) {
+        return;
+    }
+
+    foreach ($ranges as &$range) {
+        if (!isset($range['id']) || empty($range['id'])) {
+            $range['id'] = uniqid('range_', true);
+        }
+    }
+}
+
+/**
+ * Extrai valor de pontos de um range, suportando ambos formatos:
+ * - Formato antigo: $range['pontos']['1vaga']
+ * - Formato novo: $range['1vaga']
+ */
+function getPontoRange($range, $chave, $padrao = 0) {
+    // Verifica formato novo (direto)
+    if (isset($range[$chave])) {
+        return $range[$chave];
+    }
+
+    // Verifica formato antigo (nested)
+    if (isset($range['pontos']) && isset($range['pontos'][$chave])) {
+        return $range['pontos'][$chave];
+    }
+
+    // Retorna padrão
+    return $padrao;
+}
+
 // Processa login
 if (isset($_POST['login_admin'])) {
     $senha = $_POST['senha'] ?? '';
@@ -100,6 +136,9 @@ if (!isset($_SESSION['ranges_pontuacao'])) {
     $_SESSION['ranges_pontuacao'] = [];
 }
 
+// Garantir que todos os ranges tenham ID
+garantirIDRanges($_SESSION['ranges_pontuacao']);
+
 // Adicionar novo range
 if (isset($_POST['adicionar_range'])) {
     $novo_range = [
@@ -128,6 +167,7 @@ if (isset($_POST['adicionar_range'])) {
 
     // Salva no config.json
     garantirChaveAtivoRanges($_SESSION['ranges_pontuacao']);
+    garantirIDRanges($_SESSION['ranges_pontuacao']);
     $_SESSION['config_sistema']['ranges'] = $_SESSION['ranges_pontuacao'];
     salvarConfiguracoes($_SESSION['config_sistema']);
 
@@ -351,18 +391,18 @@ if (!verificarAdmin()):
                                 </td>
                                 <td>
                                     <small>
-                                        1v=<?= $range['pontos']['1vaga'] ?? 1 ?>,
-                                        2v=<?= $range['pontos']['2vagas'] ?? 2 ?>,
-                                        3v=<?= $range['pontos']['3vagas'] ?? 2 ?>,
-                                        4v=<?= $range['pontos']['4vagas'] ?? 3 ?>,
-                                        5v=<?= $range['pontos']['5vagas'] ?? 3 ?>,
-                                        6v=<?= $range['pontos']['6vagas'] ?? 3 ?>,
-                                        7v=<?= $range['pontos']['7vagas'] ?? 3 ?>,
-                                        8v=<?= $range['pontos']['8vagas'] ?? 4 ?>,
-                                        9v=<?= $range['pontos']['9vagas'] ?? 4 ?>,
-                                        10v=<?= $range['pontos']['10vagas'] ?? 4 ?>,
-                                        >10=<?= $range['pontos']['acima_10'] ?? 4 ?>,
-                                        >5(vista)=<?= $range['pontos']['vista_acima_5'] ?? 5 ?>
+                                        1v=<?= getPontoRange($range, '1vaga', 1) ?>,
+                                        2v=<?= getPontoRange($range, '2vagas', 2) ?>,
+                                        3v=<?= getPontoRange($range, '3vagas', 2) ?>,
+                                        4v=<?= getPontoRange($range, '4vagas', 3) ?>,
+                                        5v=<?= getPontoRange($range, '5vagas', 3) ?>,
+                                        6v=<?= getPontoRange($range, '6vagas', 3) ?>,
+                                        7v=<?= getPontoRange($range, '7vagas', 3) ?>,
+                                        8v=<?= getPontoRange($range, '8vagas', 4) ?>,
+                                        9v=<?= getPontoRange($range, '9vagas', 4) ?>,
+                                        10v=<?= getPontoRange($range, '10vagas', 4) ?>,
+                                        >10=<?= getPontoRange($range, 'acima_10', 4) ?>,
+                                        >5(vista)=<?= getPontoRange($range, 'vista_acima_5', 5) ?>
                                     </small>
                                 </td>
                                 <td class="text-center">
