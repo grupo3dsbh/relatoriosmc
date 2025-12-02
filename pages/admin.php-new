@@ -1,0 +1,568 @@
+<?php
+// No topo do arquivo, após os requires, adicione:
+require_once 'functions/configuracoes.php';
+
+// Carrega configuraes
+$config = carregarConfiguracoes();
+
+// Adicionar novo range
+if (isset($_POST['adicionar_range'])) {
+    $novo_range = [
+        'id' => uniqid(),
+        'nome' => $_POST['nome_range'],
+        'data_inicio' => $_POST['data_inicio_range'],
+        'data_fim' => $_POST['data_fim_range'],
+        'ativo' => isset($_POST['range_ativo']),
+        'pontos' => [
+            '1vaga_vista' => intval($_POST['range_1vaga_vista']),
+            '2a3_vagas' => intval($_POST['range_2a3_vagas']),
+            '4a7_vagas' => intval($_POST['range_4a7_vagas']),
+            '8a10_vagas' => intval($_POST['range_8a10_vagas']),
+            'acima_10' => intval($_POST['range_acima_10']),
+            'acima_5_vista' => intval($_POST['range_acima_5_vista'])
+        ]
+    ];
+    
+    $_SESSION['ranges_pontuacao'][] = $novo_range;
+    
+    // Salva no arquivo de configuração também
+    $config = carregarConfiguracoes();
+    $config['ranges'] = $_SESSION['ranges_pontuacao'];
+    salvarConfiguracoes($config);
+    
+    $mensagem_sucesso = "Range de pontuação '{$novo_range['nome']}' adicionado com sucesso!";
+}
+
+// Remover range
+if (isset($_POST['remover_range'])) {
+    $id_remover = $_POST['range_id'];
+    $_SESSION['ranges_pontuacao'] = array_filter($_SESSION['ranges_pontuacao'], function($r) use ($id_remover) {
+        return $r['id'] !== $id_remover;
+    });
+    $_SESSION['ranges_pontuacao'] = array_values($_SESSION['ranges_pontuacao']);
+    
+    // Salva no arquivo de configuração também
+    $config = carregarConfiguracoes();
+    $config['ranges'] = $_SESSION['ranges_pontuacao'];
+    salvarConfiguracoes($config);
+    
+    $mensagem_sucesso = "Range de pontuação removido com sucesso!";
+}
+
+// Alternar status do range
+if (isset($_POST['toggle_range_status'])) {
+    $id_toggle = $_POST['range_id'];
+    foreach ($_SESSION['ranges_pontuacao'] as &$range) {
+        if ($range['id'] === $id_toggle) {
+            $range['ativo'] = !($range['ativo'] ?? false);
+            break;
+        }
+    }
+    unset($range);
+    
+    // Salva no arquivo
+    $config = carregarConfiguracoes();
+    $config['ranges'] = $_SESSION['ranges_pontuacao'];
+    salvarConfiguracoes($config);
+    
+    $mensagem_sucesso = "Status do range alterado com sucesso!";
+}
+
+// ===== PROCESSAR SALVAMENTO DAS NOVAS CONFIGURAÇÕES =====
+if (isset($_POST['salvar_todas_configuracoes'])) {
+    
+    // Atualiza configuraões de acesso
+    $config['acesso'] = [
+        'relatorio_padrao' => $_POST['relatorio_padrao'] ?? 'top20',
+        'senha_filtro' => trim($_POST['senha_filtro'] ?? ''),
+        'senha_godmode' => trim($_POST['senha_godmode'] ?? 'admin123')
+    ];
+    
+    // Atualiza configurações de premiação
+    $config['premiacao'] = [
+        'mensagem' => trim($_POST['mensagem_premiacao'] ?? ''),
+        'dia_limite_primeira_parcela' => intval($_POST['dia_limite_primeira_parcela'] ?? 7),
+        'exibir_aviso' => isset($_POST['exibir_aviso_premiacao'])
+    ];
+    
+    // Atualiza período padrão do relatório
+    $config['periodo_relatorio'] = [
+        'data_inicial' => $_POST['periodo_data_inicial'] ?? date('Y-m-01'),
+        'data_final' => $_POST['periodo_data_final'] ?? date('Y-m-t'),
+        'filtro_status' => $_POST['periodo_status'] ?? 'Ativo',
+        'apenas_primeira_parcela' => isset($_POST['periodo_primeira_parcela']),
+        'apenas_vista' => isset($_POST['periodo_apenas_vista'])
+    ];
+    
+    // Mantém configurações antigas para compatibilidade
+    $config['premiacoes'] = $_SESSION['config_premiacoes'];
+    $config['campos_visiveis_consultores'] = $_SESSION['campos_visiveis_consultores'];
+    $config['ranges'] = $_SESSION['ranges_pontuacao'];
+    
+    // Salva configurações
+    $resultado = salvarConfiguracoes($config);
+    
+    if ($resultado['sucesso']) {
+        $mensagem_sucesso = $resultado['mensagem'];
+        $config = carregarConfiguracoes();
+    } else {
+        $mensagem_erro = $resultado['mensagem'];
+    }
+}
+
+// ===== EXPORTAR/IMPORTAR/RESETAR =====
+if (isset($_GET['exportar_config'])) {
+    exportarConfiguracoes();
+}
+
+if (isset($_POST['importar_configuracoes']) && isset($_FILES['arquivo_config'])) {
+    $arquivo_temp = $_FILES['arquivo_config']['tmp_name'];
+    $resultado = importarConfiguracoes($arquivo_temp);
+    
+    if ($resultado['sucesso']) {
+        $mensagem_sucesso = $resultado['mensagem'];
+        $config = carregarConfiguracoes();
+    } else {
+        $mensagem_erro = $resultado['mensagem'];
+    }
+}
+
+if (isset($_POST['resetar_configuracoes'])) {
+    $resultado = resetarConfiguracoes();
+    if ($resultado['sucesso']) {
+        $mensagem_sucesso = "Configurações resetadas para padrão!";
+        $config = carregarConfiguracoes();
+    }
+}
+?>
+
+<!-- Adicione APÓS a seção "Configuraço de Premiações" e ANTES de "Configurações de Senha" -->
+
+<!-- Card: Informações do Sistema -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Informações do Sistema
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="mb-1"><strong>Arquivo de Configuração:</strong> <code><?= CONFIG_FILE ?></code></p>
+                        <p class="mb-1"><strong>Última Atualização:</strong> <?= $config['ultima_atualizacao'] ?? 'Nunca' ?></p>
+                        <p class="mb-0"><strong>Status:</strong> 
+                            <?php if (file_exists(CONFIG_FILE)): ?>
+                                <span class="badge badge-success">Operacional</span>
+                            <?php else: ?>
+                                <span class="badge badge-danger">Arquivo não encontrado</span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-right">
+                        <a href="?page=admin&exportar_config=1" class="btn btn-success btn-sm mb-2">
+                            <i class="fas fa-download"></i> Exportar Config
+                        </a>
+                        <button type="button" class="btn btn-primary btn-sm mb-2" data-toggle="modal" data-target="#modalImportarConfig">
+                            <i class="fas fa-upload"></i> Importar Config
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm mb-2" data-toggle="modal" data-target="#modalResetarConfig">
+                            <i class="fas fa-undo"></i> Resetar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card: Configurações de Acesso e Relatórios -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-lock"></i> Configurações de Acesso e Relatórios
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="formConfigGeral">
+                    
+                    <h6 class="mb-3"><i class="fas fa-chart-bar"></i> Relatório Padrão para Consultores</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Página Padrão</strong></label>
+                                <select class="form-control" name="relatorio_padrao">
+                                    <option value="top20" <?= ($config['acesso']['relatorio_padrao'] ?? 'top20') === 'top20' ? 'selected' : '' ?>>
+                                        Top 20 (Primeiros 20 consultores)
+                                    </option>
+                                    <option value="ranking_completo" <?= ($config['acesso']['relatorio_padrao'] ?? '') === 'ranking_completo' ? 'selected' : '' ?>>
+                                        Ranking Completo (Todos os consultores)
+                                    </option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Consultores serão redirecionados para este relatório automaticamente
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Acesso Especial:</strong><br>
+                                <small>
+                                    • Com <code>?godmode=SENHA</code> → Acesso total ao admin<br>
+                                    • Com <code>?filtro=CODIGO</code> → Acesso aos filtros
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="mb-3"><i class="fas fa-key"></i> Senhas de Acesso</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Senha GodMode (Admin)</strong></label>
+                                <input type="text" class="form-control" name="senha_godmode" 
+                                       value="<?= htmlspecialchars($config['acesso']['senha_godmode'] ?? 'admin123') ?>"
+                                       placeholder="admin123">
+                                <small class="form-text text-muted">
+                                    URL: <code>?godmode=<?= htmlspecialchars($config['acesso']['senha_godmode'] ?? 'admin123') ?></code>
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Senha para Liberar Filtros</strong></label>
+                                <input type="text" class="form-control" name="senha_filtro" 
+                                       value="<?= htmlspecialchars($config['acesso']['senha_filtro'] ?? '') ?>"
+                                       placeholder="Deixe vazio para desativar">
+                                <small class="form-text text-muted">
+                                    <?php if (!empty($config['acesso']['senha_filtro'])): ?>
+                                        URL: <code><?= gerarUrlComFiltro('ranking_completo') ?></code>
+                                    <?php else: ?>
+                                        Configure uma senha para gerar URL com filtros
+                                    <?php endif; ?>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="mb-3"><i class="fas fa-calendar"></i> Período Padrão do Relatório</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Data Inicial</strong></label>
+                                <input type="date" class="form-control" name="periodo_data_inicial" 
+                                       value="<?= $config['periodo_relatorio']['data_inicial'] ?? date('Y-m-01') ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Data Final</strong></label>
+                                <input type="date" class="form-control" name="periodo_data_final" 
+                                       value="<?= $config['periodo_relatorio']['data_final'] ?? date('Y-m-t') ?>">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label><strong>Status Padrão</strong></label>
+                                <select class="form-control" name="periodo_status">
+                                    <option value="" <?= empty($config['periodo_relatorio']['filtro_status']) ? 'selected' : '' ?>>
+                                        Todos
+                                    </option>
+                                    <option value="Ativo" <?= ($config['periodo_relatorio']['filtro_status'] ?? '') === 'Ativo' ? 'selected' : '' ?>>
+                                        Ativo
+                                    </option>
+                                    <option value="Inativo" <?= ($config['periodo_relatorio']['filtro_status'] ?? '') === 'Inativo' ? 'selected' : '' ?>>
+                                        Inativo
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check mt-4 pt-2">
+                                <input type="checkbox" class="form-check-input" name="periodo_primeira_parcela" 
+                                       id="periodo_primeira_parcela"
+                                       <?= !empty($config['periodo_relatorio']['apenas_primeira_parcela']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="periodo_primeira_parcela">
+                                    <strong>Apenas com 1ª Parcela Paga</strong>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check mt-4 pt-2">
+                                <input type="checkbox" class="form-check-input" name="periodo_apenas_vista" 
+                                       id="periodo_apenas_vista"
+                                       <?= !empty($config['periodo_relatorio']['apenas_vista']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="periodo_apenas_vista">
+                                    <strong>Apenas Vendas à Vista</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="mb-3"><i class="fas fa-bullhorn"></i> Mensagem de Premiação</h6>
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label><strong>Mensagem do Aviso</strong></label>
+                                <textarea class="form-control" name="mensagem_premiacao" rows="3"><?= htmlspecialchars($config['premiacao']['mensagem'] ?? '') ?></textarea>
+                                <small class="form-text text-muted">
+                                    Esta mensagem será exibida em todas as páginas para consultores
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Dia Limite 1ª Parcela (mês seguinte)</strong></label>
+                                <input type="number" class="form-control" name="dia_limite_primeira_parcela" 
+                                       value="<?= $config['premiacao']['dia_limite_primeira_parcela'] ?? 7 ?>"
+                                       min="1" max="31">
+                                <small class="form-text text-muted">
+                                    Ex: Dia 7 = vendas de Nov contam se 1ª parcela paga até 07/Dez
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-check mt-4 pt-2">
+                                <input type="checkbox" class="form-check-input" name="exibir_aviso_premiacao" 
+                                       id="exibir_aviso_premiacao"
+                                       <?= !empty($config['premiacao']['exibir_aviso']) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="exibir_aviso_premiacao">
+                                    <strong>Exibir aviso nas páginas</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" name="salvar_todas_configuracoes" class="btn btn-danger btn-lg btn-block">
+                        <i class="fas fa-save"></i> Salvar Todas as Configurações
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card: Senha de Acesso dos Consultores -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-key"></i> Senha de Acesso dos Consultores
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-lock"></i> Senha Atual
+                                </label>
+                                <input type="text" class="form-control form-control-lg" 
+                                       value="<?= htmlspecialchars($_SESSION['senha_consultores'] ?? 'consultores123') ?>" 
+                                       disabled>
+                                <small class="form-text text-muted">
+                                    Esta é a senha que os consultores usam para acessar o sistema
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-edit"></i> Nova Senha
+                                </label>
+                                <input type="text" class="form-control form-control-lg" name="nova_senha" 
+                                       placeholder="Digite a nova senha" required>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label>&nbsp;</label>
+                            <button type="submit" name="alterar_senha_consultores" class="btn btn-warning btn-lg btn-block">
+                                <i class="fas fa-save"></i> Alterar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mb-0 mt-3">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Importante:</strong> Ao alterar a senha, todos os consultores precisarão usar a nova senha para acessar o sistema.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card: Upload de Arquivos CSV -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-upload"></i> Upload CSV de Vendas
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-file-csv"></i> Selecione o Arquivo CSV
+                        </label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" name="csv_vendas" 
+                                   id="csv_vendas" accept=".csv" required>
+                            <label class="custom-file-label" for="csv_vendas">Escolher arquivo...</label>
+                        </div>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i> Formato esperado: Exportação de vendas do sistema
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>Colunas esperadas:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>NumeroTitulo, NomeProduto, DataVenda</li>
+                            <li>Promotor, StatusTitulo, ValorTotal</li>
+                            <li>TotalPago, Parcelas, ParcelasPagas</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" name="upload_vendas" class="btn btn-primary btn-lg btn-block">
+                        <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Vendas
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-upload"></i> Upload CSV de Promotores
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-file-csv"></i> Selecione o Arquivo CSV
+                        </label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" name="csv_promotores" 
+                                   id="csv_promotores" accept=".csv" required>
+                            <label class="custom-file-label" for="csv_promotores">Escolher arquivo...</label>
+                        </div>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i> Lista de promotores/consultores com CPF e telefone
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>Colunas esperadas:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Nome_Promotor, Documento (CPF)</li>
+                            <li>Celular (Telefone)</li>
+                            <li>Status, Comissão, etc</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" name="upload_promotores" class="btn btn-info btn-lg btn-block">
+                        <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Promotores
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script para atualizar nome do arquivo no input -->
+<script>
+$(document).ready(function() {
+    // Atualiza label do input file quando arquivo é selecionado
+    $('.custom-file-input').on('change', function() {
+        var fileName = $(this).val().split('\\').pop();
+        $(this).siblings('.custom-file-label').addClass('selected').html(fileName);
+    });
+});
+</script>
+
+<!-- Modals -->
+<div class="modal fade" id="modalImportarConfig">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" enctype="multipart/form-data">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Importar Configurações</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Selecione o arquivo JSON:</label>
+                        <input type="file" class="form-control-file" name="arquivo_config" accept=".json" required>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção:</strong> Isso substituirá TODAS as configurações atuais!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="importar_configuracoes" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Importar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalResetarConfig">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">Resetar Configurações</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção:</strong> Isso irá restaurar TODAS as configurações para os valores padrão!
+                    </div>
+                    <p>Tem certeza que deseja continuar?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="resetar_configuracoes" class="btn btn-warning">
+                        <i class="fas fa-undo"></i> Sim, Resetar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
