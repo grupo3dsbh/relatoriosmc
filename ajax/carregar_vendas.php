@@ -31,17 +31,18 @@ try {
 
     $vendas_retorno = [];
     foreach ($vendas_consultor as $venda) {
-        $data = DateTime::createFromFormat('Y-m-d H:i:s.u', $venda['data_venda']);
+        // Usa data_cadastro para exibição (data_para_filtro já é usada internamente)
+        $data = DateTime::createFromFormat('Y-m-d H:i:s.u', $venda['data_cadastro']);
         if (!$data) {
-            $data = DateTime::createFromFormat('Y-m-d H:i:s', $venda['data_venda']);
+            $data = DateTime::createFromFormat('Y-m-d H:i:s', $venda['data_cadastro']);
         }
-        
+
         $vendas_retorno[] = [
             'id' => $venda['id'],
             'produto_atual' => $venda['produto_atual'],
             'produto_original' => $venda['produto_original'],
             'produto_alterado' => $venda['produto_alterado'],
-            'data_venda_formatada' => $data ? $data->format('d/m/Y H:i') : $venda['data_venda'],
+            'data_cadastro_formatada' => $data ? $data->format('d/m/Y H:i') : $venda['data_cadastro'],
             'status' => $venda['status'],
             'titular_mascarado' => mascararNome($venda['titular']),
             'tipo_pagamento' => $venda['tipo_pagamento'],

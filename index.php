@@ -167,7 +167,7 @@ if (verificarConsultores() && !verificarAdmin()) {
                     ?>
 
                     <?php if (!$e_consultor || $tem_acesso_especial || verificarAdmin()): ?>
-                        <!-- Menu completo para admin e consultores com acesso especial -->
+                        <!-- Menu principal -->
                         <li class="nav-item">
                             <a class="nav-link" href="?page=home">
                                 <i class="fas fa-home"></i> Início
@@ -186,24 +186,6 @@ if (verificarConsultores() && !verificarAdmin()) {
                             </a>
                         </li>
 
-                        <?php if (verificarAdmin()): ?>
-                        <li class="nav-item">
-                            <a class="nav-link text-danger" href="?page=admin">
-                                <i class="fas fa-user-shield"></i> Admin
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-warning" href="?page=gestao_vendas">
-                                <i class="fas fa-tasks"></i> Gestão Vendas
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-info" href="?page=configuracoes">
-                                <i class="fas fa-cog"></i> Configurações
-                            </a>
-                        </li>
-                        <?php endif; ?>
-
                         <li class="nav-item">
                             <a class="nav-link" href="?page=consultores">
                                 <i class="fas fa-users"></i> Consultores
@@ -211,16 +193,40 @@ if (verificarConsultores() && !verificarAdmin()) {
                         </li>
                     <?php endif; ?>
 
-                    <!-- Sempre visível -->
+                    <!-- Consultar Vendas - sempre visível -->
                     <li class="nav-item">
                         <a class="nav-link" href="?page=detalhes_vendas">
                             <i class="fas fa-search"></i> Consultar Vendas
                         </a>
                     </li>
 
+                    <?php if (verificarAdmin()): ?>
+                        <!-- Separador visual -->
+                        <li class="nav-item">
+                            <span class="nav-link text-muted px-2">|</span>
+                        </li>
+
+                        <!-- Menu administrativo -->
+                        <li class="nav-item">
+                            <a class="nav-link text-warning" href="?page=gestao_vendas">
+                                <i class="fas fa-tasks"></i> Gestão
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-info" href="?page=configuracoes">
+                                <i class="fas fa-cog"></i> Config
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-danger" href="?page=admin">
+                                <i class="fas fa-user-shield"></i> Admin
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
                     <?php if (verificarAdmin() || verificarConsultores()): ?>
                     <li class="nav-item">
-                        <a class="nav-link text-warning" href="?page=logout">
+                        <a class="nav-link text-secondary" href="?page=logout">
                             <i class="fas fa-sign-out-alt"></i> Sair
                         </a>
                     </li>

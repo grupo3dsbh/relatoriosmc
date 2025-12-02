@@ -781,10 +781,11 @@ $(document).ready(function() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($vendas_consultor as $venda): 
-                                        $data = DateTime::createFromFormat('Y-m-d H:i:s.u', $venda['data_venda']);
+                                    <?php foreach ($vendas_consultor as $venda):
+                                        // Usa data_cadastro para exibição
+                                        $data = DateTime::createFromFormat('Y-m-d H:i:s.u', $venda['data_cadastro']);
                                         if (!$data) {
-                                            $data = DateTime::createFromFormat('Y-m-d H:i:s', $venda['data_venda']);
+                                            $data = DateTime::createFromFormat('Y-m-d H:i:s', $venda['data_cadastro']);
                                         }
                                     ?>
                                     <tr data-tipo-pagamento="<?= htmlspecialchars($venda['tipo_pagamento']) ?>"
@@ -801,7 +802,7 @@ $(document).ready(function() {
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <?= $data ? $data->format('d/m/Y H:i') : $venda['data_venda'] ?>
+                                            <?= $data ? $data->format('d/m/Y H:i') : $venda['data_cadastro'] ?>
                                         </td>
                                         <td>
                                             <span class="badge badge-<?= $venda['status'] === 'Ativo' ? 'success' : 'danger' ?>">

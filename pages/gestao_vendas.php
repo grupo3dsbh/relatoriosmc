@@ -333,7 +333,7 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
                                 ?>
                                 <tr class="<?= $classe_linha ?>">
                                     <td><small><?= htmlspecialchars($venda['id']) ?></small></td>
-                                    <td><small><?= date('d/m/Y', strtotime($venda['data_venda'])) ?></small></td>
+                                    <td><small><?= date('d/m/Y', strtotime($venda['data_cadastro'])) ?></small></td>
                                     <td><?= htmlspecialchars($venda['titular']) ?></td>
                                     <td><small><?= htmlspecialchars($venda['cpf']) ?></small></td>
                                     <td><small><?= htmlspecialchars($venda['produto_atual']) ?></small></td>

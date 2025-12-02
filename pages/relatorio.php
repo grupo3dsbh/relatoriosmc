@@ -860,7 +860,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                     <td><?= htmlspecialchars($reg['titular']) ?></td>
                                     <td><?= $reg['id'] ?></td>
                                     <td><?= htmlspecialchars($reg['consultor']) ?></td>
-                                    <td><?= date('d/m/Y H:i', strtotime($reg['data_venda'])) ?></td>
+                                    <td><?= date('d/m/Y H:i', strtotime($reg['data_cadastro'])) ?></td>
                                     <td><small><?= htmlspecialchars($reg['produto']) ?></small></td>
                                     <td class="text-right">R$ <?= number_format($reg['valor_total'], 2, ',', '.') ?></td>
                                     <td>
@@ -1429,6 +1429,7 @@ jQuery(document).ready(function($) {
                                 <th>Status</th>
                                 <th>Titular</th>
                                 <th>Tipo Pag.</th>
+                                <th>Forma Pag.</th>
                                 <th class="text-center">Parc.</th>
                                 <th class="text-center">1ª?</th>
                                 <th class="text-right">Vlr. Pago</th>
@@ -1436,7 +1437,7 @@ jQuery(document).ready(function($) {
                         </thead>
                         <tbody id="corpoTabelaVendas">
                             <tr>
-                                <td colspan="9" class="text-center">
+                                <td colspan="10" class="text-center">
                                     <i class="fas fa-spinner fa-spin"></i> Carregando vendas...
                                 </td>
                             </tr>
@@ -1523,7 +1524,7 @@ jQuery(document).ready(function($) {
                                         `<br><span class="badge badge-warning badge-sm">Alterado de ${venda.produto_original} </span>` : 
                                         ''}
                                 </td>
-                                <td><small>${venda.data_venda_formatada}</small></td>
+                                <td><small>${venda.data_cadastro_formatada}</small></td>
                                 <td>
                                     <span class="badge badge-${venda.status === 'Ativo' ? 'success' : 'danger'} badge-sm">
                                         ${venda.status}
@@ -1534,6 +1535,9 @@ jQuery(document).ready(function($) {
                                     <span class="badge badge-${tipoPagSimples === 'Vista' ? 'success' : 'info'} badge-sm">
                                         ${tipoPagSimples}
                                     </span>
+                                </td>
+                                <td>
+                                    <small>${venda.forma_pagamento || '-'}</small>
                                 </td>
                                 <td class="text-center"><small>${venda.num_parcelas}x</small></td>
                                 <td class="text-center">
