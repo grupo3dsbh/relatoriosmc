@@ -328,18 +328,41 @@ function obterCidadesPromotores($promotores) {
  */
 function formatarTelefone($telefone) {
     $telefone = preg_replace('/\D/', '', $telefone);
-    
+
     if (empty($telefone)) {
         return 'No informado';
     }
-    
+
     if (strlen($telefone) == 11) {
         return '(' . substr($telefone, 0, 2) . ') ' . substr($telefone, 2, 5) . '-' . substr($telefone, 7, 4);
     } elseif (strlen($telefone) == 10) {
         return '(' . substr($telefone, 0, 2) . ') ' . substr($telefone, 2, 4) . '-' . substr($telefone, 6, 4);
     }
-    
+
     return $telefone;
+}
+
+/**
+ * Cria link de WhatsApp com telefone formatado
+ * Adiciona +55 automaticamente para números brasileiros
+ */
+function formatarTelefoneWhatsApp($telefone) {
+    $telefone_limpo = preg_replace('/\D/', '', $telefone);
+
+    if (empty($telefone_limpo)) {
+        return '<span class="text-muted">Não informado</span>';
+    }
+
+    // Formata para exibição
+    $telefone_formatado = formatarTelefone($telefone);
+
+    // Monta link WhatsApp com +55
+    $telefone_whatsapp = '55' . $telefone_limpo;
+    $link_whatsapp = "https://wa.me/{$telefone_whatsapp}";
+
+    return '<a href="' . $link_whatsapp . '" target="_blank" class="text-success" title="Abrir WhatsApp">' .
+           '<i class="fab fa-whatsapp"></i> ' . $telefone_formatado .
+           '</a>';
 }
 
 /**
