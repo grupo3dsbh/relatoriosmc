@@ -41,7 +41,7 @@ function detectarDuplicidadesPorCPF($vendas) {
     $por_cpf = [];
 
     foreach ($vendas as $venda) {
-        $cpf = preg_replace('/[^0-9]/', '', $venda['cpf_titular']);
+        $cpf = preg_replace('/[^0-9]/', '', $venda['cpf'] ?? '');
         if (empty($cpf)) continue;
 
         if (!isset($por_cpf[$cpf])) {
@@ -59,8 +59,8 @@ function detectarDuplicidadesPorCPF($vendas) {
     foreach ($duplicados as $cpf => &$grupo) {
         usort($grupo, function($a, $b) {
             // Prioriza: primeira parcela paga > data mais recente
-            $a_pago = !empty($a['valor_pago_entrada']) && $a['valor_pago_entrada'] > 0;
-            $b_pago = !empty($b['valor_pago_entrada']) && $b['valor_pago_entrada'] > 0;
+            $a_pago = !empty($a['valor_pago']) && $a['valor_pago'] > 0;
+            $b_pago = !empty($b['valor_pago']) && $b['valor_pago'] > 0;
 
             if ($a_pago != $b_pago) {
                 return $b_pago - $a_pago; // Pago vem primeiro
@@ -86,7 +86,7 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
     if (!empty($filtros['cpf'])) {
         $cpf_busca = preg_replace('/[^0-9]/', '', $filtros['cpf']);
         $resultado = array_filter($resultado, function($v) use ($cpf_busca) {
-            $cpf = preg_replace('/[^0-9]/', '', $v['cpf_titular']);
+            $cpf = preg_replace('/[^0-9]/', '', $v['cpf'] ?? '');
             return strpos($cpf, $cpf_busca) !== false;
         });
     }
@@ -94,7 +94,7 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
     // Filtro por status
     if (!empty($filtros['status'])) {
         $resultado = array_filter($resultado, function($v) use ($filtros) {
-            return strcasecmp($v['status'], $filtros['status']) === 0;
+            return strcasecmp($v['status'] ?? '', $filtros['status']) === 0;
         });
     }
 
@@ -117,7 +117,7 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
     if ($filtros['apenas_duplicadas']) {
         $cpfs_duplicados = array_keys($duplicidades);
         $resultado = array_filter($resultado, function($v) use ($cpfs_duplicados) {
-            $cpf = preg_replace('/[^0-9]/', '', $v['cpf_titular']);
+            $cpf = preg_replace('/[^0-9]/', '', $v['cpf'] ?? '');
             return in_array($cpf, $cpfs_duplicados);
         });
     }
@@ -275,7 +275,7 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($vendas_filtradas as $venda):
-                                    $cpf_limpo = preg_replace('/[^0-9]/', '', $venda['cpf_titular']);
+                                    $cpf_limpo = preg_replace('/[^0-9]/', '', $venda['cpf'] ?? '');
                                     $e_duplicada = isset($duplicidades[$cpf_limpo]);
                                     $e_principal = false;
 
@@ -288,7 +288,7 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
                                         }
                                     }
 
-                                    $tem_primeira_parcela = !empty($venda['valor_pago_entrada']) && $venda['valor_pago_entrada'] > 0;
+                                    $tem_primeira_parcela = !empty($venda['valor_pago']) && $venda['valor_pago'] > 0;
 
                                     $classe_linha = '';
                                     if ($e_principal) {
@@ -300,8 +300,8 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
                                 <tr class="<?= $classe_linha ?>">
                                     <td><small><?= htmlspecialchars($venda['id']) ?></small></td>
                                     <td><small><?= date('d/m/Y', strtotime($venda['data_venda'])) ?></small></td>
-                                    <td><?= htmlspecialchars($venda['nome_titular']) ?></td>
-                                    <td><small><?= htmlspecialchars($venda['cpf_titular']) ?></small></td>
+                                    <td><?= htmlspecialchars($venda['titular']) ?></td>
+                                    <td><small><?= htmlspecialchars($venda['cpf']) ?></small></td>
                                     <td><small><?= htmlspecialchars($venda['produto_atual']) ?></small></td>
                                     <td><small><?= htmlspecialchars($venda['consultor']) ?></small></td>
                                     <td>
@@ -312,13 +312,13 @@ function aplicarFiltrosGestao($vendas, $filtros, $duplicidades) {
                                     <td class="text-center">
                                         <?php if ($tem_primeira_parcela): ?>
                                             <i class="fas fa-check-circle text-success" title="Pago"></i>
-                                            <small>R$ <?= number_format($venda['valor_pago_entrada'], 2, ',', '.') ?></small>
+                                            <small>R$ <?= number_format($venda['valor_pago'], 2, ',', '.') ?></small>
                                         <?php else: ?>
                                             <i class="fas fa-times-circle text-danger" title="Não pago"></i>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
-                                        <small>R$ <?= number_format($venda['valor_total_plano'], 2, ',', '.') ?></small>
+                                        <small>R$ <?= number_format($venda['valor_total'], 2, ',', '.') ?></small>
                                     </td>
                                     <td class="text-center">
                                         <?php if ($e_principal): ?>
