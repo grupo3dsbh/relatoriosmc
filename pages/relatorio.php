@@ -860,7 +860,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                     <td><?= htmlspecialchars($reg['titular']) ?></td>
                                     <td><?= $reg['id'] ?></td>
                                     <td><?= htmlspecialchars($reg['consultor']) ?></td>
-                                    <td><?= date('d/m/Y H:i', strtotime($reg['data_venda'])) ?></td>
+                                    <td><?= date('d/m/Y H:i', strtotime($reg['data_cadastro'])) ?></td>
                                     <td><small><?= htmlspecialchars($reg['produto']) ?></small></td>
                                     <td class="text-right">R$ <?= number_format($reg['valor_total'], 2, ',', '.') ?></td>
                                     <td>
@@ -1524,7 +1524,7 @@ jQuery(document).ready(function($) {
                                         `<br><span class="badge badge-warning badge-sm">Alterado de ${venda.produto_original} </span>` : 
                                         ''}
                                 </td>
-                                <td><small>${venda.data_venda_formatada}</small></td>
+                                <td><small>${venda.data_cadastro_formatada}</small></td>
                                 <td>
                                     <span class="badge badge-${venda.status === 'Ativo' ? 'success' : 'danger'} badge-sm">
                                         ${venda.status}
