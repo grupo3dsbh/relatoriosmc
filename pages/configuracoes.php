@@ -781,16 +781,18 @@ if (isset($_POST['resetar_config'])) {
                                             </td>
                                             <td>
                                                 <small>
-                                                    <?php if (isset($range['pontos'])): ?>
-                                                        1v: <?= $range['pontos']['1vaga'] ?? 0 ?>,
-                                                        2-3v: <?= $range['pontos']['2vagas'] ?? 0 ?>-<?= $range['pontos']['3vagas'] ?? 0 ?>,
-                                                        4-7v: <?= $range['pontos']['4vagas'] ?? 0 ?>-<?= $range['pontos']['7vagas'] ?? 0 ?>,
-                                                        8-10v: <?= $range['pontos']['8vagas'] ?? 0 ?>-<?= $range['pontos']['10vagas'] ?? 0 ?>,
-                                                        >10v: <?= $range['pontos']['acima_10'] ?? 0 ?>,
-                                                        Vista >5v: <?= $range['pontos']['vista_acima_5'] ?? 0 ?>
-                                                    <?php else: ?>
-                                                        <span class="text-danger">Sem pontuação configurada</span>
-                                                    <?php endif; ?>
+                                                    <?php
+                                                    // Suporta ambos formatos: pontos nested ou diretos
+                                                    $getPonto = function($key) use ($range) {
+                                                        return $range['pontos'][$key] ?? $range[$key] ?? 0;
+                                                    };
+                                                    ?>
+                                                    1v: <?= $getPonto('1vaga') ?>,
+                                                    2-3v: <?= $getPonto('2vagas') ?>-<?= $getPonto('3vagas') ?>,
+                                                    4-7v: <?= $getPonto('4vagas') ?>-<?= $getPonto('7vagas') ?>,
+                                                    8-10v: <?= $getPonto('8vagas') ?>-<?= $getPonto('10vagas') ?>,
+                                                    >10v: <?= $getPonto('acima_10') ?>,
+                                                    Vista >5v: <?= $getPonto('vista_acima_5') ?>
                                                 </small>
                                             </td>
                                             <td>

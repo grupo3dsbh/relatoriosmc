@@ -268,14 +268,18 @@ function processarVendasCSV($arquivo, $filtros = []) {
             // Processa dados adicionais
             $venda['num_vagas'] = extrairNumeroVagas($venda['produto_atual']);
             $venda['e_vista'] = (
-                $venda['tipo_pagamento'] === 'À Vista' || 
+                $venda['tipo_pagamento'] === 'À Vista' ||
                 stripos($venda['tipo_pagamento'], 'vista') !== false ||
                 $venda['quantidade_parcelas_venda'] <= 1
             );
             $venda['primeira_parcela_paga'] = ($venda['parcelas_pagas'] > 0);
             $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
-            
+
+            // IMPORTANTE: Se o produto foi alterado, usa DataCadastro para filtros de data
+            // Isso evita que vendas alteradas sejam filtradas por terem DataVenda fora do período
+            $venda['data_para_filtro'] = $venda['produto_alterado'] ? $venda['data_cadastro'] : $venda['data_venda'];
+
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
             
@@ -300,19 +304,25 @@ function processarVendasCSV($arquivo, $filtros = []) {
                     'devido' => 0,
                     'pago' => 0,
                     'quantidade' => 0,
+                    'vendas_ativas' => 0,  // Contador de vendas com status "Ativo"
                     'contagem_vagas' => [],
                     'vendas_detalhes' => [],
                     'vendas_ids' => [],
                     'vendas_acima_2vagas' => 0
                 ];
             }
-            
+
             $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
             $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
             $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
             $por_consultor[$consultor_nome]['quantidade']++;
             $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
-            
+
+            // Conta vendas com status "Ativo"
+            if ($venda['status'] === 'Ativo') {
+                $por_consultor[$consultor_nome]['vendas_ativas']++;
+            }
+
             if ($venda['num_vagas'] > 2) {
                 $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
             }
@@ -418,29 +428,33 @@ function aplicarFiltros($venda, $filtros) {
     
     // Filtro de data inicial
     if (!empty($filtros['data_inicial'])) {
-        $data_venda = strtotime($venda['data_venda']);
+        // Usa data_para_filtro se disponível (DataCadastro para títulos alterados, DataVenda para normais)
+        $data_comparacao = $venda['data_para_filtro'] ?? $venda['data_venda'];
+        $data_venda = strtotime($data_comparacao);
         $data_inicial_filter = strtotime($filtros['data_inicial'] . ' 00:00:00');
-        
+
         if ($data_venda < $data_inicial_filter) {
             return [
-                'passa' => false, 
-                'motivo' => 'Data anterior ao filtro (' . 
-                           date('d/m/Y', $data_venda) . ' < ' . 
+                'passa' => false,
+                'motivo' => 'Data anterior ao filtro (' .
+                           date('d/m/Y', $data_venda) . ' < ' .
                            date('d/m/Y', $data_inicial_filter) . ')'
             ];
         }
     }
-    
+
     // Filtro de data final
     if (!empty($filtros['data_final'])) {
-        $data_venda = strtotime($venda['data_venda']);
+        // Usa data_para_filtro se disponível (DataCadastro para títulos alterados, DataVenda para normais)
+        $data_comparacao = $venda['data_para_filtro'] ?? $venda['data_venda'];
+        $data_venda = strtotime($data_comparacao);
         $data_final_filter = strtotime($filtros['data_final'] . ' 23:59:59');
-        
+
         if ($data_venda > $data_final_filter) {
             return [
-                'passa' => false, 
-                'motivo' => 'Data posterior ao filtro (' . 
-                           date('d/m/Y', $data_venda) . ' > ' . 
+                'passa' => false,
+                'motivo' => 'Data posterior ao filtro (' .
+                           date('d/m/Y', $data_venda) . ' > ' .
                            date('d/m/Y', $data_final_filter) . ')'
             ];
         }

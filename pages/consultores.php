@@ -241,8 +241,7 @@ $cidades_list = obterCidadesPromotores($promotores_data['promotores']);
                                     </td>
                                     <td>
                                         <small>
-                                            <i class="fas fa-phone"></i>
-                                            <?= formatarTelefone($promotor['telefone']) ?>
+                                            <?= formatarTelefoneWhatsApp($promotor['telefone']) ?>
                                         </small>
                                     </td>
                                     <td>
@@ -257,7 +256,7 @@ $cidades_list = obterCidadesPromotores($promotores_data['promotores']);
                                         <button type="button" class="btn btn-sm btn-info"
                                                 data-toggle="modal"
                                                 data-target="#modalDetalhes"
-                                                data-promotor='<?= json_encode($promotor, JSON_HEX_APOS | JSON_HEX_QUOT) ?>'>
+                                                data-promotor="<?= htmlspecialchars(json_encode($promotor), ENT_QUOTES) ?>">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </td>
@@ -347,7 +346,8 @@ $(document).ready(function() {
     // Preenche modal com detalhes do promotor
     $('#modalDetalhes').on('show.bs.modal', function (event) {
         const button = $(event.relatedTarget);
-        const promotor = button.data('promotor');
+        const promotorData = button.attr('data-promotor');
+        const promotor = JSON.parse(promotorData);
         
         const html = `
             <div class="row">
@@ -390,7 +390,12 @@ $(document).ready(function() {
                     <table class="table table-sm">
                         <tr>
                             <th>Telefone:</th>
-                            <td>${promotor.telefone || 'Não informado'}</td>
+                            <td>${promotor.telefone ?
+                                `<a href="https://wa.me/55${promotor.telefone.replace(/\\D/g, '')}" target="_blank" class="text-success" title="Abrir WhatsApp">
+                                    <i class="fab fa-whatsapp"></i> ${promotor.telefone}
+                                </a>` :
+                                '<span class="text-muted">Não informado</span>'}
+                            </td>
                         </tr>
                         <tr>
                             <th>Rua:</th>
