@@ -153,11 +153,14 @@ function processarPromotoresCSV($arquivo) {
         }
         
         fclose($handle);
-        
+
          "<!-- PROMOTORES: " . count($promotores) . " promotores processados -->";
     }
-    
-    return ['promotores' => $promotores];
+
+    return [
+        'promotores' => $promotores,
+        'total' => count($promotores)
+    ];
 }
 
 /**

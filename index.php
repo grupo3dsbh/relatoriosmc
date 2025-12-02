@@ -1,5 +1,6 @@
 <?php
 // index.php - Router principal do sistema (ATUALIZADO)
+ob_start(); // Inicia buffer de saída para permitir header() redirects
 require_once 'config.php';
 
 // ===== CRIA DIRETÓRIO DATA SE NO EXISTIR =====
@@ -232,9 +233,28 @@ if (verificarConsultores() && !verificarAdmin()) {
     </div>
     
     <!-- Footer -->
-    <footer class="text-center text-white mt-5 no-print">
-        <p>&copy; <?= date('Y') ?> Aquabeat - Sistema de Vendas v1.0</p>
-        <small>Desenvolvido com <i class="fas fa-heart text-danger"></i></small>
+    <footer class="bg-dark text-white mt-5 py-4 no-print">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6 text-center text-md-left">
+                    <h5 class="mb-2">MCAQUABEAT CONSULTORIA LTDA</h5>
+                    <p class="mb-1">
+                        <small>CNPJ: 01.453.236/0001-60</small>
+                    </p>
+                    <p class="mb-0">
+                        <small>&copy; <?= date('Y') ?> Todos os direitos reservados.</small>
+                    </p>
+                </div>
+                <div class="col-md-6 text-center text-md-right">
+                    <p class="mb-1">
+                        <i class="fas fa-trophy"></i> <strong>Sistema de Gestão de Vendas Aquabeat</strong>
+                    </p>
+                    <p class="mb-0">
+                        <small class="text-muted">Versão 1.0 | Desenvolvido com <i class="fas fa-heart text-danger"></i></small>
+                    </p>
+                </div>
+            </div>
+        </div>
     </footer>
     
     <!-- Scripts -->
@@ -245,3 +265,4 @@ if (verificarConsultores() && !verificarAdmin()) {
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
 </body>
 </html>
+<?php ob_end_flush(); // Flush buffer de saída ?>

@@ -3,6 +3,7 @@
 
 require_once 'functions/vendas.php';
 require_once 'functions/promotores.php';
+require_once 'functions/pin_manager.php';
 
 // Inicializa variáveis de sessão
 if (!isset($_SESSION['detalhes_vendas'])) {
@@ -96,6 +97,7 @@ if (isset($_POST['definir_pin'])) {
         definirPINConsultor($consultor_nome, $pin, $dados_promotor['cpf'] ?? null, $dados_promotor['telefone'] ?? null);
 
         // Avança para vendas
+        $_SESSION['detalhes_vendas']['consultor_selecionado'] = $consultor_nome;
         $_SESSION['detalhes_vendas']['passo'] = 3;
         $passo_atual = 3;
         $mensagem_sucesso = "PIN criado com sucesso! Nas próximas vezes use seu PIN de 4 dígitos.";
