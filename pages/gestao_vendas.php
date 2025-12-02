@@ -34,6 +34,40 @@ $filtros = [
 
 $vendas_filtradas = aplicarFiltrosGestao($vendas_data, $filtros, $duplicidades);
 
+// Ordena por CPF e prioriza vendas principais
+usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
+    $cpf_a = preg_replace('/[^0-9]/', '', $a['cpf'] ?? '');
+    $cpf_b = preg_replace('/[^0-9]/', '', $b['cpf'] ?? '');
+
+    // Primeiro ordena por CPF
+    $cmp_cpf = strcmp($cpf_a, $cpf_b);
+    if ($cmp_cpf !== 0) {
+        return $cmp_cpf;
+    }
+
+    // Mesmo CPF: verifica se alguma é principal
+    $a_principal = false;
+    $b_principal = false;
+
+    if (isset($duplicidades[$cpf_a])) {
+        foreach ($duplicidades[$cpf_a] as $v) {
+            if ($v['id'] === $a['id'] && isset($v['e_principal'])) {
+                $a_principal = true;
+            }
+            if ($v['id'] === $b['id'] && isset($v['e_principal'])) {
+                $b_principal = true;
+            }
+        }
+    }
+
+    // Principal vem primeiro
+    if ($a_principal && !$b_principal) return -1;
+    if (!$a_principal && $b_principal) return 1;
+
+    // Se ambas são principais ou nenhuma é, mantém ordem original (por data)
+    return strtotime($b['data_venda']) - strtotime($a['data_venda']);
+});
+
 /**
  * Detecta vendas duplicadas pelo CPF do titular
  */
