@@ -13,24 +13,31 @@ function extrairNumeroVagas($produto) {
 
 /**
  * Processa CSV de vendas detalhadas
- * Estrutura do CSV:
+ * Estrutura do CSV (24 campos, índices 0-23):
  * 0: ID (SFA-XXXX)
  * 1: NomeProdutoOriginal
  * 2: NomeProdutoAtual
- * 5: DataVenda
- * 6: DataAtualizacao
+ * 3: AlterouVagas
+ * 4: Categoria
+ * 5: DataCadastro
+ * 6: DataVenda
+ * 7: OrigemVenda
+ * 8: Telefone
  * 9: StatusTitulo
  * 10: NomeConsultor
+ * 11: Gerente
  * 12: NomeTitular
  * 13: CPF
- * 17: ValorParcela
- * 18: NumeroParcelas
- * 19: TipoPagamento
- * 20: ValorTotalPlano
- * 21: ValorDevidoTotal
- * 22: ValorPagoEntrada
- * 23: ValorRestante
- * 24: NumeroParcelasRestantes
+ * 14: QuantidadeParcelasVenda
+ * 15: Parcelas (lista)
+ * 16: ValoresPagos
+ * 17: ParcelasPagas
+ * 18: TipoPagamento
+ * 19: ValorParcela
+ * 20: ValorTotal
+ * 21: ValorPago
+ * 22: ValorRestante
+ * 23: ParcelasRestantes
  */
  
  /**
@@ -212,14 +219,14 @@ function processarVendasCSV($arquivo, $filtros = []) {
                 'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
                 'parcelas' => trim($dados[15] ?? ''),
                 'valores_pagos' => trim($dados[16] ?? ''),
-                'forma_pagamento' => trim($dados[17] ?? ''),
-                'parcelas_pagas' => intval($dados[18] ?? 0),
-                'tipo_pagamento' => trim($dados[19] ?? ''),
-                'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
-                'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
-                'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
-                'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),
-                'parcelas_restantes' => intval($dados[24] ?? 0)
+                'parcelas_pagas' => intval($dados[17] ?? 0),
+                'tipo_pagamento' => trim($dados[18] ?? ''),
+                'valor_parcela' => floatval(str_replace(',', '.', $dados[19] ?? 0)),
+                'valor_total' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                'valor_pago' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
+                'valor_restante' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
+                'parcelas_restantes' => intval($dados[23] ?? 0),
+                'forma_pagamento' => '' // Removido do CSV - campo não existe mais
             ];
             
             // Debug da primeira venda

@@ -1183,7 +1183,7 @@ jQuery(document).ready(function($) {
                             <h2 class="mb-1"><i class="fas fa-trophy"></i> ${consultor.saps || 0}</h2>
                             <small>Títulos SAP Recebidos</small>
                             <hr class="bg-white my-1">
-                            <small>A cada <?= $_SESSION['config_premiacoes']['pontos_por_sap'] ?> pontos = 1 SAP</small>
+                            <small>A cada <?= $_SESSION['config_premiacoes']['pontos_por_sap'] ?? 21 ?> pontos = 1 SAP</small>
                         </div>
                     </div>
                 </div>
