@@ -14,6 +14,24 @@ if (!file_exists(CONFIG_FILE)) {
     file_put_contents(CONFIG_FILE, json_encode($config_padrao, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 
+// ===== LIMPAR CACHE/SESSÃO =====
+if (isset($_GET['limpar_cache'])) {
+    // Limpa toda a sessão
+    session_unset();
+    session_destroy();
+
+    // Inicia nova sessão
+    session_start();
+
+    // Recarrega configurações do arquivo
+    inicializarConfiguracoes();
+
+    // Redireciona para home com mensagem
+    $_SESSION['mensagem_sucesso'] = 'Cache e sessão limpos com sucesso! Configurações recarregadas.';
+    header('Location: index.php');
+    exit;
+}
+
 // Detecta qual página deve ser carregada
 $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 
