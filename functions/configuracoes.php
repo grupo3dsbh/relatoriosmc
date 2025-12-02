@@ -100,6 +100,11 @@ function obterConfigPadrao() {
             'senha_godmode' => 'admin123', // Senha para modo admin
             'senha_admin_setores' => 'aquabeat' // Senha para setores acessarem dados de consultores
         ],
+        'premiacoes' => [
+            'pontos_por_sap' => 21,
+            'vendas_para_dip' => 30,
+            'vendas_acima_2vagas_para_dip' => 20
+        ],
         'premiacao' => [
             'mensagem' => 'Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior. Ex: vendas de Novembro até 07 de Dezembro.',
             'dia_limite_primeira_parcela' => 7,
