@@ -131,20 +131,6 @@ if (isset($_POST['excluir_arquivo'])) {
     }
 }
 
-// Processa salvamento de metadados CSV
-if (isset($_POST['salvar_metadados_csv'])) {
-    $tipo = $_POST['tipo_arquivo'];
-    $nome_arquivo = $_POST['nome_arquivo'];
-    $nome_amigavel = $_POST['nome_amigavel'];
-    $mes_referencia = $_POST['mes_referencia'] ?? '';
-
-    if (salvarMetadadosCSV($tipo, $nome_arquivo, $nome_amigavel, $mes_referencia)) {
-        $mensagem_sucesso = "Metadados salvos com sucesso!";
-    } else {
-        $erro_upload = "Erro ao salvar metadados!";
-    }
-}
-
 // Gerenciamento de Ranges de Pontuação
 if (!isset($_SESSION['ranges_pontuacao'])) {
     $_SESSION['ranges_pontuacao'] = [];
@@ -841,48 +827,26 @@ if (!verificarAdmin()):
                             <thead class="thead-light">
                                 <tr>
                                     <th><i class="fas fa-file"></i> Arquivo</th>
-                                    <th><i class="fas fa-tag"></i> Nome Amigável</th>
-                                    <th><i class="fas fa-calendar-alt"></i> Mês Ref.</th>
-                                    <th><i class="fas fa-calendar"></i> Upload</th>
+                                    <th><i class="fas fa-calendar"></i> Data</th>
                                     <th><i class="fas fa-hdd"></i> Tamanho</th>
                                     <th class="text-center"><i class="fas fa-tools"></i> Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($arquivos_vendas as $idx => $arquivo): ?>
+                                <?php foreach ($arquivos_vendas as $arquivo): ?>
                                 <tr>
                                     <td>
                                         <i class="fas fa-file-csv text-success"></i>
-                                        <small><?= htmlspecialchars($arquivo['nome']) ?></small>
+                                        <?= htmlspecialchars($arquivo['nome']) ?>
                                     </td>
-                                    <td>
-                                        <?php if ($arquivo['nome_amigavel']): ?>
-                                            <strong><?= htmlspecialchars($arquivo['nome_amigavel']) ?></strong>
-                                        <?php else: ?>
-                                            <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if ($arquivo['mes_referencia']): ?>
-                                            <?= date('m/Y', strtotime($arquivo['mes_referencia'] . '-01')) ?>
-                                        <?php else: ?>
-                                            <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><small><?= $arquivo['data'] ?></small></td>
+                                    <td><?= $arquivo['data'] ?></td>
                                     <td><?= formatarBytes($arquivo['tamanho']) ?></td>
                                     <td class="text-center">
-                                        <button class="btn btn-sm btn-warning"
-                                                data-toggle="modal"
-                                                data-target="#modalEditarVendas<?= $idx ?>"
-                                                title="Editar nome">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <a href="?page=relatorio&arquivo=<?= urlencode($arquivo['slug'] ?? $arquivo['nome']) ?>"
+                                        <a href="?page=relatorio&arquivo=<?= urlencode($arquivo['nome']) ?>" 
                                            class="btn btn-sm btn-primary" title="Processar">
                                             <i class="fas fa-chart-line"></i>
                                         </a>
-                                        <form method="post" style="display: inline;"
+                                        <form method="post" style="display: inline;" 
                                               onsubmit="return confirm('Deseja realmente excluir este arquivo?');">
                                             <input type="hidden" name="arquivo_path" value="<?= htmlspecialchars($arquivo['caminho']) ?>">
                                             <button type="submit" name="excluir_arquivo" class="btn btn-sm btn-danger" title="Excluir">
@@ -891,62 +855,6 @@ if (!verificarAdmin()):
                                         </form>
                                     </td>
                                 </tr>
-
-                                <!-- Modal para editar metadados -->
-                                <div class="modal fade" id="modalEditarVendas<?= $idx ?>" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <form method="post">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">
-                                                        <i class="fas fa-edit"></i> Editar Metadados
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal">
-                                                        <span>&times;</span>
-                                                    </button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <input type="hidden" name="tipo_arquivo" value="vendas">
-                                                    <input type="hidden" name="nome_arquivo" value="<?= htmlspecialchars($arquivo['nome']) ?>">
-
-                                                    <div class="form-group">
-                                                        <label><strong>Arquivo:</strong></label>
-                                                        <p class="form-control-plaintext"><small><?= htmlspecialchars($arquivo['nome']) ?></small></p>
-                                                    </div>
-
-                                                    <div class="form-group">
-                                                        <label>Nome Amigável *</label>
-                                                        <input type="text"
-                                                               class="form-control"
-                                                               name="nome_amigavel"
-                                                               value="<?= htmlspecialchars($arquivo['nome_amigavel'] ?? '') ?>"
-                                                               placeholder="Ex: Vendas Novembro 2025"
-                                                               required>
-                                                        <small class="text-muted">Este nome será exibido na seleção de arquivos</small>
-                                                    </div>
-
-                                                    <div class="form-group">
-                                                        <label>Mês de Referência *</label>
-                                                        <input type="month"
-                                                               class="form-control"
-                                                               name="mes_referencia"
-                                                               value="<?= htmlspecialchars($arquivo['mes_referencia'] ?? '') ?>"
-                                                               required>
-                                                        <small class="text-muted">Usado para calcular data de corte da premiação</small>
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                                                        Cancelar
-                                                    </button>
-                                                    <button type="submit" name="salvar_metadados_csv" class="btn btn-primary">
-                                                        <i class="fas fa-save"></i> Salvar
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -980,28 +888,20 @@ if (!verificarAdmin()):
                             <thead class="thead-light">
                                 <tr>
                                     <th><i class="fas fa-file"></i> Arquivo</th>
-                                    <th><i class="fas fa-tag"></i> Nome Amigável</th>
-                                    <th><i class="fas fa-calendar"></i> Upload</th>
+                                    <th><i class="fas fa-calendar"></i> Data</th>
                                     <th><i class="fas fa-hdd"></i> Tamanho</th>
                                     <th><i class="fas fa-users"></i> Promotores</th>
                                     <th class="text-center"><i class="fas fa-tools"></i> Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($arquivos_promotores as $idx => $arquivo): ?>
+                                <?php foreach ($arquivos_promotores as $arquivo): ?>
                                 <tr>
                                     <td>
                                         <i class="fas fa-file-csv text-info"></i>
-                                        <small><?= htmlspecialchars($arquivo['nome']) ?></small>
+                                        <?= htmlspecialchars($arquivo['nome']) ?>
                                     </td>
-                                    <td>
-                                        <?php if ($arquivo['nome_amigavel']): ?>
-                                            <strong><?= htmlspecialchars($arquivo['nome_amigavel']) ?></strong>
-                                        <?php else: ?>
-                                            <span class="text-muted">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><small><?= $arquivo['data'] ?></small></td>
+                                    <td><?= $arquivo['data'] ?></td>
                                     <td><?= formatarBytes($arquivo['tamanho']) ?></td>
                                     <td>
                                         <?php
@@ -1016,13 +916,7 @@ if (!verificarAdmin()):
                                         ?>
                                     </td>
                                     <td class="text-center">
-                                        <button class="btn btn-sm btn-warning"
-                                                data-toggle="modal"
-                                                data-target="#modalEditarPromotores<?= $idx ?>"
-                                                title="Editar nome">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <form method="post" style="display: inline;"
+                                        <form method="post" style="display: inline;" 
                                               onsubmit="return confirm('Deseja realmente excluir este arquivo?');">
                                             <input type="hidden" name="arquivo_path" value="<?= htmlspecialchars($arquivo['caminho']) ?>">
                                             <button type="submit" name="excluir_arquivo" class="btn btn-sm btn-danger" title="Excluir">
@@ -1031,53 +925,6 @@ if (!verificarAdmin()):
                                         </form>
                                     </td>
                                 </tr>
-
-                                <!-- Modal para editar metadados promotores -->
-                                <div class="modal fade" id="modalEditarPromotores<?= $idx ?>" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <form method="post">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">
-                                                        <i class="fas fa-edit"></i> Editar Nome do Arquivo
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal">
-                                                        <span>&times;</span>
-                                                    </button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <input type="hidden" name="tipo_arquivo" value="promotores">
-                                                    <input type="hidden" name="nome_arquivo" value="<?= htmlspecialchars($arquivo['nome']) ?>">
-                                                    <input type="hidden" name="mes_referencia" value="">
-
-                                                    <div class="form-group">
-                                                        <label><strong>Arquivo:</strong></label>
-                                                        <p class="form-control-plaintext"><small><?= htmlspecialchars($arquivo['nome']) ?></small></p>
-                                                    </div>
-
-                                                    <div class="form-group">
-                                                        <label>Nome Amigável *</label>
-                                                        <input type="text"
-                                                               class="form-control"
-                                                               name="nome_amigavel"
-                                                               value="<?= htmlspecialchars($arquivo['nome_amigavel'] ?? '') ?>"
-                                                               placeholder="Ex: Promotores Novembro 2025"
-                                                               required>
-                                                        <small class="text-muted">Este nome será exibido na seleção de arquivos</small>
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                                                        Cancelar
-                                                    </button>
-                                                    <button type="submit" name="salvar_metadados_csv" class="btn btn-primary">
-                                                        <i class="fas fa-save"></i> Salvar
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
