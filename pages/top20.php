@@ -33,11 +33,19 @@ if (!empty($arquivos_vendas)) {
         $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
         // Ordena e pega top 20
+        // Prioriza consultores com vendas ativas, depois por pontos
         usort($vendas_processadas['por_consultor'], function($a, $b) {
-            if ($b['pontos'] == $a['pontos']) {
-                return $b['quantidade'] <=> $a['quantidade'];
+            // Prioridade 1: Consultores com vendas ativas no topo
+            if ($a['vendas_ativas'] > 0 && $b['vendas_ativas'] == 0) return -1;
+            if ($a['vendas_ativas'] == 0 && $b['vendas_ativas'] > 0) return 1;
+
+            // Prioridade 2: Pontos
+            if ($b['pontos'] != $a['pontos']) {
+                return $b['pontos'] <=> $a['pontos'];
             }
-            return $b['pontos'] <=> $a['pontos'];
+
+            // Desempate: Quantidade
+            return $b['quantidade'] <=> $a['quantidade'];
         });
 
         $vendas_processadas['por_consultor'] = array_slice($vendas_processadas['por_consultor'], 0, 20);

@@ -304,19 +304,25 @@ function processarVendasCSV($arquivo, $filtros = []) {
                     'devido' => 0,
                     'pago' => 0,
                     'quantidade' => 0,
+                    'vendas_ativas' => 0,  // Contador de vendas com status "Ativo"
                     'contagem_vagas' => [],
                     'vendas_detalhes' => [],
                     'vendas_ids' => [],
                     'vendas_acima_2vagas' => 0
                 ];
             }
-            
+
             $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
             $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
             $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
             $por_consultor[$consultor_nome]['quantidade']++;
             $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
-            
+
+            // Conta vendas com status "Ativo"
+            if ($venda['status'] === 'Ativo') {
+                $por_consultor[$consultor_nome]['vendas_ativas']++;
+            }
+
             if ($venda['num_vagas'] > 2) {
                 $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
             }

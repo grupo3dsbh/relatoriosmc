@@ -211,13 +211,35 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             echo "</div>"; // Fecha alert-info
         }
         // ===== FIM DEBUG =====
-        
-        // Ordena por pontos (maior para menor)
-        usort($vendas_processadas['por_consultor'], function($a, $b) {
-            if ($b['pontos'] == $a['pontos']) {
+
+        // Parâmetro de ordenação (pontos ou quantidade)
+        $ordem_por = $_POST['ordenar_por'] ?? 'pontos';
+
+        // Ordena consultores com lógica inteligente:
+        // 1. Consultores com vendas ativas ficam no topo
+        // 2. Ordena por pontos OU quantidade (conforme escolha)
+        // 3. Desempate final por quantidade
+        usort($vendas_processadas['por_consultor'], function($a, $b) use ($ordem_por) {
+            // Prioridade 1: Consultores com vendas ativas no topo
+            if ($a['vendas_ativas'] > 0 && $b['vendas_ativas'] == 0) return -1;
+            if ($a['vendas_ativas'] == 0 && $b['vendas_ativas'] > 0) return 1;
+
+            // Prioridade 2: Ordena por pontos ou quantidade
+            if ($ordem_por === 'quantidade') {
+                // Ordem por quantidade de vendas
+                if ($b['quantidade'] != $a['quantidade']) {
+                    return $b['quantidade'] <=> $a['quantidade'];
+                }
+                // Desempate por pontos
+                return $b['pontos'] <=> $a['pontos'];
+            } else {
+                // Ordem por pontos (padrão)
+                if ($b['pontos'] != $a['pontos']) {
+                    return $b['pontos'] <=> $a['pontos'];
+                }
+                // Desempate por quantidade
                 return $b['quantidade'] <=> $a['quantidade'];
             }
-            return $b['pontos'] <=> $a['pontos'];
         });
         
         $mensagem_sucesso = "Relatório processado com sucesso! " . 
@@ -373,9 +395,31 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                             </div>
                                         </div>
                                     </div>
-                                    
+
+                                    <!-- Ordenação -->
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label>
+                                                    <i class="fas fa-sort"></i> Ordenar Por
+                                                </label>
+                                                <select class="form-control" name="ordenar_por">
+                                                    <option value="pontos" <?= ($_POST['ordenar_por'] ?? 'pontos') === 'pontos' ? 'selected' : '' ?>>
+                                                        Pontos (padrão)
+                                                    </option>
+                                                    <option value="quantidade" <?= ($_POST['ordenar_por'] ?? '') === 'quantidade' ? 'selected' : '' ?>>
+                                                        Quantidade de Vendas
+                                                    </option>
+                                                </select>
+                                                <small class="form-text text-muted">
+                                                    <i class="fas fa-info-circle"></i> Consultores com vendas ativas sempre ficam no topo
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <hr>
-                                    
+
                                     <!-- Botões de Ação -->
                                     <div class="row">
                                         <div class="col-md-6">
