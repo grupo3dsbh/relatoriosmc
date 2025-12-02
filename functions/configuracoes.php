@@ -106,8 +106,8 @@ function obterConfigPadrao() {
             'exibir_aviso' => true
         ],
         'periodo_relatorio' => [
-            'data_inicial' => date('Y-m-01'), // Primeiro dia do mês atual
-            'data_final' => date('Y-m-t'), // Último dia do mês atual
+            'data_inicial' => date('Y-m-01', strtotime('first day of last month')), // Primeiro dia do mês anterior
+            'data_final' => date('Y-m-t', strtotime('last day of last month')), // Último dia do mês anterior
             'filtro_status' => 'Ativo',
             'apenas_primeira_parcela' => false,
             'apenas_vista' => false

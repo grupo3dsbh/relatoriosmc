@@ -198,6 +198,9 @@ if (isset($_SESSION['config_sistema']['tipos_premiacao'])) {
                             <th class="text-center">DIPs</th>
                         <?php endif; ?>
                     <?php endif; ?>
+                    <?php if ($campos_visiveis['detalhamento']): ?>
+                        <th class="text-center">Ações</th>
+                    <?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -238,6 +241,14 @@ if (isset($_SESSION['config_sistema']['tipos_premiacao'])) {
                             <strong><?= $consultor['dips'] ?? 0 ?></strong>
                         </td>
                         <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php if ($campos_visiveis['detalhamento']): ?>
+                        <td class="text-center">
+                            <a href="?page=detalhes_vendas" class="btn btn-sm btn-info" title="Ver minhas vendas detalhadas">
+                                <i class="fas fa-eye"></i> Ver Detalhes
+                            </a>
+                        </td>
                     <?php endif; ?>
                 </tr>
                 <?php endforeach; ?>

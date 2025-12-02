@@ -87,12 +87,18 @@ if (isset($_POST['adicionar_range'])) {
         'data_inicio' => $_POST['data_inicio_range'],
         'data_fim' => $_POST['data_fim_range'],
         'pontos' => [
-            '1vaga_vista' => intval($_POST['range_1vaga_vista']),
-            '2a3_vagas' => intval($_POST['range_2a3_vagas']),
-            '4a7_vagas' => intval($_POST['range_4a7_vagas']),
-            '8a10_vagas' => intval($_POST['range_8a10_vagas']),
-            'acima_10' => intval($_POST['range_acima_10']),
-            'acima_5_vista' => intval($_POST['range_acima_5_vista'])
+            '1vaga' => intval($_POST['range_1vaga'] ?? 1),
+            '2vagas' => intval($_POST['range_2vagas'] ?? 2),
+            '3vagas' => intval($_POST['range_3vagas'] ?? 2),
+            '4vagas' => intval($_POST['range_4vagas'] ?? 3),
+            '5vagas' => intval($_POST['range_5vagas'] ?? 3),
+            '6vagas' => intval($_POST['range_6vagas'] ?? 3),
+            '7vagas' => intval($_POST['range_7vagas'] ?? 3),
+            '8vagas' => intval($_POST['range_8vagas'] ?? 4),
+            '9vagas' => intval($_POST['range_9vagas'] ?? 4),
+            '10vagas' => intval($_POST['range_10vagas'] ?? 4),
+            'acima_10' => intval($_POST['range_acima_10'] ?? 4),
+            'vista_acima_5' => intval($_POST['range_vista_acima_5'] ?? 5)
         ]
     ];
     
@@ -184,9 +190,14 @@ if (!verificarAdmin()):
 
 <div class="row">
     <div class="col-md-12">
-        <div class="alert alert-success">
-            <i class="fas fa-check-circle"></i>
-            <strong>Bem-vindo ao Painel Administrativo!</strong> Você está autenticado como administrador.
+        <div class="alert alert-success d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-check-circle"></i>
+                <strong>Bem-vindo ao Painel Administrativo!</strong> Você está autenticado como administrador.
+            </div>
+            <a href="?page=configuracoes" class="btn btn-primary btn-sm">
+                <i class="fas fa-cog"></i> Configurações Detalhadas
+            </a>
         </div>
     </div>
 </div>
@@ -294,12 +305,18 @@ if (!verificarAdmin()):
                                 </td>
                                 <td>
                                     <small>
-                                        1v(vista)=<?= $range['pontos']['1vaga_vista'] ?>, 
-                                        2-3=<?= $range['pontos']['2a3_vagas'] ?>, 
-                                        4-7=<?= $range['pontos']['4a7_vagas'] ?>, 
-                                        8-10=<?= $range['pontos']['8a10_vagas'] ?>, 
-                                        >10=<?= $range['pontos']['acima_10'] ?>, 
-                                        >5(vista)=<?= $range['pontos']['acima_5_vista'] ?>
+                                        1v=<?= $range['pontos']['1vaga'] ?? 1 ?>,
+                                        2v=<?= $range['pontos']['2vagas'] ?? 2 ?>,
+                                        3v=<?= $range['pontos']['3vagas'] ?? 2 ?>,
+                                        4v=<?= $range['pontos']['4vagas'] ?? 3 ?>,
+                                        5v=<?= $range['pontos']['5vagas'] ?? 3 ?>,
+                                        6v=<?= $range['pontos']['6vagas'] ?? 3 ?>,
+                                        7v=<?= $range['pontos']['7vagas'] ?? 3 ?>,
+                                        8v=<?= $range['pontos']['8vagas'] ?? 4 ?>,
+                                        9v=<?= $range['pontos']['9vagas'] ?? 4 ?>,
+                                        10v=<?= $range['pontos']['10vagas'] ?? 4 ?>,
+                                        >10=<?= $range['pontos']['acima_10'] ?? 4 ?>,
+                                        >5(vista)=<?= $range['pontos']['vista_acima_5'] ?? 5 ?>
                                     </small>
                                 </td>
                                 <td class="text-center">
@@ -357,35 +374,66 @@ if (!verificarAdmin()):
                                     </div>
                                 </div>
                                 
+                                <h6 class="mb-2"><strong>Pontuação por Quantidade de Vagas:</strong></h6>
                                 <div class="row">
-                                    <div class="col-md-2">
-                                        <label class="small"><strong>1 vaga (à vista)</strong></label>
-                                        <input type="number" class="form-control" name="range_1vaga_vista" 
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>1 vaga</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_1vaga"
                                                value="1" min="0" required>
                                     </div>
-                                    <div class="col-md-2">
-                                        <label class="small"><strong>2-3 vagas</strong></label>
-                                        <input type="number" class="form-control" name="range_2a3_vagas" 
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>2 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_2vagas"
                                                value="2" min="0" required>
                                     </div>
-                                    <div class="col-md-2">
-                                        <label class="small"><strong>4-7 vagas</strong></label>
-                                        <input type="number" class="form-control" name="range_4a7_vagas" 
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>3 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_3vagas"
+                                               value="2" min="0" required>
+                                    </div>
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>4 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_4vagas"
                                                value="3" min="0" required>
                                     </div>
-                                    <div class="col-md-2">
-                                        <label class="small"><strong>8-10 vagas</strong></label>
-                                        <input type="number" class="form-control" name="range_8a10_vagas" 
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>5 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_5vagas"
+                                               value="3" min="0" required>
+                                    </div>
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>6 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_6vagas"
+                                               value="3" min="0" required>
+                                    </div>
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>7 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_7vagas"
+                                               value="3" min="0" required>
+                                    </div>
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>8 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_8vagas"
                                                value="4" min="0" required>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>9 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_9vagas"
+                                               value="4" min="0" required>
+                                    </div>
+                                    <div class="col-md-2 col-6 mb-2">
+                                        <label class="small"><strong>10 vagas</strong></label>
+                                        <input type="number" class="form-control form-control-sm" name="range_10vagas"
+                                               value="4" min="0" required>
+                                    </div>
+                                    <div class="col-md-2 col-6 mb-2">
                                         <label class="small"><strong>Acima de 10</strong></label>
-                                        <input type="number" class="form-control" name="range_acima_10" 
+                                        <input type="number" class="form-control form-control-sm" name="range_acima_10"
                                                value="4" min="0" required>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-2 col-6 mb-2">
                                         <label class="small"><strong>5+ vagas (à vista)</strong></label>
-                                        <input type="number" class="form-control" name="range_acima_5_vista" 
+                                        <input type="number" class="form-control form-control-sm" name="range_vista_acima_5"
                                                value="5" min="0" required>
                                     </div>
                                 </div>
@@ -539,18 +587,18 @@ if (!verificarAdmin()):
                         
                         <div class="col-md-4">
                             <label><strong>Vendas totais para DIP</strong></label>
-                            <input type="number" class="form-control" name="vendas_para_dip" 
-                                   value="<?= $_SESSION['config_premiacoes']['vendas_para_dip'] ?>" 
-                                   min="1" required>
-                            <small class="text-muted">Total de vendas no mês</small>
+                            <input type="number" class="form-control" name="vendas_para_dip"
+                                   value="<?= $_SESSION['config_premiacoes']['vendas_para_dip'] ?>"
+                                   min="0" required>
+                            <small class="text-muted">Total de vendas no mês (0 para desativar)</small>
                         </div>
-                        
+
                         <div class="col-md-4">
                             <label><strong>Vendas acima de 2 vagas para DIP</strong></label>
-                            <input type="number" class="form-control" name="vendas_acima_2vagas_para_dip" 
-                                   value="<?= $_SESSION['config_premiacoes']['vendas_acima_2vagas_para_dip'] ?>" 
-                                   min="1" required>
-                            <small class="text-muted">Vendas com mais de 2 vagas</small>
+                            <input type="number" class="form-control" name="vendas_acima_2vagas_para_dip"
+                                   value="<?= $_SESSION['config_premiacoes']['vendas_acima_2vagas_para_dip'] ?>"
+                                   min="0" required>
+                            <small class="text-muted">Vendas com mais de 2 vagas (0 para desativar)</small>
                         </div>
                     </div>
                     
