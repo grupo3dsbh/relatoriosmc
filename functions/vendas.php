@@ -13,7 +13,7 @@ function extrairNumeroVagas($produto) {
 
 /**
  * Processa CSV de vendas detalhadas
- * Estrutura do CSV (24 campos, índices 0-23):
+ * Estrutura do CSV (25 campos, índices 0-24):
  * 0: ID (SFA-XXXX)
  * 1: NomeProdutoOriginal
  * 2: NomeProdutoAtual
@@ -22,22 +22,23 @@ function extrairNumeroVagas($produto) {
  * 5: DataCadastro
  * 6: DataVenda
  * 7: OrigemVenda
- * 8: Telefone
+ * 8: ResidentialPhone
  * 9: StatusTitulo
- * 10: NomeConsultor
+ * 10: Promotor
  * 11: Gerente
  * 12: NomeTitular
- * 13: CPF
+ * 13: DocumentoTitular
  * 14: QuantidadeParcelasVenda
  * 15: Parcelas (lista)
  * 16: ValoresPagos
- * 17: ParcelasPagas
- * 18: TipoPagamento
- * 19: ValorParcela
- * 20: ValorTotal
- * 21: ValorPago
- * 22: ValorRestante
- * 23: ParcelasRestantes
+ * 17: FormaPagamento (ex: "Loja Cartão de Crédito")
+ * 18: ParcelasPagas
+ * 19: TipoPagamento (ex: "Recorrente")
+ * 20: ValorParcela
+ * 21: ValorTotalPlano
+ * 22: TotalPago
+ * 23: SaldoRestante
+ * 24: ParcelasRestantes
  */
  
  /**
@@ -188,10 +189,10 @@ function processarVendasCSV($arquivo, $filtros = []) {
             }
             
             // LOG: Colunas insuficientes
-            if (count($dados) < 24) {
+            if (count($dados) < 25) {
                 $log_ignorados[] = [
                     'linha' => $linha_num,
-                    'motivo' => 'Colunas insuficientes (' . count($dados) . '/24)',
+                    'motivo' => 'Colunas insuficientes (' . count($dados) . '/25)',
                     'id' => $dados[0] ?? 'N/A'
                 ];
                 continue;
@@ -219,14 +220,14 @@ function processarVendasCSV($arquivo, $filtros = []) {
                 'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
                 'parcelas' => trim($dados[15] ?? ''),
                 'valores_pagos' => trim($dados[16] ?? ''),
-                'parcelas_pagas' => intval($dados[17] ?? 0),
-                'tipo_pagamento' => trim($dados[18] ?? ''),
-                'valor_parcela' => floatval(str_replace(',', '.', $dados[19] ?? 0)),
-                'valor_total' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
-                'valor_pago' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
-                'valor_restante' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
-                'parcelas_restantes' => intval($dados[23] ?? 0),
-                'forma_pagamento' => '' // Removido do CSV - campo não existe mais
+                'forma_pagamento' => trim($dados[17] ?? ''),  // FormaPagamento (ex: "Loja Cartão de Crédito")
+                'parcelas_pagas' => intval($dados[18] ?? 0),  // ParcelasPagas (número)
+                'tipo_pagamento' => trim($dados[19] ?? ''),   // TipoPagamento (ex: "Recorrente")
+                'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),      // ValorTotalPlano
+                'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),       // TotalPago
+                'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),   // SaldoRestante
+                'parcelas_restantes' => intval($dados[24] ?? 0)                         // ParcelasRestantes
             ];
             
             // Debug da primeira venda

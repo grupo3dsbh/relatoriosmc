@@ -1429,6 +1429,7 @@ jQuery(document).ready(function($) {
                                 <th>Status</th>
                                 <th>Titular</th>
                                 <th>Tipo Pag.</th>
+                                <th>Forma Pag.</th>
                                 <th class="text-center">Parc.</th>
                                 <th class="text-center">1ª?</th>
                                 <th class="text-right">Vlr. Pago</th>
@@ -1436,7 +1437,7 @@ jQuery(document).ready(function($) {
                         </thead>
                         <tbody id="corpoTabelaVendas">
                             <tr>
-                                <td colspan="9" class="text-center">
+                                <td colspan="10" class="text-center">
                                     <i class="fas fa-spinner fa-spin"></i> Carregando vendas...
                                 </td>
                             </tr>
@@ -1534,6 +1535,9 @@ jQuery(document).ready(function($) {
                                     <span class="badge badge-${tipoPagSimples === 'Vista' ? 'success' : 'info'} badge-sm">
                                         ${tipoPagSimples}
                                     </span>
+                                </td>
+                                <td>
+                                    <small>${venda.forma_pagamento || '-'}</small>
                                 </td>
                                 <td class="text-center"><small>${venda.num_parcelas}x</small></td>
                                 <td class="text-center">
