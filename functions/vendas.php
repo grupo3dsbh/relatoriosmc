@@ -814,6 +814,14 @@ function validarIdentificacaoConsultor($consultor_nome, $identificacao, $vendas)
  * Determina qual configuração de pontos usar baseado na data da venda
  */
 function obterConfiguracaoPontosPorData($data_venda) {
+    // IMPORTANTE: Carrega ranges do config.json se não estiver na sessão
+    if (!isset($_SESSION['ranges_pontuacao']) || empty($_SESSION['ranges_pontuacao'])) {
+        $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+        if (isset($config['ranges']) && !empty($config['ranges'])) {
+            $_SESSION['ranges_pontuacao'] = $config['ranges'];
+        }
+    }
+
     // Converte data da venda para DateTime
     $data = DateTime::createFromFormat('Y-m-d H:i:s.u', $data_venda);
     if (!$data) {
@@ -822,22 +830,22 @@ function obterConfiguracaoPontosPorData($data_venda) {
     if (!$data) {
         $data = DateTime::createFromFormat('d/m/Y', $data_venda);
     }
-    
+
     if (!$data) {
         return PONTOS_PADRAO; // Retorna padrão se não conseguir parsear
     }
-    
+
     // Verifica se há ranges configurados
     if (!isset($_SESSION['ranges_pontuacao']) || empty($_SESSION['ranges_pontuacao'])) {
         return PONTOS_PADRAO;
     }
-    
+
     // Procura range que contenha esta data
     foreach ($_SESSION['ranges_pontuacao'] as $range) {
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59); // Fim do dia
-        
+
         if ($data >= $data_inicio && $data <= $data_fim) {
             return $range['pontos'];
         }
@@ -937,29 +945,37 @@ function calcularPontosComRanges($vendas_detalhes) {
  * Identifica qual range foi usado para uma data específica
  */
 function identificarRange($data_venda) {
+    // IMPORTANTE: Carrega ranges do config.json se não estiver na sessão
+    if (!isset($_SESSION['ranges_pontuacao']) || empty($_SESSION['ranges_pontuacao'])) {
+        $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+        if (isset($config['ranges']) && !empty($config['ranges'])) {
+            $_SESSION['ranges_pontuacao'] = $config['ranges'];
+        }
+    }
+
     $data = DateTime::createFromFormat('Y-m-d H:i:s.u', $data_venda);
     if (!$data) {
         $data = DateTime::createFromFormat('Y-m-d H:i:s', $data_venda);
     }
-    
+
     if (!$data) {
-        return 'Padro';
+        return 'Padrão';
     }
-    
+
     if (!isset($_SESSION['ranges_pontuacao']) || empty($_SESSION['ranges_pontuacao'])) {
         return 'Padrão';
     }
-    
+
     foreach ($_SESSION['ranges_pontuacao'] as $range) {
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59);
-        
+
         if ($data >= $data_inicio && $data <= $data_fim) {
             return $range['nome'];
         }
     }
-    
+
     return 'Padrão';
 }
 

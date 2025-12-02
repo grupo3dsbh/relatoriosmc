@@ -3,6 +3,13 @@
 
 require_once 'functions/vendas.php';
 
+// Carrega configurações para obter período padrão
+$config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+$periodo_padrao = $config['periodo_relatorio'] ?? [
+    'data_inicial' => date('Y-m-01', strtotime('first day of last month')),
+    'data_final' => date('Y-m-t', strtotime('last day of last month'))
+];
+
 // Inicializa variáveis
 $vendas_processadas = null;
 $arquivo_selecionado = null;
@@ -309,8 +316,8 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                 <label>
                                                     <i class="fas fa-calendar-alt"></i> Data Inicial
                                                 </label>
-                                                <input type="date" class="form-control" name="data_inicial" 
-                                                       value="<?= $_POST['data_inicial'] ?? date('Y-m-01') ?>">
+                                                <input type="date" class="form-control" name="data_inicial"
+                                                       value="<?= $_POST['data_inicial'] ?? $periodo_padrao['data_inicial'] ?>">
                                             </div>
                                         </div>
                                         
@@ -319,8 +326,8 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                 <label>
                                                     <i class="fas fa-calendar-check"></i> Data Final
                                                 </label>
-                                                <input type="date" class="form-control" name="data_final" 
-                                                       value="<?= $_POST['data_final'] ?? date('Y-m-t') ?>">
+                                                <input type="date" class="form-control" name="data_final"
+                                                       value="<?= $_POST['data_final'] ?? $periodo_padrao['data_final'] ?>">
                                             </div>
                                         </div>
                                     </div>
