@@ -265,10 +265,10 @@ if (verificarConsultores() && !verificarAdmin()) {
                 </div>
                 <div class="col-md-6 text-center text-md-right">
                     <p class="mb-1">
-                        <i class="fas fa-trophy"></i> <strong>Sistema de Gestão de Vendas Aquabeat</strong>
+                        <i class="fas fa-trophy"></i> <strong>Sistema de Gestão de Vendas Aquabeat Multiclubes</strong>
                     </p>
                     <p class="mb-0">
-                        <small class="text-muted">Versão 1.0 | Desenvolvido com <i class="fas fa-heart text-danger"></i> pelo <a href="https://grupo3ds.com.br">Grupo 3DS</a></small>
+                        <small class="text-muted">Versão 2.0 | Desenvolvido com <i class="fas fa-heart text-danger"></i> pelo <a href="https://grupo3ds.com.br">Grupo 3DS</a></small>
                     </p>
                 </div>
             </div>
@@ -494,3 +494,4 @@ if (verificarConsultores() && !verificarAdmin()) {
 </html>
 
 <?php ob_end_flush(); // Flush buffer de saída ?>
+
