@@ -204,13 +204,11 @@ if (verificarConsultores() && !verificarAdmin()) {
                         </li>
                         <?php endif; ?>
 
-                        <?php if (!verificarConsultores()): ?>
                         <li class="nav-item">
                             <a class="nav-link" href="?page=consultores">
                                 <i class="fas fa-users"></i> Consultores
                             </a>
                         </li>
-                        <?php endif; ?>
                     <?php endif; ?>
 
                     <!-- Sempre visível -->

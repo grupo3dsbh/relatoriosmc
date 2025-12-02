@@ -268,14 +268,18 @@ function processarVendasCSV($arquivo, $filtros = []) {
             // Processa dados adicionais
             $venda['num_vagas'] = extrairNumeroVagas($venda['produto_atual']);
             $venda['e_vista'] = (
-                $venda['tipo_pagamento'] === 'À Vista' || 
+                $venda['tipo_pagamento'] === 'À Vista' ||
                 stripos($venda['tipo_pagamento'], 'vista') !== false ||
                 $venda['quantidade_parcelas_venda'] <= 1
             );
             $venda['primeira_parcela_paga'] = ($venda['parcelas_pagas'] > 0);
             $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
-            
+
+            // IMPORTANTE: Se o produto foi alterado, usa DataCadastro para filtros de data
+            // Isso evita que vendas alteradas sejam filtradas por terem DataVenda fora do período
+            $venda['data_para_filtro'] = $venda['produto_alterado'] ? $venda['data_cadastro'] : $venda['data_venda'];
+
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
             
@@ -418,29 +422,33 @@ function aplicarFiltros($venda, $filtros) {
     
     // Filtro de data inicial
     if (!empty($filtros['data_inicial'])) {
-        $data_venda = strtotime($venda['data_venda']);
+        // Usa data_para_filtro se disponível (DataCadastro para títulos alterados, DataVenda para normais)
+        $data_comparacao = $venda['data_para_filtro'] ?? $venda['data_venda'];
+        $data_venda = strtotime($data_comparacao);
         $data_inicial_filter = strtotime($filtros['data_inicial'] . ' 00:00:00');
-        
+
         if ($data_venda < $data_inicial_filter) {
             return [
-                'passa' => false, 
-                'motivo' => 'Data anterior ao filtro (' . 
-                           date('d/m/Y', $data_venda) . ' < ' . 
+                'passa' => false,
+                'motivo' => 'Data anterior ao filtro (' .
+                           date('d/m/Y', $data_venda) . ' < ' .
                            date('d/m/Y', $data_inicial_filter) . ')'
             ];
         }
     }
-    
+
     // Filtro de data final
     if (!empty($filtros['data_final'])) {
-        $data_venda = strtotime($venda['data_venda']);
+        // Usa data_para_filtro se disponível (DataCadastro para títulos alterados, DataVenda para normais)
+        $data_comparacao = $venda['data_para_filtro'] ?? $venda['data_venda'];
+        $data_venda = strtotime($data_comparacao);
         $data_final_filter = strtotime($filtros['data_final'] . ' 23:59:59');
-        
+
         if ($data_venda > $data_final_filter) {
             return [
-                'passa' => false, 
-                'motivo' => 'Data posterior ao filtro (' . 
-                           date('d/m/Y', $data_venda) . ' > ' . 
+                'passa' => false,
+                'motivo' => 'Data posterior ao filtro (' .
+                           date('d/m/Y', $data_venda) . ' > ' .
                            date('d/m/Y', $data_final_filter) . ')'
             ];
         }
