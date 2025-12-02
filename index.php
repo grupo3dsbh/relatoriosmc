@@ -114,8 +114,8 @@ if (verificarConsultores() && !verificarAdmin()) {
     
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css">
-    <!-- CSS Customizado -->
-    <link rel="stylesheet" href="assets/css/custom.css">
+    <!-- CSS Customizado com cache busting -->
+    <link rel="stylesheet" href="assets/css/custom.css?v=<?= filemtime('assets/css/custom.css') ?>">
     
     <style>
         body {
@@ -429,26 +429,53 @@ if (verificarConsultores() && !verificarAdmin()) {
             });
         }
 
-        // 5. Mostra mensagem e recarrega
-        Swal.fire({
-            title: 'Cache Limpo!',
-            text: 'Recarregando página...',
-            icon: 'success',
-            timer: 1500,
-            showConfirmButton: false
+        // 5. Limpa cookies e dados do site
+        try {
+            // Limpa todos os cookies do domínio atual
+            document.cookie.split(";").forEach(function(c) {
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            });
+            console.log('✓ Cookies limpos');
+        } catch (e) {
+            console.warn('Erro ao limpar cookies:', e);
+        }
+
+        // 6. Chama servidor para limpar sessão PHP
+        fetch('?limpar_cache=1', {
+            method: 'GET',
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
         }).then(() => {
-            // Force hard reload (equivalente a Ctrl+F5)
-            // Adiciona timestamp para forçar reload de todos os recursos
-            const url = new URL(window.location.href);
-            url.searchParams.set('_cache_bust', Date.now());
+            console.log('✓ Sessão PHP limpa no servidor');
+        }).catch(e => {
+            console.warn('Erro ao limpar sessão PHP:', e);
+        }).finally(() => {
+            // 7. Mostra mensagem e recarrega
+            Swal.fire({
+                title: 'Cache Limpo!',
+                text: 'Recarregando página sem cache...',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                // Force hard reload (equivalente a Ctrl+F5)
+                // Adiciona timestamp para forçar reload de todos os recursos
+                const url = new URL(window.location.href);
+                url.searchParams.set('_nocache', Date.now());
+                url.searchParams.delete('limpar_cache'); // Remove o parâmetro de limpar cache
 
-            // Recarrega SEM usar cache
-            window.location.href = url.toString();
+                // Recarrega SEM usar cache
+                window.location.replace(url.toString());
 
-            // Fallback: força reload do cache
-            setTimeout(() => {
-                window.location.reload(true);
-            }, 100);
+                // Fallback: força reload hard
+                setTimeout(() => {
+                    window.location.reload(true);
+                }, 100);
+            });
         });
     }
 
