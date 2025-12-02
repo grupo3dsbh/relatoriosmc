@@ -98,7 +98,7 @@ function obterConfigPadrao() {
             'relatorio_padrao' => 'top20', // 'top20' ou 'ranking_completo'
             'senha_filtro' => '', // Senha encode/decode para liberar filtros
             'senha_godmode' => 'admin123', // Senha para modo admin
-            'senha_consultores' => '1234' // PIN de 4 dígitos para consultores
+            'senha_admin_setores' => 'aquabeat' // Senha para setores acessarem dados de consultores
         ],
         'premiacao' => [
             'mensagem' => 'Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior. Ex: vendas de Novembro até 07 de Dezembro.',

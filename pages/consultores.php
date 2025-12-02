@@ -1,71 +1,29 @@
 <?php
-// pages/consultores.php - Gerenciamento de Consultores/Promotores
+// pages/consultores.php - Acesso Administrativo (Setores)
 
 require_once 'functions/promotores.php';
 
-// Inicializa controle de tentativas
-if (!isset($_SESSION['pin_attempts'])) {
-    $_SESSION['pin_attempts'] = 0;
-    $_SESSION['pin_locked_until'] = null;
-}
-
-// Verifica se está bloqueado
-$is_locked = false;
-$lockout_time_remaining = 0;
-
-if ($_SESSION['pin_locked_until'] !== null && time() < $_SESSION['pin_locked_until']) {
-    $is_locked = true;
-    $lockout_time_remaining = $_SESSION['pin_locked_until'] - time();
-} elseif ($_SESSION['pin_locked_until'] !== null && time() >= $_SESSION['pin_locked_until']) {
-    // Desbloqueio automático após timeout
-    $_SESSION['pin_attempts'] = 0;
-    $_SESSION['pin_locked_until'] = null;
-}
-
-// Processa login
+// Processa login administrativo
 if (isset($_POST['login_consultores'])) {
-    if ($is_locked) {
-        $erro_login = "Acesso bloqueado! Aguarde " . ceil($lockout_time_remaining / 60) . " minutos para tentar novamente.";
-    } else {
-        $pin = preg_replace('/\D/', '', $_POST['pin'] ?? '');
+    $senha = $_POST['senha'] ?? '';
 
-        // Valida PIN (4 dígitos)
-        if (strlen($pin) !== 4) {
-            $erro_login = "O PIN deve ter exatamente 4 dígitos!";
-        } else {
-            // Tenta fazer login
-            $senha_configurada = $_SESSION['config_sistema']['acesso']['senha_consultores'] ?? 'aquabeat';
+    // Senha administrativa configurável
+    $senha_admin = $_SESSION['config_sistema']['acesso']['senha_admin_setores'] ?? 'aquabeat';
 
-            if ($pin === $senha_configurada) {
-                // Login bem-sucedido - reseta tentativas
-                $_SESSION['pin_attempts'] = 0;
-                $_SESSION['pin_locked_until'] = null;
-                $_SESSION['consultores_autenticado'] = true;
+    if ($senha === $senha_admin) {
+        $_SESSION['consultores_autenticado'] = true;
 
-                // Redireciona se houver página pendente
-                if (isset($_SESSION['redirect_after_login'])) {
-                    $redirect = $_SESSION['redirect_after_login'];
-                    unset($_SESSION['redirect_after_login']);
-                    header("Location: ?page=$redirect");
-                    exit;
-                }
-                header('Location: ?page=consultores');
-                exit;
-            } else {
-                // Login falhou - incrementa tentativas
-                $_SESSION['pin_attempts']++;
-
-                if ($_SESSION['pin_attempts'] >= 3) {
-                    // Bloqueia por 15 minutos
-                    $_SESSION['pin_locked_until'] = time() + (15 * 60);
-                    $is_locked = true;
-                    $erro_login = "Acesso bloqueado por 15 minutos após 3 tentativas incorretas!";
-                } else {
-                    $tentativas_restantes = 3 - $_SESSION['pin_attempts'];
-                    $erro_login = "PIN incorreto! Você tem mais $tentativas_restantes tentativa(s).";
-                }
-            }
+        // Redireciona se houver página pendente
+        if (isset($_SESSION['redirect_after_login'])) {
+            $redirect = $_SESSION['redirect_after_login'];
+            unset($_SESSION['redirect_after_login']);
+            header("Location: ?page=$redirect");
+            exit;
         }
+        header('Location: ?page=consultores');
+        exit;
+    } else {
+        $erro_login = "Senha incorreta!";
     }
 }
 
@@ -85,103 +43,29 @@ if (!verificarConsultores()):
                     </div>
                 <?php endif; ?>
                 
-                <form method="post" id="formPIN">
+                <form method="post">
                     <div class="form-group">
-                        <label for="pin">
-                            <i class="fas fa-lock"></i> PIN de Acesso (4 dígitos)
+                        <label for="senha">
+                            <i class="fas fa-key"></i> Senha Administrativa
                         </label>
-                        <input type="text"
-                               class="form-control form-control-lg text-center"
-                               id="pin"
-                               name="pin"
-                               placeholder="****"
-                               maxlength="4"
-                               pattern="[0-9]{4}"
-                               inputmode="numeric"
-                               autocomplete="off"
-                               required
-                               autofocus
-                               <?= $is_locked ? 'disabled' : '' ?>
-                               style="font-size: 2em; letter-spacing: 0.5em;">
-                        <small class="form-text text-muted">
-                            Digite seu PIN de 4 dígitos
-                        </small>
+                        <input type="password" class="form-control form-control-lg"
+                               id="senha" name="senha"
+                               placeholder="Digite a senha administrativa"
+                               required autofocus>
                     </div>
 
-                    <?php if ($is_locked): ?>
-                        <div class="alert alert-danger">
-                            <i class="fas fa-lock"></i>
-                            <strong>Acesso bloqueado!</strong><br>
-                            Aguarde <strong id="lockoutTimer"><?= ceil($lockout_time_remaining / 60) ?></strong> minutos para tentar novamente.
-                        </div>
-                        <button type="button" class="btn btn-secondary btn-block" disabled>
-                            <i class="fas fa-lock"></i> Bloqueado
-                        </button>
-                    <?php else: ?>
-                        <button type="submit" name="login_consultores" class="btn btn-info btn-block btn-lg">
-                            <i class="fas fa-sign-in-alt"></i> Entrar
-                        </button>
-
-                        <?php if (isset($_SESSION['pin_attempts']) && $_SESSION['pin_attempts'] > 0): ?>
-                            <div class="alert alert-warning mt-3 mb-0">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <strong><?= $_SESSION['pin_attempts'] ?></strong> tentativa(s) incorreta(s).
-                                Restam <strong><?= 3 - $_SESSION['pin_attempts'] ?></strong> tentativa(s).
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
+                    <button type="submit" name="login_consultores" class="btn btn-info btn-block btn-lg">
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </button>
                 </form>
-
-                <script>
-                // Permite apenas números no PIN
-                document.getElementById('pin').addEventListener('input', function(e) {
-                    this.value = this.value.replace(/\D/g, '');
-                });
-
-                // Auto-submit quando completar 4 dígitos
-                document.getElementById('pin').addEventListener('input', function(e) {
-                    if (this.value.length === 4) {
-                        // Aguarda 300ms para melhor UX
-                        setTimeout(() => {
-                            if (this.value.length === 4) {
-                                document.getElementById('formPIN').submit();
-                            }
-                        }, 300);
-                    }
-                });
-
-                <?php if ($is_locked): ?>
-                // Atualiza timer de bloqueio a cada segundo
-                let timeRemaining = <?= $lockout_time_remaining ?>;
-                const timerElement = document.getElementById('lockoutTimer');
-
-                const interval = setInterval(function() {
-                    timeRemaining--;
-                    const minutesLeft = Math.ceil(timeRemaining / 60);
-                    timerElement.textContent = minutesLeft;
-
-                    if (timeRemaining <= 0) {
-                        clearInterval(interval);
-                        location.reload(); // Recarrega página para desbloquear
-                    }
-                }, 1000);
-                <?php endif; ?>
-                </script>
                 
                 <hr>
                 
                 <div class="alert alert-info mb-0">
                     <small>
                         <i class="fas fa-info-circle"></i>
-                        <strong>Acesso restrito:</strong> Esta área é acessível apenas com PIN de 4 dígitos.
-                        Entre em contato com o administrador para obter seu PIN de acesso.
-                    </small>
-                </div>
-
-                <div class="alert alert-warning mb-0 mt-3">
-                    <small>
-                        <i class="fas fa-shield-alt"></i>
-                        <strong>Segurança:</strong> Após 3 tentativas incorretas, o acesso será bloqueado por 15 minutos.
+                        <strong>Acesso Administrativo:</strong> Esta área é restrita aos setores autorizados.
+                        Entre em contato com o administrador para obter a senha de acesso.
                     </small>
                 </div>
             </div>
