@@ -53,7 +53,62 @@
                     <a href="?page=admin" class="btn btn-danger btn-sm ml-2">Ir para Admin</a>
                 </div>
                 <?php endif; ?>
+
+                <!-- Botão para limpar cache/sessão -->
+                <div class="mt-4 pt-4 border-top">
+                    <button onclick="limparCache()" class="btn btn-outline-secondary btn-sm"
+                            data-toggle="tooltip"
+                            title="Limpa o cache da sessão e recarrega as configurações do config.json">
+                        <i class="fas fa-sync-alt"></i> Limpar Cache/Sessão
+                    </button>
+                    <small class="text-muted d-block mt-2">
+                        <i class="fas fa-info-circle"></i> Use para aplicar mudanças no config.json
+                    </small>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Mensagem de sucesso se cache foi limpo -->
+<?php if (isset($_SESSION['mensagem_sucesso'])): ?>
+<script>
+$(document).ready(function() {
+    Swal.fire({
+        icon: 'success',
+        title: 'Sucesso!',
+        text: '<?= $_SESSION['mensagem_sucesso'] ?>',
+        timer: 3000,
+        showConfirmButton: false
+    });
+});
+</script>
+<?php
+unset($_SESSION['mensagem_sucesso']);
+endif;
+?>
+
+<script>
+// Função para limpar cache com confirmação
+function limparCache() {
+    Swal.fire({
+        title: 'Limpar Cache?',
+        text: 'Isso vai limpar a sessão atual e recarregar as configurações do config.json.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim, limpar!',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = '?limpar_cache=1';
+        }
+    });
+}
+
+// Inicializa tooltips
+$(function () {
+    $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
