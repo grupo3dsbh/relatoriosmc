@@ -51,6 +51,11 @@ if (isset($_POST['remover_logo'])) {
 // Processa alteração de senha de consultores
 if (isset($_POST['alterar_senha_consultores'])) {
     $_SESSION['senha_consultores'] = $_POST['nova_senha'];
+
+    // Salva no config.json
+    $_SESSION['config_sistema']['acesso']['senha_admin_setores'] = $_POST['nova_senha'];
+    salvarConfiguracoes($_SESSION['config_sistema']);
+
     $mensagem_sucesso = "Senha de consultores alterada com sucesso!";
 }
 
