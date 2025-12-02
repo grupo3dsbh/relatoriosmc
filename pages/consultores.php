@@ -254,10 +254,10 @@ $cidades_list = obterCidadesPromotores($promotores_data['promotores']);
                                         <strong><?= number_format($promotor['comissao'], 2, ',', '.') ?>%</strong>
                                     </td>
                                     <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-info" 
-                                                data-toggle="modal" 
+                                        <button type="button" class="btn btn-sm btn-info"
+                                                data-toggle="modal"
                                                 data-target="#modalDetalhes"
-                                                data-promotor='<?= htmlspecialchars(json_encode($promotor)) ?>'>
+                                                data-promotor='<?= json_encode($promotor, JSON_HEX_APOS | JSON_HEX_QUOT) ?>'>
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </td>
@@ -393,8 +393,25 @@ $(document).ready(function() {
                             <td>${promotor.telefone || 'Não informado'}</td>
                         </tr>
                         <tr>
-                            <th>Endereço:</th>
-                            <td>${promotor.endereco_completo}</td>
+                            <th>Rua:</th>
+                            <td>${promotor.rua || 'Não informado'}</td>
+                        </tr>
+                        <tr>
+                            <th>Número:</th>
+                            <td>${promotor.numero || 'S/N'}</td>
+                        </tr>
+                        ${promotor.complemento ? `<tr><th>Complemento:</th><td>${promotor.complemento}</td></tr>` : ''}
+                        <tr>
+                            <th>Bairro:</th>
+                            <td>${promotor.bairro || 'Não informado'}</td>
+                        </tr>
+                        <tr>
+                            <th>Cidade/UF:</th>
+                            <td>${promotor.cidade || 'Não informado'}/${promotor.estado || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>CEP:</th>
+                            <td>${promotor.cep || 'Não informado'}</td>
                         </tr>
                     </table>
                 </div>
