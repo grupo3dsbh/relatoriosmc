@@ -56,7 +56,8 @@ if (isset($_POST['salvar_configuracoes'])) {
     $config['acesso'] = [
         'relatorio_padrao' => $_POST['relatorio_padrao'] ?? 'top20',
         'senha_filtro' => trim($_POST['senha_filtro'] ?? ''),
-        'senha_godmode' => trim($_POST['senha_godmode'] ?? 'admin123')
+        'senha_godmode' => trim($_POST['senha_godmode'] ?? 'admin123'),
+        'senha_consultores' => preg_replace('/\D/', '', $_POST['senha_consultores'] ?? '1234')
     ];
     
     // Atualiza configurações de premiação
@@ -290,19 +291,53 @@ if (isset($_POST['resetar_config'])) {
                             </div>
                         </div>
                     </div>
-                    
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-lock"></i> PIN de Consultores (4 dígitos)
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="senha_consultores"
+                                       value="<?= htmlspecialchars($config['acesso']['senha_consultores'] ?? '1234') ?>"
+                                       maxlength="4"
+                                       pattern="[0-9]{4}"
+                                       placeholder="1234">
+                                <small class="form-text text-muted">
+                                    PIN de 4 dígitos para acesso dos consultores
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-unlock-alt"></i> Desbloquear Acesso PIN
+                                </label>
+                                <button type="button" class="btn btn-warning btn-block" id="btnUnlockPIN">
+                                    <i class="fas fa-unlock"></i> Desbloquear Todas as Contas
+                                </button>
+                                <small class="form-text text-muted">
+                                    Remove bloqueios de tentativas incorretas
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-12">
                             <div class="form-group">
                                 <label>
                                     <i class="fas fa-filter"></i> Senha para Liberar Filtros
                                 </label>
-                                <input type="text" class="form-control" name="senha_filtro" 
+                                <input type="text" class="form-control" name="senha_filtro"
                                        value="<?= htmlspecialchars($config['acesso']['senha_filtro'] ?? '') ?>"
                                        placeholder="Deixe vazio para desativar">
                                 <small class="form-text text-muted">
                                     <?php if (!empty($config['acesso']['senha_filtro'])): ?>
-                                        URL com filtros liberados: 
+                                        URL com filtros liberados:
                                         <code><?= gerarUrlComFiltro('ranking_completo') ?></code>
                                     <?php else: ?>
                                         Configure uma senha para gerar URL com filtros liberados
@@ -311,6 +346,28 @@ if (isset($_POST['resetar_config'])) {
                             </div>
                         </div>
                     </div>
+
+                    <script>
+                    // Desbloquear PIN
+                    document.getElementById('btnUnlockPIN').addEventListener('click', function() {
+                        if (confirm('Deseja realmente desbloquear todas as contas de consultores?')) {
+                            fetch('ajax/unlock_pin.php', {
+                                method: 'POST'
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    alert('Bloqueios removidos com sucesso!');
+                                } else {
+                                    alert('Erro ao desbloquear: ' + (data.mensagem || 'Erro desconhecido'));
+                                }
+                            })
+                            .catch(error => {
+                                alert('Erro de comunicação: ' + error);
+                            });
+                        }
+                    });
+                    </script>
                 </div>
             </div>
             

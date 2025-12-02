@@ -1,5 +1,5 @@
 <?php
-// pages/top20.php - Top 20 Consultores com Impressão
+// pages/ranking_completo.php - Ranking Completo de Consultores (sem filtros manuais)
 
 require_once 'functions/vendas.php';
 
@@ -32,15 +32,13 @@ if (!empty($arquivos_vendas)) {
     if (file_exists($arquivo_selecionado)) {
         $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
-        // Ordena e pega top 20
+        // Ordena por pontos (maior para menor)
         usort($vendas_processadas['por_consultor'], function($a, $b) {
             if ($b['pontos'] == $a['pontos']) {
                 return $b['quantidade'] <=> $a['quantidade'];
             }
             return $b['pontos'] <=> $a['pontos'];
         });
-
-        $vendas_processadas['por_consultor'] = array_slice($vendas_processadas['por_consultor'], 0, 20);
     } else {
         $mensagem_erro = "Arquivo não encontrado!";
     }
@@ -49,17 +47,28 @@ if (!empty($arquivos_vendas)) {
 }
 
 // Determina se DIP está ativo
-$dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 && 
-              $_SESSION['config_premiacoes']['vendas_para_dip'] < 200);
+$dip_ativo = false;
+if (isset($_SESSION['config_sistema']['tipos_premiacao'])) {
+    foreach ($_SESSION['config_sistema']['tipos_premiacao'] as $tipo) {
+        if ($tipo['nome'] === 'DIP' && $tipo['ativo']) {
+            $dip_ativo = true;
+            break;
+        }
+    }
+} else {
+    $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
+                  $_SESSION['config_premiacoes']['vendas_para_dip'] < 200);
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Top 20 Consultores - Aquabeat</title>
+    <title>Ranking Completo - Aquabeat</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
     <style>
         @media print {
             .no-print { display: none !important; }
@@ -99,13 +108,13 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     <?php endif; ?>
 
     <?php if ($vendas_processadas): ?>
-    
+
     <!-- Cabeçalho com Logo -->
     <div class="text-center mb-4">
         <?php if (temLogo()): ?>
             <img src="<?= getLogoURL() ?>" alt="Aquabeat" style="max-height: 100px;">
         <?php endif; ?>
-        <h2 class="mt-3">Top 20 Consultores - Ranking</h2>
+        <h2 class="mt-3">Ranking Completo de Consultores</h2>
         <p class="text-muted">
             Período: <?= date('d/m/Y', strtotime($periodo_config['data_inicial'])) ?>
             até <?= date('d/m/Y', strtotime($periodo_config['data_final'])) ?>
@@ -128,7 +137,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     <div class="card mb-4 no-print">
         <div class="card-header bg-info text-white">
             <h5 class="mb-0">
-                <i class="fas fa-search"></i> Buscar Consultor no Top 20
+                <i class="fas fa-search"></i> Buscar Consultor no Ranking
             </h5>
         </div>
         <div class="card-body">
@@ -154,8 +163,8 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
         </div>
     </div>
 
-    <!-- Botes de Ação -->
-    <div class="text-center mt-4 no-print">
+    <!-- Botões de Ação -->
+    <div class="text-center mb-4 no-print">
         <button onclick="window.print()" class="btn btn-success btn-lg">
             <i class="fas fa-print"></i> Imprimir
         </button>
@@ -163,79 +172,85 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             <i class="fas fa-arrow-left"></i> Voltar
         </a>
     </div>
-    
-    <!-- Tabela Top 20 -->
-    <table class="table table-bordered table-hover" id="rankingTable">
-        <thead class="thead-dark">
-            <tr>
-                <th class="text-center">Pos.</th>
-                <th>Consultor</th>
-                <?php if ($campos_visiveis['pontos']): ?>
-                    <th class="text-center">Pontos</th>
-                <?php endif; ?>
-                <?php if ($campos_visiveis['vendas']): ?>
-                    <th class="text-center">Vendas</th>
-                <?php endif; ?>
-                <?php if ($campos_visiveis['valor_total']): ?>
-                    <th class="text-right">Valor Total</th>
-                <?php endif; ?>
-                <?php if ($campos_visiveis['valor_pago']): ?>
-                    <th class="text-right">Valor Pago</th>
-                <?php endif; ?>
-                <?php if ($campos_visiveis['cotas_sap']): ?>
-                    <th class="text-center">SAPs</th>
-                    <?php if ($dip_ativo): ?>
-                        <th class="text-center">DIPs</th>
+
+    <!-- Tabela Ranking Completo -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="rankingTable">
+            <thead class="thead-dark">
+                <tr>
+                    <th class="text-center">Pos.</th>
+                    <th>Consultor</th>
+                    <?php if ($campos_visiveis['pontos']): ?>
+                        <th class="text-center">Pontos</th>
                     <?php endif; ?>
-                <?php endif; ?>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($vendas_processadas['por_consultor'] as $index => $consultor): ?>
-            <tr data-consultor="<?= strtolower(htmlspecialchars($consultor['consultor'])) ?>">
-                <td class="text-center">
-                    <strong><?= $index + 1 ?>º</strong>
-                    <?php if ($index < 3): ?>
-                        <i class="fas fa-trophy <?= ['trophy-gold', 'trophy-silver', 'trophy-bronze'][$index] ?>"></i>
+                    <?php if ($campos_visiveis['vendas']): ?>
+                        <th class="text-center">Vendas</th>
                     <?php endif; ?>
-                </td>
-                <td><strong><?= htmlspecialchars($consultor['consultor']) ?></strong></td>
-                
-                <?php if ($campos_visiveis['pontos']): ?>
-                    <td class="text-center">
-                        <span class="badge badge-primary"><?= $consultor['pontos'] ?> pts</span>
-                    </td>
-                <?php endif; ?>
-                
-                <?php if ($campos_visiveis['vendas']): ?>
-                    <td class="text-center"><?= $consultor['quantidade'] ?></td>
-                <?php endif; ?>
-                
-                <?php if ($campos_visiveis['valor_total']): ?>
-                    <td class="text-right">R$ <?= number_format($consultor['venda'], 2, ',', '.') ?></td>
-                <?php endif; ?>
-                
-                <?php if ($campos_visiveis['valor_pago']): ?>
-                    <td class="text-right">R$ <?= number_format($consultor['pago'], 2, ',', '.') ?></td>
-                <?php endif; ?>
-                
-                <?php if ($campos_visiveis['cotas_sap']): ?>
-                    <td class="text-center">
-                        <strong><?= $consultor['saps'] ?></strong>
-                    </td>
-                    <?php if ($dip_ativo): ?>
-                    <td class="text-center">
-                        <strong><?= $consultor['dips'] ?></strong>
-                    </td>
+                    <?php if ($campos_visiveis['valor_total']): ?>
+                        <th class="text-right">Valor Total</th>
                     <?php endif; ?>
-                <?php endif; ?>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-    
-    
-    
+                    <?php if ($campos_visiveis['valor_pago']): ?>
+                        <th class="text-right">Valor Pago</th>
+                    <?php endif; ?>
+                    <?php if ($campos_visiveis['cotas_sap']): ?>
+                        <th class="text-center">SAPs</th>
+                        <?php if ($dip_ativo): ?>
+                            <th class="text-center">DIPs</th>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($vendas_processadas['por_consultor'] as $index => $consultor): ?>
+                <tr data-consultor="<?= strtolower(htmlspecialchars($consultor['consultor'])) ?>">
+                    <td class="text-center">
+                        <strong><?= $index + 1 ?>º</strong>
+                        <?php if ($index < 3): ?>
+                            <i class="fas fa-trophy <?= ['trophy-gold', 'trophy-silver', 'trophy-bronze'][$index] ?>"></i>
+                        <?php endif; ?>
+                    </td>
+                    <td><strong><?= htmlspecialchars($consultor['consultor']) ?></strong></td>
+
+                    <?php if ($campos_visiveis['pontos']): ?>
+                        <td class="text-center">
+                            <span class="badge badge-primary"><?= $consultor['pontos'] ?> pts</span>
+                        </td>
+                    <?php endif; ?>
+
+                    <?php if ($campos_visiveis['vendas']): ?>
+                        <td class="text-center"><?= $consultor['quantidade'] ?></td>
+                    <?php endif; ?>
+
+                    <?php if ($campos_visiveis['valor_total']): ?>
+                        <td class="text-right">R$ <?= number_format($consultor['venda'], 2, ',', '.') ?></td>
+                    <?php endif; ?>
+
+                    <?php if ($campos_visiveis['valor_pago']): ?>
+                        <td class="text-right">R$ <?= number_format($consultor['pago'], 2, ',', '.') ?></td>
+                    <?php endif; ?>
+
+                    <?php if ($campos_visiveis['cotas_sap']): ?>
+                        <td class="text-center">
+                            <strong><?= $consultor['saps'] ?? 0 ?></strong>
+                        </td>
+                        <?php if ($dip_ativo): ?>
+                        <td class="text-center">
+                            <strong><?= $consultor['dips'] ?? 0 ?></strong>
+                        </td>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Resumo -->
+    <div class="alert alert-info mt-4">
+        <strong>Total de Consultores:</strong> <?= count($vendas_processadas['por_consultor']) ?><br>
+        <strong>Total de Vendas:</strong> <?= count($vendas_processadas['vendas']) ?>
+    </div>
+
     <?php endif; ?>
 
 </div>
