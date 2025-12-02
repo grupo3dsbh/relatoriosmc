@@ -212,13 +212,14 @@ function processarVendasCSV($arquivo, $filtros = []) {
                 'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
                 'parcelas' => trim($dados[15] ?? ''),
                 'valores_pagos' => trim($dados[16] ?? ''),
-                'parcelas_pagas' => intval($dados[17] ?? 0),
-                'tipo_pagamento' => trim($dados[18] ?? ''),
-                'valor_parcela' => floatval(str_replace(',', '.', $dados[19] ?? 0)),
-                'valor_total' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
-                'valor_pago' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
-                'valor_restante' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
-                'parcelas_restantes' => intval($dados[23] ?? 0)
+                'forma_pagamento' => trim($dados[17] ?? ''),
+                'parcelas_pagas' => intval($dados[18] ?? 0),
+                'tipo_pagamento' => trim($dados[19] ?? ''),
+                'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
+                'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
+                'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),
+                'parcelas_restantes' => intval($dados[24] ?? 0)
             ];
             
             // Debug da primeira venda
