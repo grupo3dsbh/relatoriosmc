@@ -445,19 +445,24 @@ function aplicarFiltros($venda, $filtros) {
  * Calcula premiações (SAP e DIP) baseado nas configuraões
  */
 function calcularPremiacoes($consultor) {
-    $config = $_SESSION['config_premiacoes'];
-    
+    $config = $_SESSION['config_premiacoes'] ?? [];
+
+    // Fallback para valores padrão se não estiver na sessão
+    $pontos_por_sap = $config['pontos_por_sap'] ?? 21;
+    $vendas_para_dip = $config['vendas_para_dip'] ?? 0;
+    $vendas_acima_2vagas_para_dip = $config['vendas_acima_2vagas_para_dip'] ?? 0;
+
     $pontos = $consultor['pontos'] ?? 0;
     $vendas_total = $consultor['quantidade'] ?? 0;
     $vendas_acima_2vagas = $consultor['vendas_acima_2vagas'] ?? 0;
-    
-    // Calcula SAPs
-    $saps = floor($pontos / $config['pontos_por_sap']);
+
+    // Calcula SAPs (protege contra divisão por zero)
+    $saps = $pontos_por_sap > 0 ? floor($pontos / $pontos_por_sap) : 0;
 
     // Calcula DIPs (se atingir qualquer um dos critérios)
     // IMPORTANTE: Se o valor configurado for 0, desativa esse critério
-    $dip_por_total = ($config['vendas_para_dip'] > 0 && $vendas_total >= $config['vendas_para_dip']) ? 1 : 0;
-    $dip_por_acima_2vagas = ($config['vendas_acima_2vagas_para_dip'] > 0 && $vendas_acima_2vagas >= $config['vendas_acima_2vagas_para_dip']) ? 1 : 0;
+    $dip_por_total = ($vendas_para_dip > 0 && $vendas_total >= $vendas_para_dip) ? 1 : 0;
+    $dip_por_acima_2vagas = ($vendas_acima_2vagas_para_dip > 0 && $vendas_acima_2vagas >= $vendas_acima_2vagas_para_dip) ? 1 : 0;
 
     $dips = max($dip_por_total, $dip_por_acima_2vagas);
     
@@ -865,6 +870,7 @@ function obterConfiguracaoPontosPorData($data_venda) {
         }
 
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
+        $data_inicio->setTime(0, 0, 0); // Início do dia
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
         $data_fim->setTime(23, 59, 59); // Fim do dia
 
@@ -1035,8 +1041,9 @@ function identificarRange($data_venda) {
         }
 
         $data_inicio = DateTime::createFromFormat('Y-m-d', $range['data_inicio']);
+        $data_inicio->setTime(0, 0, 0); // Início do dia
         $data_fim = DateTime::createFromFormat('Y-m-d', $range['data_fim']);
-        $data_fim->setTime(23, 59, 59);
+        $data_fim->setTime(23, 59, 59); // Fim do dia
 
         if ($data >= $data_inicio && $data <= $data_fim) {
             return $range['nome'];

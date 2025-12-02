@@ -432,12 +432,12 @@ $(document).ready(function() {
                             }
 
                             if (this.value.length === 4) {
-                                // Aguarda 1.5 segundo antes de submeter
+                                // Aguarda 3 segundos antes de submeter
                                 autoSubmitTimeout = setTimeout(() => {
                                     if (this.value.length === 4) {
                                         this.form.submit();
                                     }
-                                }, 1500);
+                                }, 3000);
                             }
                         });
 
