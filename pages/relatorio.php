@@ -3,13 +3,6 @@
 
 require_once 'functions/vendas.php';
 
-// Tenta carregar banco de dados (se disponível)
-$usar_banco = false;
-if (file_exists(BASE_DIR . '/database/queries.php')) {
-    require_once BASE_DIR . '/database/queries.php';
-    $usar_banco = bancoDadosDisponivel();
-}
-
 // Carrega configurações para obter período padrão
 $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
 $periodo_padrao = $config['periodo_relatorio'] ?? [
@@ -134,35 +127,10 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             echo "<br>";
         }
         // ===== DEBUG DETALHADO - FIM =====
-
+        
         // Processa vendas COM RANGES DE PONTUAÇÃO
-        // Usa banco de dados se disponível e tiver mês de referência
-        if ($usar_banco && !empty($mes_referencia_arquivo)) {
-            // Busca do banco de dados
-            $resultado_vendas = buscarVendasDoBanco($mes_referencia_arquivo, $filtros);
-
-            // Calcula pontos com ranges
-            require_once BASE_DIR . '/functions/vendas.php';
-            foreach ($resultado_vendas['por_consultor'] as &$consultor) {
-                $resultado_pontos = calcularPontosComRanges($consultor['vendas_detalhes']);
-                $consultor['pontos'] = $resultado_pontos['pontos_total'];
-                $consultor['detalhamento_pontos'] = $resultado_pontos['detalhamento_por_range'];
-            }
-
-            $vendas_processadas = $resultado_vendas;
-
-            if (isGodMode()) {
-                echo "<div class='alert alert-success'><strong>📊 Usando BANCO DE DADOS</strong> (mês: $mes_referencia_arquivo)</div>";
-            }
-        } else {
-            // Processa do CSV (modo legado)
-            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
-
-            if (isGodMode()) {
-                echo "<div class='alert alert-warning'><strong>📄 Usando CSV</strong> (modo legado)</div>";
-            }
-        }
-
+        $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+        
         // ===== DEBUG: RESULTADO DO PROCESSAMENTO =====
         if (isGodMode()) {
             echo "<strong>✅ Resultado do Processamento:</strong><br>";

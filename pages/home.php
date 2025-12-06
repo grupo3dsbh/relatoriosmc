@@ -45,23 +45,7 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Seção Admin/Database -->
-                <?php if (isAdmin() || isGodMode()): ?>
-                <div class="row mt-4">
-                    <div class="col-md-6 mx-auto">
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <i class="fas fa-database fa-3x text-primary mb-3"></i>
-                                <h5>Dashboard do Banco de Dados</h5>
-                                <p class="small">Visualize estatísticas e gerencie o banco de dados</p>
-                                <a href="?page=dashboard_db" class="btn btn-primary btn-sm">Acessar Dashboard</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
-
+                
                 <?php if (isGodMode()): ?>
                 <div class="alert alert-danger mt-4">
                     <i class="fas fa-exclamation-triangle"></i>
