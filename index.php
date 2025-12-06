@@ -46,7 +46,6 @@ $paginas_disponiveis = [
     'ranking_completo' => 'pages/ranking_completo.php',
     'detalhes_vendas' => 'pages/detalhes_vendas.php',
     'configuracoes' => 'pages/configuracoes.php',
-    'dashboard_db' => 'pages/dashboard_db.php',
     'logout' => 'pages/logout.php'
 ];
 
@@ -54,7 +53,6 @@ $paginas_disponiveis = [
 $rotas_protegidas = [
     'admin' => 'admin',
     'gestao_vendas' => 'admin',
-    'dashboard_db' => 'admin',
     'consultores' => 'consultores'
 ];
 
