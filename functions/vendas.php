@@ -284,11 +284,18 @@ function processarVendasCSV($arquivo, $filtros = []) {
             // Para vendas normais:
             //   - DataCadastro = DataVenda = data da venda
 
-            // Para FILTROS de período: usa DataCadastro quando alterado (já que DataVenda é data da alteração)
-            $venda['data_para_filtro'] = $venda['produto_alterado'] ? $venda['data_cadastro'] : $venda['data_venda'];
+            // VALIDAÇÃO DEFENSIVA: Se data_cadastro estiver vazia/inválida, usa data_venda como fallback
+            $data_cadastro_valida = !empty($venda['data_cadastro']) && strtotime($venda['data_cadastro']) !== false;
+            $data_venda_valida = !empty($venda['data_venda']) && strtotime($venda['data_venda']) !== false;
 
-            // Para PONTUAÇÃO/RANGES: usa DataCadastro quando alterado (data original para aplicar range correto)
-            $venda['data_para_pontuacao'] = $venda['produto_alterado'] ? $venda['data_cadastro'] : $venda['data_venda'];
+            // Se produto alterado MAS data_cadastro inválida, força usar data_venda
+            $usar_data_cadastro = $venda['produto_alterado'] && $data_cadastro_valida;
+
+            // Para FILTROS de período: usa DataCadastro quando alterado E válido
+            $venda['data_para_filtro'] = $usar_data_cadastro ? $venda['data_cadastro'] : $venda['data_venda'];
+
+            // Para PONTUAÇÃO/RANGES: usa DataCadastro quando alterado E válido
+            $venda['data_para_pontuacao'] = $usar_data_cadastro ? $venda['data_cadastro'] : $venda['data_venda'];
 
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
