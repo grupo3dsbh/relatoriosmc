@@ -48,26 +48,15 @@ $campos_visiveis = $_SESSION['campos_visiveis_consultores'];
 
 // Processa relatório
 if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
-
+    
     // Determina qual arquivo usar
     if (isset($_GET['arquivo'])) {
-        $identificador = $_GET['arquivo'];
-        // Busca arquivo por slug ou nome original
-        $arquivo_info = buscarArquivoCSV('vendas', $identificador);
-        if ($arquivo_info) {
-            $arquivo_selecionado = $arquivo_info['caminho'];
-            $mes_referencia_arquivo = $arquivo_info['mes_referencia'];
-            $nome_amigavel_arquivo = $arquivo_info['nome_amigavel'];
-        }
+        $nome_arquivo = $_GET['arquivo'];
+        $arquivo_selecionado = VENDAS_DIR . '/' . $nome_arquivo;
     } elseif (isset($_POST['arquivo_vendas'])) {
         $arquivo_selecionado = $_POST['arquivo_vendas'];
-        // Busca metadados do arquivo selecionado
-        $nome_arquivo = basename($arquivo_selecionado);
-        $arquivo_info = buscarArquivoCSV('vendas', $nome_arquivo);
-        $mes_referencia_arquivo = $arquivo_info['mes_referencia'] ?? null;
-        $nome_amigavel_arquivo = $arquivo_info['nome_amigavel'] ?? null;
     }
-
+    
     if ($arquivo_selecionado && file_exists($arquivo_selecionado)) {
         
         // Monta filtros
@@ -327,15 +316,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                     </div>
                 <?php endif; ?>
-
-                <!-- Aviso de Premiação com data automática -->
-                <?php if (isset($mes_referencia_arquivo) && $mes_referencia_arquivo): ?>
-                    <div class="alert alert-warning">
-                        <i class="fas fa-trophy"></i> <strong>Atenção: Regras de Premiação</strong><br>
-                        <?= gerarMensagemDataCorte($mes_referencia_arquivo) ?>
-                    </div>
-                <?php endif; ?>
-
+                
                 <?php if (empty($arquivos_vendas)): ?>
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
@@ -376,11 +357,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                             <?php foreach ($arquivos_vendas as $arquivo): ?>
                                                 <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
                                                         <?= $arquivo_selecionado === $arquivo['caminho'] ? 'selected' : '' ?>>
-                                                    <?php if ($arquivo['nome_amigavel']): ?>
-                                                        <?= htmlspecialchars($arquivo['nome_amigavel']) ?>
-                                                    <?php else: ?>
-                                                        <?= htmlspecialchars($arquivo['nome']) ?> (<?= $arquivo['data'] ?>)
-                                                    <?php endif; ?>
+                                                    <?= htmlspecialchars($arquivo['nome']) ?> (<?= $arquivo['data'] ?>)
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
