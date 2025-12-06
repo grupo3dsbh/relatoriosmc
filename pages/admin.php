@@ -328,9 +328,14 @@ if (!verificarAdmin()):
                 <i class="fas fa-check-circle"></i>
                 <strong>Bem-vindo ao Painel Administrativo!</strong> Você está autenticado como administrador.
             </div>
-            <a href="?page=configuracoes" class="btn btn-primary btn-sm">
-                <i class="fas fa-cog"></i> Configurações Detalhadas
-            </a>
+            <div>
+                <a href="?page=dashboard_db" class="btn btn-info btn-sm mr-2">
+                    <i class="fas fa-database"></i> Dashboard BD
+                </a>
+                <a href="?page=configuracoes" class="btn btn-primary btn-sm">
+                    <i class="fas fa-cog"></i> Configurações Detalhadas
+                </a>
+            </div>
         </div>
     </div>
 </div>
