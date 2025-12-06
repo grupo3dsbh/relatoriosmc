@@ -145,6 +145,39 @@ if (isset($_POST['salvar_metadados_csv'])) {
     }
 }
 
+// Processa importação de CSV para banco de dados
+if (isset($_POST['importar_para_banco'])) {
+    require_once BASE_DIR . '/database/config.php';
+    require_once BASE_DIR . '/database/import_csv.php';
+
+    $tipo = $_POST['tipo_importacao'];
+    $caminho = $_POST['arquivo_path'];
+    $mes_referencia = $_POST['mes_ref'] ?? null;
+    $nome_amigavel = $_POST['nome_amig'] ?? null;
+    $reimportar = isset($_POST['reimportar']);
+
+    ob_start();
+
+    if ($tipo === 'vendas') {
+        // Se reimportar, limpa o mês primeiro
+        if ($reimportar && $mes_referencia) {
+            limparVendasMes($mes_referencia);
+        }
+
+        $resultado = importarVendasParaBanco($caminho, $mes_referencia, $nome_amigavel);
+    } else {
+        $resultado = importarPromotoresParaBanco($caminho, $nome_amigavel);
+    }
+
+    $output_importacao = ob_get_clean();
+
+    if ($resultado && $resultado['sucesso']) {
+        $mensagem_sucesso = "Importação concluída! {$resultado['sucesso_count']} registros importados.";
+    } else {
+        $erro_upload = "Erro na importação: " . ($resultado['erro'] ?? 'Desconhecido');
+    }
+}
+
 // Gerenciamento de Ranges de Pontuação
 if (!isset($_SESSION['ranges_pontuacao'])) {
     $_SESSION['ranges_pontuacao'] = [];
@@ -1083,6 +1116,162 @@ if (!verificarAdmin()):
                         </table>
                     </div>
                 <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Seção de Banco de Dados -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-database"></i> Gerenciamento de Banco de Dados
+                </h5>
+            </div>
+            <div class="card-body">
+                <?php if (isset($output_importacao)): ?>
+                    <div class="alert alert-info">
+                        <strong>Log da Importação:</strong>
+                        <div style="max-height: 300px; overflow-y: auto; font-size: 12px;">
+                            <?= $output_importacao ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <a href="database/migrations.php" target="_blank" class="btn btn-info">
+                            <i class="fas fa-cogs"></i> Gerenciar Tabelas
+                        </a>
+                        <a href="database/migrations.php?action=verificar" target="_blank" class="btn btn-secondary">
+                            <i class="fas fa-check-circle"></i> Verificar Integridade
+                        </a>
+                        <a href="database/migrations.php?action=exportar" target="_blank" class="btn btn-success">
+                            <i class="fas fa-download"></i> Exportar Dados (JSON)
+                        </a>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h6><i class="fas fa-upload"></i> Importar CSVs para Banco de Dados</h6>
+                <p class="text-muted">Selecione arquivos CSV já enviados para importar no banco de dados MySQL.</p>
+
+                <!-- Importar Vendas -->
+                <div class="card mb-3">
+                    <div class="card-header bg-light">
+                        <strong>Importar Vendas</strong>
+                    </div>
+                    <div class="card-body">
+                        <?php $arquivos_vendas_db = listarCSVs('vendas'); ?>
+                        <?php if (empty($arquivos_vendas_db)): ?>
+                            <p class="text-muted">Nenhum arquivo de vendas disponível.</p>
+                        <?php else: ?>
+                            <form method="post">
+                                <input type="hidden" name="tipo_importacao" value="vendas">
+
+                                <div class="form-group">
+                                    <label>Arquivo CSV</label>
+                                    <select name="arquivo_path" class="form-control" required onchange="preencherMetadadosVendas(this)">
+                                        <option value="">-- Selecione --</option>
+                                        <?php foreach ($arquivos_vendas_db as $arq): ?>
+                                            <option value="<?= htmlspecialchars($arq['caminho']) ?>"
+                                                    data-nome="<?= htmlspecialchars($arq['nome_amigavel'] ?? '') ?>"
+                                                    data-mes="<?= htmlspecialchars($arq['mes_referencia'] ?? '') ?>">
+                                                <?= $arq['nome_amigavel'] ?? $arq['nome'] ?>
+                                                <?= $arq['mes_referencia'] ? "({$arq['mes_referencia']})" : '' ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Mês de Referência *</label>
+                                            <input type="month" name="mes_ref" id="mes_ref_vendas" class="form-control" required>
+                                            <small class="text-muted">Mês das vendas (para filtros e relatórios)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Nome Amigável</label>
+                                            <input type="text" name="nome_amig" id="nome_amig_vendas" class="form-control"
+                                                   placeholder="Ex: Vendas Novembro 2025">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" name="reimportar" id="reimportar_vendas">
+                                    <label class="form-check-label" for="reimportar_vendas">
+                                        <strong class="text-warning">Reimportar</strong>
+                                        (remove vendas existentes do mesmo mês antes de importar)
+                                    </label>
+                                </div>
+
+                                <button type="submit" name="importar_para_banco" class="btn btn-primary">
+                                    <i class="fas fa-database"></i> Importar para Banco
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Importar Promotores -->
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <strong>Importar Promotores</strong>
+                    </div>
+                    <div class="card-body">
+                        <?php $arquivos_promotores_db = listarCSVs('promotores'); ?>
+                        <?php if (empty($arquivos_promotores_db)): ?>
+                            <p class="text-muted">Nenhum arquivo de promotores disponível.</p>
+                        <?php else: ?>
+                            <form method="post">
+                                <input type="hidden" name="tipo_importacao" value="promotores">
+
+                                <div class="form-group">
+                                    <label>Arquivo CSV</label>
+                                    <select name="arquivo_path" class="form-control" required onchange="preencherMetadadosPromotores(this)">
+                                        <option value="">-- Selecione --</option>
+                                        <?php foreach ($arquivos_promotores_db as $arq): ?>
+                                            <option value="<?= htmlspecialchars($arq['caminho']) ?>"
+                                                    data-nome="<?= htmlspecialchars($arq['nome_amigavel'] ?? '') ?>">
+                                                <?= $arq['nome_amigavel'] ?? $arq['nome'] ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Nome Amigável</label>
+                                    <input type="text" name="nome_amig" id="nome_amig_promotores" class="form-control"
+                                           placeholder="Ex: Promotores Novembro 2025">
+                                </div>
+
+                                <button type="submit" name="importar_para_banco" class="btn btn-primary">
+                                    <i class="fas fa-database"></i> Importar para Banco
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <script>
+                function preencherMetadadosVendas(select) {
+                    const option = select.options[select.selectedIndex];
+                    document.getElementById('nome_amig_vendas').value = option.dataset.nome || '';
+                    document.getElementById('mes_ref_vendas').value = option.dataset.mes || '';
+                }
+
+                function preencherMetadadosPromotores(select) {
+                    const option = select.options[select.selectedIndex];
+                    document.getElementById('nome_amig_promotores').value = option.dataset.nome || '';
+                }
+                </script>
             </div>
         </div>
     </div>
