@@ -180,8 +180,7 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
     // Filtro Venda à Vista
     if ($filtros['venda_a_vista']) {
         $resultado = array_filter($resultado, function($v) {
-            return stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
-                   stripos($v['forma_pagamento'] ?? '', 'à vista') !== false;
+            return ($v['tipo_pagamento'] ?? '') === 'À Vista';
         });
     }
 
