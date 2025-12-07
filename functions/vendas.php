@@ -978,19 +978,24 @@ function converterPontosPadrao($pontos_padrao) {
 }
 
 /**
- * Calcula pontos com ranges de pontuaão por data (CORRIGIDO)
+ * Calcula pontos com ranges de pontuação por data (CORRIGIDO)
  */
 function calcularPontosComRanges($vendas_detalhes) {
     $pontos_total = 0;
     $detalhamento_por_range = [];
-    
+
+    // DEBUG: Armazena info para exibir na tela com godmode
+    $debug_info = [];
+
     foreach ($vendas_detalhes as $detalhe) {
-        // DEBUG: Log para venda específica SFA-9340
+        // DEBUG: Captura info para venda específica SFA-9340
         if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
-            error_log("DEBUG SFA-9340:");
-            error_log("  data_venda (usado para pontuação): " . ($detalhe['data_venda'] ?? 'NULL'));
-            error_log("  data_cadastro_original: " . ($detalhe['data_cadastro_original'] ?? 'NULL'));
-            error_log("  data_venda_original: " . ($detalhe['data_venda_original'] ?? 'NULL'));
+            $debug_info['SFA-9340'] = [
+                'data_venda_usada' => $detalhe['data_venda'] ?? 'NULL',
+                'data_cadastro_original' => $detalhe['data_cadastro_original'] ?? 'NULL',
+                'data_venda_original' => $detalhe['data_venda_original'] ?? 'NULL',
+                'num_vagas' => $detalhe['num_vagas'] ?? 'NULL'
+            ];
         }
 
         // Obtém configuração de pontos baseada na data da venda (que deveria ser DataCadastro!)
@@ -1019,7 +1024,14 @@ function calcularPontosComRanges($vendas_detalhes) {
         
         // Identifica qual range foi usado
         $range_usado = identificarRange($detalhe['data_venda']);
-        
+
+        // DEBUG: Adiciona info do range usado para SFA-9340
+        if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
+            $debug_info['SFA-9340']['range_usado'] = $range_usado;
+            $debug_info['SFA-9340']['pontos_calculados'] = $pontos;
+            $debug_info['SFA-9340']['categoria'] = $categoria;
+        }
+
         // Agrupa por range
         if (!isset($detalhamento_por_range[$range_usado])) {
             $detalhamento_por_range[$range_usado] = [
@@ -1044,7 +1056,23 @@ function calcularPontosComRanges($vendas_detalhes) {
         $detalhamento_por_range[$range_usado]['categorias'][$categoria]['pontos_total'] += $pontos;
         $detalhamento_por_range[$range_usado]['total_pontos'] += $pontos;
     }
-    
+
+    // DEBUG: Exibe na tela se godmode ativo
+    if (!empty($debug_info) && isGodMode()) {
+        echo '<div class="alert alert-warning mt-3"><strong>🔍 DEBUG PONTUAÇÃO (GodMode):</strong><br>';
+        foreach ($debug_info as $id => $info) {
+            echo "<strong>Venda {$id}:</strong><br>";
+            echo "• Data usada para pontuação: <strong>{$info['data_venda_usada']}</strong><br>";
+            echo "• DataCadastro (original): {$info['data_cadastro_original']}<br>";
+            echo "• DataVenda (alteração): {$info['data_venda_original']}<br>";
+            echo "• Número de vagas: {$info['num_vagas']}<br>";
+            echo "• Range aplicado: <strong class='text-danger'>{$info['range_usado']}</strong><br>";
+            echo "• Categoria: {$info['categoria']}<br>";
+            echo "• Pontos calculados: <strong>{$info['pontos_calculados']}</strong><br>";
+        }
+        echo '</div>';
+    }
+
     // Monta detalhamento final
     $detalhamento = [];
     foreach ($detalhamento_por_range as $range_nome => $range_data) {
@@ -1052,7 +1080,7 @@ function calcularPontosComRanges($vendas_detalhes) {
             $detalhamento[] = array_merge($cat_data, ['range' => $range_nome]);
         }
     }
-    
+
     return [
         'pontos_total' => $pontos_total,
         'detalhamento' => $detalhamento,
