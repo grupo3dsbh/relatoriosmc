@@ -276,10 +276,13 @@ function exportarVendas($vendas, $formato) {
 
             fputcsv($output, [
                 'ID', 'Data Cadastro', 'Titular', 'CPF', 'Produto Original', 'Produto Atual',
-                'Consultor', 'Status', 'Forma Pagamento', 'Valor Pago', 'Primeira Parcela Paga'
+                'Consultor', 'Status', 'Forma Pagamento', 'Tipo Pgto', 'Valor Pago', 'Primeira Parcela Paga'
             ], ';');
 
             foreach ($vendas as $v) {
+                $tipo_pgto = (stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
+                              stripos($v['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+
                 fputcsv($output, [
                     $v['id'],
                     date('d/m/Y H:i', strtotime($v['data_cadastro'])),
@@ -290,6 +293,7 @@ function exportarVendas($vendas, $formato) {
                     $v['consultor'],
                     $v['status'],
                     $v['forma_pagamento'] ?? '',
+                    $tipo_pgto,
                     number_format($v['valor_pago'], 2, ',', '.'),
                     ($v['primeira_parcela_paga'] ?? false) ? 'Sim' : 'Não'
                 ], ';');
@@ -303,6 +307,9 @@ function exportarVendas($vendas, $formato) {
             header('Content-Disposition: attachment; filename="' . $nome_arquivo . '.json"');
 
             $dados_limpos = array_map(function($v) {
+                $tipo_pgto = (stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
+                              stripos($v['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+
                 return [
                     'id' => $v['id'],
                     'data_cadastro' => $v['data_cadastro'],
@@ -313,6 +320,7 @@ function exportarVendas($vendas, $formato) {
                     'consultor' => $v['consultor'],
                     'status' => $v['status'],
                     'forma_pagamento' => $v['forma_pagamento'] ?? '',
+                    'tipo_pagamento' => $tipo_pgto,
                     'valor_pago' => $v['valor_pago'],
                     'primeira_parcela_paga' => $v['primeira_parcela_paga'] ?? false
                 ];
@@ -331,10 +339,13 @@ function exportarVendas($vendas, $formato) {
             echo '<th>ID</th><th>Data Cadastro</th><th>Titular</th><th>CPF</th>';
             echo '<th>Produto Original</th><th>Produto Atual</th>';
             echo '<th>Consultor</th><th>Status</th><th>Forma Pagamento</th>';
-            echo '<th>Valor Pago</th><th>Primeira Parcela</th>';
+            echo '<th>Tipo Pgto</th><th>Valor Pago</th><th>Primeira Parcela</th>';
             echo '</tr></thead><tbody>';
 
             foreach ($vendas as $v) {
+                $tipo_pgto = (stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
+                              stripos($v['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+
                 echo '<tr>';
                 echo '<td>' . htmlspecialchars($v['id']) . '</td>';
                 echo '<td>' . date('d/m/Y H:i', strtotime($v['data_cadastro'])) . '</td>';
@@ -345,6 +356,7 @@ function exportarVendas($vendas, $formato) {
                 echo '<td>' . htmlspecialchars($v['consultor']) . '</td>';
                 echo '<td>' . htmlspecialchars($v['status']) . '</td>';
                 echo '<td>' . htmlspecialchars($v['forma_pagamento'] ?? '') . '</td>';
+                echo '<td>' . $tipo_pgto . '</td>';
                 echo '<td>' . number_format($v['valor_pago'], 2, ',', '.') . '</td>';
                 echo '<td>' . (($v['primeira_parcela_paga'] ?? false) ? 'Sim' : 'Não') . '</td>';
                 echo '</tr>';
@@ -686,6 +698,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <th>Consultor</th>
                             <th>Status</th>
                             <th>Forma Pgto</th>
+                            <th>Tipo Pgto</th>
                             <th class="text-right">Valor Pago</th>
                             <th class="text-center">Duplicidade</th>
                         </tr>
@@ -693,7 +706,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                     <tbody>
                         <?php if (empty($vendas_filtradas)): ?>
                             <tr>
-                                <td colspan="11" class="text-center">Nenhuma venda encontrada.</td>
+                                <td colspan="12" class="text-center">Nenhuma venda encontrada.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($vendas_filtradas as $venda):
@@ -741,6 +754,14 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                     </span>
                                 </td>
                                 <td><small><?= htmlspecialchars($venda['forma_pagamento'] ?? '-') ?></small></td>
+                                <td class="text-center">
+                                    <?php
+                                    $tipo_pgto = (stripos($venda['forma_pagamento'] ?? '', 'vista') !== false ||
+                                                  stripos($venda['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+                                    $badge_tipo = ($tipo_pgto === 'À Vista') ? 'info' : 'secondary';
+                                    ?>
+                                    <span class="badge badge-<?= $badge_tipo ?> badge-sm"><?= $tipo_pgto ?></span>
+                                </td>
                                 <td class="text-right">
                                     <small>R$ <?= number_format($venda['valor_pago'], 2, ',', '.') ?></small>
                                     <?php if (!empty($venda['primeira_parcela_paga']) || $venda['valor_pago'] > 0): ?>
