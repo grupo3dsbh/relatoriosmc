@@ -1205,6 +1205,15 @@ function processarVendasComRanges($arquivo, $filtros = []) {
         $consultor['detalhamento_pontos'] = $calculo_pontos['detalhamento'];
         $consultor['detalhamento_por_range'] = $calculo_pontos['detalhamento_por_range'];
 
+        // DEBUG: Verifica se pontos estão sendo preservados
+        if (isGodMode() && stripos($consultor_nome, 'LUCIANA') !== false) {
+            echo '<div class="alert alert-danger mt-2">';
+            echo '<strong>⚠️ DEBUG VERIFICAÇÃO FINAL:</strong><br>';
+            echo "Pontos calculados pela função: <strong>{$calculo_pontos['pontos_total']}</strong><br>";
+            echo "Pontos atribuídos ao consultor: <strong>{$consultor['pontos']}</strong><br>";
+            echo '</div>';
+        }
+
         $por_consultor[] = $consultor;
     }
     
