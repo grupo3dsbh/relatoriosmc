@@ -277,18 +277,18 @@ function processarVendasCSV($arquivo, $filtros = []) {
             $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
 
-            // IMPORTANTE: Define qual data usar para diferentes propósitos
+            // IMPORTANTE: SEMPRE usa DataCadastro para filtros e pontuação
             // Para vendas alteradas:
             //   - DataCadastro = data original da venda
             //   - DataVenda = data da alteração
             // Para vendas normais:
             //   - DataCadastro = DataVenda = data da venda
 
-            // Para FILTROS de período: usa DataCadastro quando alterado (já que DataVenda é data da alteração)
-            $venda['data_para_filtro'] = $venda['produto_alterado'] ? $venda['data_cadastro'] : $venda['data_venda'];
+            // Para FILTROS de período: SEMPRE usa DataCadastro (data original/real da venda)
+            $venda['data_para_filtro'] = $venda['data_cadastro'];
 
-            // Para PONTUAÇÃO/RANGES: usa DataCadastro quando alterado (data original para aplicar range correto)
-            $venda['data_para_pontuacao'] = $venda['produto_alterado'] ? $venda['data_cadastro'] : $venda['data_venda'];
+            // Para PONTUAÇÃO/RANGES: SEMPRE usa DataCadastro (data original para aplicar range correto)
+            $venda['data_para_pontuacao'] = $venda['data_cadastro'];
 
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
