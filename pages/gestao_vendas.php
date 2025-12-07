@@ -5,6 +5,11 @@
 
 // ===== PROCESSAMENTO DE EXPORTAÇÃO (ANTES DE QUALQUER OUTPUT!) =====
 if (isset($_GET['exportar'])) {
+    // LIMPA TODO O BUFFER DE SAÍDA (remove HTML do index.php)
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
     $formato = $_GET['exportar'];
 
     // Reaplica filtros
