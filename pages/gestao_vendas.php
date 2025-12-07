@@ -1,8 +1,55 @@
 <?php
 // pages/gestao_vendas.php - Gestão Administrativa de Vendas com Filtros Avançados
 
+// IMPORTANTE: NÃO chamar session_start() aqui - o index.php já faz isso!
+
+// ===== PROCESSAMENTO DE EXPORTAÇÃO (ANTES DE QUALQUER OUTPUT!) =====
+if (isset($_GET['exportar'])) {
+    $formato = $_GET['exportar'];
+
+    // Reaplica filtros
+    $filtros_export = [
+        'cpf' => $_GET['filtro_cpf'] ?? '',
+        'titular' => $_GET['filtro_titular'] ?? '',
+        'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
+        'status' => $_GET['filtro_status'] ?? '',
+        'data_inicio' => $_GET['data_inicio'] ?? '',
+        'data_fim' => $_GET['data_fim'] ?? '',
+        'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
+        'produto_alterado' => isset($_GET['filtro_produto_alterado']),
+        'venda_a_vista' => isset($_GET['filtro_venda_a_vista']),
+        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
+        'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
+        'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
+        'apenas_duplicadas' => isset($_GET['apenas_duplicadas']),
+        'csv_selecionado' => $_GET['filtro_csv'] ?? ''
+    ];
+
+    // Busca arquivos CSV
+    $arquivos = listarCSVs('vendas');
+    $todas_vendas_export = [];
+
+    if (!empty($filtros_export['csv_selecionado'])) {
+        foreach ($arquivos as $arquivo) {
+            if ($arquivo['caminho'] === $filtros_export['csv_selecionado']) {
+                $resultado = processarVendasCSV($arquivo['caminho']);
+                $todas_vendas_export = $resultado['vendas'];
+                break;
+            }
+        }
+    } else {
+        foreach ($arquivos as $arquivo) {
+            $resultado = processarVendasCSV($arquivo['caminho']);
+            $todas_vendas_export = array_merge($todas_vendas_export, $resultado['vendas']);
+        }
+    }
+
+    $vendas_export = aplicarFiltrosAvancados($todas_vendas_export, $filtros_export);
+    exportarVendas($vendas_export, $formato);
+    exit;
+}
+
 // ===== AUTENTICAÇÃO ESPECIAL PARA GESTÃO DE VENDAS =====
-session_start();
 
 // Processa login especial
 if (isset($_POST['login_gestao'])) {
@@ -308,128 +355,6 @@ function exportarVendas($vendas, $formato) {
     }
 }
 
-// ===== PROCESSAMENTO DE EXPORTAÇÃO =====
-if (isset($_GET['exportar'])) {
-    $formato = $_GET['exportar'];
-
-    // Reaplica filtros
-    $filtros_export = [
-        'cpf' => $_GET['filtro_cpf'] ?? '',
-        'titular' => $_GET['filtro_titular'] ?? '',
-        'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
-        'status' => $_GET['filtro_status'] ?? '',
-        'data_inicio' => $_GET['data_inicio'] ?? '',
-        'data_fim' => $_GET['data_fim'] ?? '',
-        'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
-        'produto_alterado' => isset($_GET['filtro_produto_alterado']),
-        'venda_a_vista' => isset($_GET['filtro_venda_a_vista']),
-        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
-        'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
-        'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
-        'apenas_duplicadas' => isset($_GET['apenas_duplicadas']),
-        'csv_selecionado' => $_GET['filtro_csv'] ?? ''
-    ];
-
-    // Busca arquivos CSV
-    $arquivos = listarCSVs('vendas');
-    $todas_vendas = [];
-
-    if (!empty($filtros_export['csv_selecionado'])) {
-        // CSV específico
-        foreach ($arquivos as $arquivo) {
-            if ($arquivo['caminho'] === $filtros_export['csv_selecionado']) {
-                $resultado = processarVendasCSV($arquivo['caminho']);
-                $todas_vendas = $resultado['vendas'];
-                break;
-            }
-        }
-    } else {
-        // Todos os CSVs
-        foreach ($arquivos as $arquivo) {
-            $resultado = processarVendasCSV($arquivo['caminho']);
-            $todas_vendas = array_merge($todas_vendas, $resultado['vendas']);
-        }
-    }
-
-    $vendas_export = aplicarFiltrosAvancados($todas_vendas, $filtros_export);
-    exportarVendas($vendas_export, $formato);
-    exit;
-}
-
-// ===== PROCESSAMENTO AJAX (retorna JSON) =====
-if (isset($_GET['ajax'])) {
-    header('Content-Type: application/json');
-
-    $filtros_ajax = [
-        'cpf' => $_GET['filtro_cpf'] ?? '',
-        'titular' => $_GET['filtro_titular'] ?? '',
-        'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
-        'status' => $_GET['filtro_status'] ?? '',
-        'data_inicio' => $_GET['data_inicio'] ?? '',
-        'data_fim' => $_GET['data_fim'] ?? '',
-        'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
-        'produto_alterado' => isset($_GET['filtro_produto_alterado']) && $_GET['filtro_produto_alterado'] === 'true',
-        'venda_a_vista' => isset($_GET['filtro_venda_a_vista']) && $_GET['filtro_venda_a_vista'] === 'true',
-        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
-        'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
-        'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
-        'apenas_duplicadas' => isset($_GET['apenas_duplicadas']) && $_GET['apenas_duplicadas'] === 'true',
-        'csv_selecionado' => $_GET['filtro_csv'] ?? ''
-    ];
-
-    // Busca arquivos CSV
-    $arquivos = listarCSVs('vendas');
-    $todas_vendas_ajax = [];
-
-    if (!empty($filtros_ajax['csv_selecionado'])) {
-        // CSV específico
-        foreach ($arquivos as $arquivo) {
-            if ($arquivo['caminho'] === $filtros_ajax['csv_selecionado']) {
-                $resultado = processarVendasCSV($arquivo['caminho']);
-                $todas_vendas_ajax = $resultado['vendas'];
-                break;
-            }
-        }
-    } else {
-        // Todos os CSVs
-        foreach ($arquivos as $arquivo) {
-            $resultado = processarVendasCSV($arquivo['caminho']);
-            $todas_vendas_ajax = array_merge($todas_vendas_ajax, $resultado['vendas']);
-        }
-    }
-
-    $vendas_ajax = aplicarFiltrosAvancados($todas_vendas_ajax, $filtros_ajax);
-    $duplicidades_ajax = detectarDuplicidadesPorCPF($vendas_ajax);
-
-    // Ordena por CPF
-    usort($vendas_ajax, function($a, $b) use ($duplicidades_ajax) {
-        $cpf_a = preg_replace('/[^0-9]/', '', $a['cpf'] ?? '');
-        $cpf_b = preg_replace('/[^0-9]/', '', $b['cpf'] ?? '');
-
-        $cmp_cpf = strcmp($cpf_a, $cpf_b);
-        if ($cmp_cpf !== 0) return $cmp_cpf;
-
-        return strtotime($b['data_cadastro']) - strtotime($a['data_cadastro']);
-    });
-
-    $total_principais_ajax = 0;
-    foreach ($duplicidades_ajax as $grupo) {
-        foreach ($grupo as $v) {
-            if (isset($v['e_principal'])) $total_principais_ajax++;
-        }
-    }
-
-    echo json_encode([
-        'total_sem_filtro' => count($todas_vendas_ajax),
-        'total_duplicados' => count($duplicidades_ajax),
-        'total_principais' => $total_principais_ajax,
-        'total_filtrados' => count($vendas_ajax),
-        'vendas' => $vendas_ajax,
-        'duplicidades' => $duplicidades_ajax
-    ]);
-    exit;
-}
-
 // ===== CARREGA DADOS INICIAIS =====
 $arquivos_vendas = listarCSVs('vendas');
 $csv_selecionado = $_GET['filtro_csv'] ?? '';
@@ -454,7 +379,7 @@ if (!empty($csv_selecionado)) {
 
 $total_sem_filtro = count($todas_vendas);
 
-// Aplica filtros iniciais
+// Aplica filtros
 $filtros = [
     'cpf' => $_GET['filtro_cpf'] ?? '',
     'titular' => $_GET['filtro_titular'] ?? '',
@@ -506,7 +431,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
         <div class="card-header bg-warning text-dark">
             <h4 class="mb-0">
                 <i class="fas fa-tasks"></i> Gestão Avançada de Vendas
-                <span class="badge badge-secondary" id="badgeCSV">
+                <span class="badge badge-secondary">
                     📄 <?= empty($csv_selecionado) ? 'Todos os CSVs' : basename($csv_selecionado) ?>
                 </span>
             </h4>
@@ -518,7 +443,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                 <div class="col-md-3">
                     <div class="card bg-primary text-white">
                         <div class="card-body text-center">
-                            <h3 id="statTotal"><?= number_format($total_sem_filtro) ?></h3>
+                            <h3><?= number_format($total_sem_filtro) ?></h3>
                             <p class="mb-0">Total de Vendas</p>
                         </div>
                     </div>
@@ -526,7 +451,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                 <div class="col-md-3">
                     <div class="card bg-danger text-white">
                         <div class="card-body text-center">
-                            <h3 id="statDuplicados"><?= count($duplicidades) ?></h3>
+                            <h3><?= count($duplicidades) ?></h3>
                             <p class="mb-0">CPFs Duplicados</p>
                         </div>
                     </div>
@@ -542,7 +467,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                 }
                             }
                             ?>
-                            <h3 id="statPrincipais"><?= $total_principais ?></h3>
+                            <h3><?= $total_principais ?></h3>
                             <p class="mb-0">Vendas Principais</p>
                         </div>
                     </div>
@@ -550,7 +475,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                 <div class="col-md-3">
                     <div class="card bg-info text-white">
                         <div class="card-body text-center">
-                            <h3 id="statFiltrados"><?= count($vendas_filtradas) ?></h3>
+                            <h3><?= count($vendas_filtradas) ?></h3>
                             <p class="mb-0">Resultados Filtrados</p>
                         </div>
                     </div>
@@ -560,15 +485,18 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
             <!-- Botões de Exportação -->
             <div class="mb-3 text-right">
                 <div class="btn-group">
-                    <button class="btn btn-success" onclick="exportarDados('csv')">
+                    <a href="?page=gestao_vendas&exportar=csv&<?= http_build_query(array_filter($filtros)) ?>"
+                       class="btn btn-success">
                         <i class="fas fa-file-csv"></i> CSV
-                    </button>
-                    <button class="btn btn-primary" onclick="exportarDados('excel')">
+                    </a>
+                    <a href="?page=gestao_vendas&exportar=excel&<?= http_build_query(array_filter($filtros)) ?>"
+                       class="btn btn-primary">
                         <i class="fas fa-file-excel"></i> Excel
-                    </button>
-                    <button class="btn btn-secondary" onclick="exportarDados('json')">
+                    </a>
+                    <a href="?page=gestao_vendas&exportar=json&<?= http_build_query(array_filter($filtros)) ?>"
+                       class="btn btn-secondary">
                         <i class="fas fa-file-code"></i> JSON
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -578,13 +506,14 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                     <h5 class="mb-0"><i class="fas fa-filter"></i> Filtros Avançados</h5>
                 </div>
                 <div class="card-body">
-                    <form id="formFiltros">
+                    <form method="get">
+                        <input type="hidden" name="page" value="gestao_vendas">
 
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label><i class="fas fa-file-csv"></i> Arquivo CSV</label>
-                                    <select class="form-control form-control-sm" name="filtro_csv" id="filtro_csv">
+                                    <select class="form-control form-control-sm" name="filtro_csv">
                                         <option value="">📄 Todos os CSVs</option>
                                         <?php foreach ($arquivos_vendas as $arquivo): ?>
                                             <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
@@ -599,7 +528,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-id-card"></i> CPF</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_cpf" id="filtro_cpf"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_cpf"
                                            placeholder="000.000.000-00"
                                            value="<?= htmlspecialchars($filtros['cpf']) ?>">
                                 </div>
@@ -608,7 +537,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label><i class="fas fa-user"></i> Nome Cliente</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_titular" id="filtro_titular"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_titular"
                                            placeholder="Nome do titular"
                                            value="<?= htmlspecialchars($filtros['titular']) ?>">
                                 </div>
@@ -617,7 +546,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-ticket-alt"></i> ID Cota</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_titulo_id" id="filtro_titulo_id"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_titulo_id"
                                            placeholder="SFA-12345"
                                            value="<?= htmlspecialchars($filtros['titulo_id']) ?>">
                                 </div>
@@ -626,7 +555,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-flag"></i> Status</label>
-                                    <select class="form-control form-control-sm" name="filtro_status" id="filtro_status">
+                                    <select class="form-control form-control-sm" name="filtro_status">
                                         <option value="">Todos</option>
                                         <option value="Ativo" <?= $filtros['status'] === 'Ativo' ? 'selected' : '' ?>>Ativo</option>
                                         <option value="Bloqueado" <?= $filtros['status'] === 'Bloqueado' ? 'selected' : '' ?>>Bloqueado</option>
@@ -640,7 +569,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-calendar"></i> Data Início</label>
-                                    <input type="date" class="form-control form-control-sm" name="data_inicio" id="data_inicio"
+                                    <input type="date" class="form-control form-control-sm" name="data_inicio"
                                            value="<?= htmlspecialchars($filtros['data_inicio']) ?>">
                                 </div>
                             </div>
@@ -648,7 +577,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-calendar"></i> Data Fim</label>
-                                    <input type="date" class="form-control form-control-sm" name="data_fim" id="data_fim"
+                                    <input type="date" class="form-control form-control-sm" name="data_fim"
                                            value="<?= htmlspecialchars($filtros['data_fim']) ?>">
                                 </div>
                             </div>
@@ -656,7 +585,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-credit-card"></i> Forma Pgto</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_forma_pagamento" id="filtro_forma_pagamento"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_forma_pagamento"
                                            placeholder="PIX, Boleto, etc"
                                            value="<?= htmlspecialchars($filtros['forma_pagamento']) ?>">
                                 </div>
@@ -665,7 +594,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-money-bill"></i> Valor Pago Min</label>
-                                    <input type="number" class="form-control form-control-sm" name="valor_pago_min" id="valor_pago_min"
+                                    <input type="number" class="form-control form-control-sm" name="valor_pago_min"
                                            step="0.01" placeholder="0.00"
                                            value="<?= htmlspecialchars($filtros['valor_pago_min']) ?>">
                                 </div>
@@ -674,7 +603,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-money-bill"></i> Valor Pago Max</label>
-                                    <input type="number" class="form-control form-control-sm" name="valor_pago_max" id="valor_pago_max"
+                                    <input type="number" class="form-control form-control-sm" name="valor_pago_max"
                                            step="0.01" placeholder="0.00"
                                            value="<?= htmlspecialchars($filtros['valor_pago_max']) ?>">
                                 </div>
@@ -683,7 +612,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-check-circle"></i> 1ª Parcela</label>
-                                    <select class="form-control form-control-sm" name="filtro_primeira_parcela" id="filtro_primeira_parcela">
+                                    <select class="form-control form-control-sm" name="filtro_primeira_parcela">
                                         <option value="">Todas</option>
                                         <option value="paga" <?= $filtros['primeira_parcela'] === 'paga' ? 'selected' : '' ?>>Paga</option>
                                         <option value="nao_paga" <?= $filtros['primeira_parcela'] === 'nao_paga' ? 'selected' : '' ?>>Não Paga</option>
@@ -693,7 +622,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                         </div>
 
                         <div class="row">
-                            <div class="col-md-12">
+                            <div class="col-md-9">
                                 <div class="form-group">
                                     <label>&nbsp;</label>
                                     <div>
@@ -724,12 +653,20 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="text-right">
-                            <button type="button" class="btn btn-secondary" onclick="limparFiltros()">
-                                <i class="fas fa-times"></i> Limpar
-                            </button>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <div class="text-right">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search"></i> Filtrar
+                                        </button>
+                                        <a href="?page=gestao_vendas" class="btn btn-secondary">
+                                            <i class="fas fa-times"></i> Limpar
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -753,7 +690,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <th class="text-center">Duplicidade</th>
                         </tr>
                     </thead>
-                    <tbody id="tabelaBody">
+                    <tbody>
                         <?php if (empty($vendas_filtradas)): ?>
                             <tr>
                                 <td colspan="11" class="text-center">Nenhuma venda encontrada.</td>
@@ -775,6 +712,15 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
 
                                 $produto_alterado = !empty($venda['produto_alterado']);
                                 $classe_linha = $e_principal ? 'table-success' : ($e_duplicada ? 'table-warning' : '');
+
+                                // Status badge color (case insensitive)
+                                $status_lower = strtolower($venda['status']);
+                                $badge_color = 'danger';
+                                if ($status_lower === 'ativo' || $status_lower === 'ativa') {
+                                    $badge_color = 'success';
+                                } elseif ($status_lower === 'bloqueado' || $status_lower === 'bloqueada') {
+                                    $badge_color = 'warning';
+                                }
                             ?>
                             <tr class="<?= $classe_linha ?>">
                                 <td><small><?= htmlspecialchars($venda['id']) ?></small></td>
@@ -790,15 +736,6 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                 <td><small><?= htmlspecialchars($venda['produto_original']) ?></small></td>
                                 <td><small><?= htmlspecialchars($venda['consultor']) ?></small></td>
                                 <td>
-                                    <?php
-                                    $status_lower = strtolower($venda['status']);
-                                    $badge_color = 'danger';
-                                    if ($status_lower === 'ativo' || $status_lower === 'ativa') {
-                                        $badge_color = 'success';
-                                    } elseif ($status_lower === 'bloqueada' || $status_lower === 'bloqueado') {
-                                        $badge_color = 'warning';
-                                    }
-                                    ?>
                                     <span class="badge badge-<?= $badge_color ?> badge-sm">
                                         <?= $venda['status'] ?>
                                     </span>
@@ -852,182 +789,15 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
 
 <script>
-let dataTable;
-
 $(document).ready(function() {
-    // Inicializa DataTable
-    dataTable = $('#tabelaGestaoVendas').DataTable({
+    $('#tabelaGestaoVendas').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
         },
         order: [[1, 'desc']],
         pageLength: 50
     });
-
-    // Filtros AJAX em tempo real
-    $('#formFiltros input, #formFiltros select').on('change keyup', function(e) {
-        // Se apertou Enter, aplica imediatamente
-        if (e.type === 'keyup' && e.keyCode === 13) {
-            aplicarFiltrosAjax();
-            return;
-        }
-
-        // Senão, aguarda 500ms
-        clearTimeout(window.filtroTimeout);
-        window.filtroTimeout = setTimeout(aplicarFiltrosAjax, 500);
-    });
-
-    $('#formFiltros input[type="checkbox"]').on('change', function() {
-        aplicarFiltrosAjax();
-    });
-
-    // Previne submit do formulário
-    $('#formFiltros').on('submit', function(e) {
-        e.preventDefault();
-        aplicarFiltrosAjax();
-        return false;
-    });
 });
-
-function aplicarFiltrosAjax() {
-    const formData = {
-        ajax: '1',
-        filtro_csv: $('#filtro_csv').val(),
-        filtro_cpf: $('#filtro_cpf').val(),
-        filtro_titular: $('#filtro_titular').val(),
-        filtro_titulo_id: $('#filtro_titulo_id').val(),
-        filtro_status: $('#filtro_status').val(),
-        data_inicio: $('#data_inicio').val(),
-        data_fim: $('#data_fim').val(),
-        filtro_primeira_parcela: $('#filtro_primeira_parcela').val(),
-        filtro_forma_pagamento: $('#filtro_forma_pagamento').val(),
-        valor_pago_min: $('#valor_pago_min').val(),
-        valor_pago_max: $('#valor_pago_max').val(),
-        filtro_produto_alterado: $('#filtro_produto_alterado').is(':checked') ? 'true' : '',
-        filtro_venda_a_vista: $('#filtro_venda_a_vista').is(':checked') ? 'true' : '',
-        apenas_duplicadas: $('#apenas_duplicadas').is(':checked') ? 'true' : ''
-    };
-
-    $.get('?page=gestao_vendas', formData, function(response) {
-        // Atualiza estatísticas
-        $('#statTotal').text(response.total_sem_filtro.toLocaleString('pt-BR'));
-        $('#statDuplicados').text(response.total_duplicados);
-        $('#statPrincipais').text(response.total_principais);
-        $('#statFiltrados').text(response.total_filtrados);
-
-        // Atualiza badge CSV
-        const csvSelecionado = $('#filtro_csv option:selected').text();
-        $('#badgeCSV').text(csvSelecionado);
-
-        // Reconstrói tabela
-        dataTable.destroy();
-        $('#tabelaBody').html(renderizarLinhas(response.vendas, response.duplicidades));
-
-        dataTable = $('#tabelaGestaoVendas').DataTable({
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
-            },
-            order: [[1, 'desc']],
-            pageLength: 50
-        });
-    });
-}
-
-function renderizarLinhas(vendas, duplicidades) {
-    if (vendas.length === 0) {
-        return '<tr><td colspan="11" class="text-center">Nenhuma venda encontrada.</td></tr>';
-    }
-
-    let html = '';
-    vendas.forEach(venda => {
-        const cpfLimpo = venda.cpf.replace(/[^0-9]/g, '');
-        const eDuplicada = duplicidades.hasOwnProperty(cpfLimpo);
-        let ePrincipal = false;
-
-        if (eDuplicada) {
-            duplicidades[cpfLimpo].forEach(v => {
-                if (v.id === venda.id && v.e_principal) {
-                    ePrincipal = true;
-                }
-            });
-        }
-
-        const produtoAlterado = venda.produto_alterado || false;
-        const classeLinha = ePrincipal ? 'table-success' : (eDuplicada ? 'table-warning' : '');
-        const primeiraParcela = venda.primeira_parcela_paga || venda.valor_pago > 0;
-
-        let badgeStatus = 'danger';
-        const statusLower = (venda.status || '').toLowerCase();
-        if (statusLower === 'ativo' || statusLower === 'ativa') {
-            badgeStatus = 'success';
-        } else if (statusLower === 'bloqueado' || statusLower === 'bloqueada') {
-            badgeStatus = 'warning';
-        } else if (statusLower === 'cancelado' || statusLower === 'cancelada') {
-            badgeStatus = 'danger';
-        }
-
-        html += `<tr class="${classeLinha}">
-            <td><small>${venda.id}</small></td>
-            <td><small>${new Date(venda.data_cadastro).toLocaleDateString('pt-BR')}</small></td>
-            <td><small>${venda.titular}</small></td>
-            <td><small>${venda.cpf}</small></td>
-            <td>
-                <small>${venda.produto_atual}</small>
-                ${produtoAlterado ? '<i class="fas fa-exclamation-triangle text-warning" title="Alterado"></i>' : ''}
-            </td>
-            <td><small>${venda.produto_original}</small></td>
-            <td><small>${venda.consultor}</small></td>
-            <td><span class="badge badge-${badgeStatus} badge-sm">${venda.status}</span></td>
-            <td><small>${venda.forma_pagamento || '-'}</small></td>
-            <td class="text-right">
-                <small>R$ ${venda.valor_pago.toFixed(2).replace('.', ',')}</small>
-                ${primeiraParcela ? '<i class="fas fa-check-circle text-success" title="1ª Parcela Paga"></i>' : ''}
-            </td>
-            <td class="text-center">
-                ${ePrincipal ? '<span class="badge badge-success"><i class="fas fa-star"></i> Principal</span>' :
-                  (eDuplicada ? '<span class="badge badge-warning"><i class="fas fa-copy"></i> Duplicada</span>' :
-                   '<span class="badge badge-secondary"><i class="fas fa-check"></i> Única</span>')}
-            </td>
-        </tr>`;
-    });
-
-    return html;
-}
-
-function exportarDados(formato) {
-    const formData = new URLSearchParams({
-        page: 'gestao_vendas',
-        exportar: formato,
-        filtro_csv: $('#filtro_csv').val(),
-        filtro_cpf: $('#filtro_cpf').val(),
-        filtro_titular: $('#filtro_titular').val(),
-        filtro_titulo_id: $('#filtro_titulo_id').val(),
-        filtro_status: $('#filtro_status').val(),
-        data_inicio: $('#data_inicio').val(),
-        data_fim: $('#data_fim').val(),
-        filtro_primeira_parcela: $('#filtro_primeira_parcela').val(),
-        filtro_forma_pagamento: $('#filtro_forma_pagamento').val(),
-        valor_pago_min: $('#valor_pago_min').val(),
-        valor_pago_max: $('#valor_pago_max').val()
-    });
-
-    if ($('#filtro_produto_alterado').is(':checked')) {
-        formData.append('filtro_produto_alterado', 'true');
-    }
-    if ($('#filtro_venda_a_vista').is(':checked')) {
-        formData.append('filtro_venda_a_vista', 'true');
-    }
-    if ($('#apenas_duplicadas').is(':checked')) {
-        formData.append('apenas_duplicadas', 'true');
-    }
-
-    window.location.href = '?' + formData.toString();
-}
-
-function limparFiltros() {
-    $('#formFiltros')[0].reset();
-    aplicarFiltrosAjax();
-}
 </script>
 
 </body>
