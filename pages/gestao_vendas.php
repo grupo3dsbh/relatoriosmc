@@ -628,9 +628,9 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                     <label><i class="fas fa-flag"></i> Status</label>
                                     <select class="form-control form-control-sm" name="filtro_status" id="filtro_status">
                                         <option value="">Todos</option>
-                                        <option value="Ativa" <?= $filtros['status'] === 'Ativa' ? 'selected' : '' ?>>Ativa</option>
-                                        <option value="Bloqueada" <?= $filtros['status'] === 'Bloqueada' ? 'selected' : '' ?>>Bloqueada</option>
-                                        <option value="Cancelada" <?= $filtros['status'] === 'Cancelada' ? 'selected' : '' ?>>Cancelada</option>
+                                        <option value="Ativo" <?= $filtros['status'] === 'Ativo' ? 'selected' : '' ?>>Ativo</option>
+                                        <option value="Bloqueado" <?= $filtros['status'] === 'Bloqueado' ? 'selected' : '' ?>>Bloqueado</option>
+                                        <option value="Cancelado" <?= $filtros['status'] === 'Cancelado' ? 'selected' : '' ?>>Cancelado</option>
                                     </select>
                                 </div>
                             </div>
@@ -790,7 +790,16 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                 <td><small><?= htmlspecialchars($venda['produto_original']) ?></small></td>
                                 <td><small><?= htmlspecialchars($venda['consultor']) ?></small></td>
                                 <td>
-                                    <span class="badge badge-<?= $venda['status'] === 'Ativa' ? 'success' : ($venda['status'] === 'Bloqueada' ? 'warning' : 'danger') ?> badge-sm">
+                                    <?php
+                                    $status_lower = strtolower($venda['status']);
+                                    $badge_color = 'danger';
+                                    if ($status_lower === 'ativo' || $status_lower === 'ativa') {
+                                        $badge_color = 'success';
+                                    } elseif ($status_lower === 'bloqueada' || $status_lower === 'bloqueado') {
+                                        $badge_color = 'warning';
+                                    }
+                                    ?>
+                                    <span class="badge badge-<?= $badge_color ?> badge-sm">
                                         <?= $venda['status'] ?>
                                     </span>
                                 </td>
@@ -856,13 +865,27 @@ $(document).ready(function() {
     });
 
     // Filtros AJAX em tempo real
-    $('#formFiltros input, #formFiltros select').on('change keyup', function() {
+    $('#formFiltros input, #formFiltros select').on('change keyup', function(e) {
+        // Se apertou Enter, aplica imediatamente
+        if (e.type === 'keyup' && e.keyCode === 13) {
+            aplicarFiltrosAjax();
+            return;
+        }
+
+        // Senão, aguarda 500ms
         clearTimeout(window.filtroTimeout);
         window.filtroTimeout = setTimeout(aplicarFiltrosAjax, 500);
     });
 
     $('#formFiltros input[type="checkbox"]').on('change', function() {
         aplicarFiltrosAjax();
+    });
+
+    // Previne submit do formulário
+    $('#formFiltros').on('submit', function(e) {
+        e.preventDefault();
+        aplicarFiltrosAjax();
+        return false;
     });
 });
 
@@ -933,10 +956,15 @@ function renderizarLinhas(vendas, duplicidades) {
         const classeLinha = ePrincipal ? 'table-success' : (eDuplicada ? 'table-warning' : '');
         const primeiraParcela = venda.primeira_parcela_paga || venda.valor_pago > 0;
 
-        let badgeStatus = 'secondary';
-        if (venda.status === 'Ativa') badgeStatus = 'success';
-        else if (venda.status === 'Bloqueada') badgeStatus = 'warning';
-        else if (venda.status === 'Cancelada') badgeStatus = 'danger';
+        let badgeStatus = 'danger';
+        const statusLower = (venda.status || '').toLowerCase();
+        if (statusLower === 'ativo' || statusLower === 'ativa') {
+            badgeStatus = 'success';
+        } else if (statusLower === 'bloqueado' || statusLower === 'bloqueada') {
+            badgeStatus = 'warning';
+        } else if (statusLower === 'cancelado' || statusLower === 'cancelada') {
+            badgeStatus = 'danger';
+        }
 
         html += `<tr class="${classeLinha}">
             <td><small>${venda.id}</small></td>
