@@ -277,25 +277,27 @@ function processarVendasCSV($arquivo, $filtros = []) {
             $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
 
-            // IMPORTANTE: Define qual data usar para diferentes propósitos
-            // Para vendas alteradas:
-            //   - DataCadastro = data original da venda
-            //   - DataVenda = data da alteração
-            // Para vendas normais:
-            //   - DataCadastro = DataVenda = data da venda
+            // IMPORTANTE: SEMPRE usa DataCadastro (data original da venda)
+            // DataVenda é apenas informativa (data da última alteração)
+            //
+            // Comportamento:
+            // - Para vendas NORMAIS: DataCadastro = DataVenda = data da venda
+            // - Para vendas ALTERADAS: DataCadastro = data original, DataVenda = data da alteração
+            //
+            // REGRA: Sempre usar DataCadastro para filtros e pontuação
 
             // VALIDAÇÃO DEFENSIVA: Se data_cadastro estiver vazia/inválida, usa data_venda como fallback
             $data_cadastro_valida = !empty($venda['data_cadastro']) && strtotime($venda['data_cadastro']) !== false;
             $data_venda_valida = !empty($venda['data_venda']) && strtotime($venda['data_venda']) !== false;
 
-            // Se produto alterado MAS data_cadastro inválida, força usar data_venda
-            $usar_data_cadastro = $venda['produto_alterado'] && $data_cadastro_valida;
+            // Escolhe qual data usar (prioriza data_cadastro)
+            $data_para_usar = $data_cadastro_valida ? $venda['data_cadastro'] : ($data_venda_valida ? $venda['data_venda'] : $venda['data_venda']);
 
-            // Para FILTROS de período: usa DataCadastro quando alterado E válido
-            $venda['data_para_filtro'] = $usar_data_cadastro ? $venda['data_cadastro'] : $venda['data_venda'];
+            // Para FILTROS de período: SEMPRE DataCadastro (data original)
+            $venda['data_para_filtro'] = $data_para_usar;
 
-            // Para PONTUAÇÃO/RANGES: usa DataCadastro quando alterado E válido
-            $venda['data_para_pontuacao'] = $usar_data_cadastro ? $venda['data_cadastro'] : $venda['data_venda'];
+            // Para PONTUAÇÃO/RANGES: SEMPRE DataCadastro (data original)
+            $venda['data_para_pontuacao'] = $data_para_usar;
 
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
