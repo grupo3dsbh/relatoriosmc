@@ -59,86 +59,6 @@ if (!$tem_acesso):
     return;
 endif;
 
-// ===== PROCESSAMENTO DE EXPORTAÇÃO =====
-if (isset($_GET['exportar'])) {
-    $formato = $_GET['exportar'];
-
-    // Reaplica filtros
-    $filtros_export = [
-        'cpf' => $_GET['filtro_cpf'] ?? '',
-        'titular' => $_GET['filtro_titular'] ?? '',
-        'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
-        'status' => $_GET['filtro_status'] ?? '',
-        'data_inicio' => $_GET['data_inicio'] ?? '',
-        'data_fim' => $_GET['data_fim'] ?? '',
-        'primeira_parcela_paga' => isset($_GET['filtro_primeira_parcela']),
-        'produto_alterado' => isset($_GET['filtro_produto_alterado']),
-        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
-        'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
-        'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
-        'apenas_duplicadas' => isset($_GET['apenas_duplicadas'])
-    ];
-
-    // Busca TODOS os arquivos CSV
-    $arquivos = listarCSVs('vendas');
-    $todas_vendas = [];
-
-    foreach ($arquivos as $arquivo) {
-        $resultado = processarVendasCSV($arquivo['caminho']);
-        $todas_vendas = array_merge($todas_vendas, $resultado['vendas']);
-    }
-
-    $vendas_export = aplicarFiltrosAvancados($todas_vendas, $filtros_export);
-    exportarVendas($vendas_export, $formato);
-    exit;
-}
-
-// ===== CARREGA TODAS AS VENDAS DE TODOS OS CSVs =====
-$arquivos_vendas = listarCSVs('vendas');
-$todas_vendas = [];
-$total_sem_filtro = 0;
-
-if (!empty($arquivos_vendas)) {
-    foreach ($arquivos_vendas as $arquivo) {
-        $vendas_processadas = processarVendasCSV($arquivo['caminho']);
-        $todas_vendas = array_merge($todas_vendas, $vendas_processadas['vendas']);
-    }
-}
-
-$total_sem_filtro = count($todas_vendas);
-
-// Aplica filtros
-$filtros = [
-    'cpf' => $_GET['filtro_cpf'] ?? '',
-    'titular' => $_GET['filtro_titular'] ?? '',
-    'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
-    'status' => $_GET['filtro_status'] ?? '',
-    'data_inicio' => $_GET['data_inicio'] ?? '',
-    'data_fim' => $_GET['data_fim'] ?? '',
-    'primeira_parcela_paga' => isset($_GET['filtro_primeira_parcela']),
-    'produto_alterado' => isset($_GET['filtro_produto_alterado']),
-    'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
-    'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
-    'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
-    'apenas_duplicadas' => isset($_GET['apenas_duplicadas'])
-];
-
-$vendas_filtradas = aplicarFiltrosAvancados($todas_vendas, $filtros);
-
-// Detecta duplicidades
-$duplicidades = detectarDuplicidadesPorCPF($vendas_filtradas);
-
-// Ordena por CPF
-usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
-    $cpf_a = preg_replace('/[^0-9]/', '', $a['cpf'] ?? '');
-    $cpf_b = preg_replace('/[^0-9]/', '', $b['cpf'] ?? '');
-
-    $cmp_cpf = strcmp($cpf_a, $cpf_b);
-    if ($cmp_cpf !== 0) return $cmp_cpf;
-
-    return strtotime($b['data_cadastro']) - strtotime($a['data_cadastro']);
-});
-
 // ===== FUNÇÕES AUXILIARES =====
 
 function aplicarFiltrosAvancados($vendas, $filtros) {
@@ -190,17 +110,31 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
         });
     }
 
-    // Filtro Primeira Parcela Paga
-    if ($filtros['primeira_parcela_paga']) {
-        $resultado = array_filter($resultado, function($v) {
-            return !empty($v['primeira_parcela_paga']) || (!empty($v['valor_pago']) && $v['valor_pago'] > 0);
-        });
+    // Filtro Primeira Parcela (Paga/Não Paga/Todas)
+    if (!empty($filtros['primeira_parcela'])) {
+        if ($filtros['primeira_parcela'] === 'paga') {
+            $resultado = array_filter($resultado, function($v) {
+                return !empty($v['primeira_parcela_paga']) || (!empty($v['valor_pago']) && $v['valor_pago'] > 0);
+            });
+        } elseif ($filtros['primeira_parcela'] === 'nao_paga') {
+            $resultado = array_filter($resultado, function($v) {
+                return empty($v['primeira_parcela_paga']) && (empty($v['valor_pago']) || $v['valor_pago'] == 0);
+            });
+        }
     }
 
     // Filtro Produto Alterado
     if ($filtros['produto_alterado']) {
         $resultado = array_filter($resultado, function($v) {
             return !empty($v['produto_alterado']);
+        });
+    }
+
+    // Filtro Venda à Vista
+    if ($filtros['venda_a_vista']) {
+        $resultado = array_filter($resultado, function($v) {
+            return stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
+                   stripos($v['forma_pagamento'] ?? '', 'à vista') !== false;
         });
     }
 
@@ -223,6 +157,25 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
         $resultado = array_filter($resultado, function($v) use ($filtros) {
             return ($v['valor_pago'] ?? 0) <= (float) $filtros['valor_pago_max'];
         });
+    }
+
+    // Filtro Apenas Duplicadas
+    if ($filtros['apenas_duplicadas']) {
+        $por_cpf = [];
+        foreach ($resultado as $v) {
+            $cpf = preg_replace('/[^0-9]/', '', $v['cpf'] ?? '');
+            if (!empty($cpf)) {
+                $por_cpf[$cpf][] = $v;
+            }
+        }
+
+        $duplicadas = [];
+        foreach ($por_cpf as $cpf => $vendas_cpf) {
+            if (count($vendas_cpf) > 1) {
+                $duplicadas = array_merge($duplicadas, $vendas_cpf);
+            }
+        }
+        $resultado = $duplicadas;
     }
 
     return array_values($resultado);
@@ -276,8 +229,7 @@ function exportarVendas($vendas, $formato) {
 
             fputcsv($output, [
                 'ID', 'Data Cadastro', 'Titular', 'CPF', 'Produto Original', 'Produto Atual',
-                'Produto Alterado', 'Consultor', 'Status', 'Forma Pagamento',
-                'Valor Total', 'Valor Pago', 'Valor Restante', 'Primeira Parcela Paga'
+                'Consultor', 'Status', 'Forma Pagamento', 'Valor Pago', 'Primeira Parcela Paga'
             ], ';');
 
             foreach ($vendas as $v) {
@@ -288,13 +240,10 @@ function exportarVendas($vendas, $formato) {
                     $v['cpf'],
                     $v['produto_original'],
                     $v['produto_atual'],
-                    ($v['produto_alterado'] ?? false) ? 'Sim' : 'Não',
                     $v['consultor'],
                     $v['status'],
                     $v['forma_pagamento'] ?? '',
-                    number_format($v['valor_total'], 2, ',', '.'),
                     number_format($v['valor_pago'], 2, ',', '.'),
-                    number_format($v['valor_restante'], 2, ',', '.'),
                     ($v['primeira_parcela_paga'] ?? false) ? 'Sim' : 'Não'
                 ], ';');
             }
@@ -306,11 +255,23 @@ function exportarVendas($vendas, $formato) {
             header('Content-Type: application/json; charset=utf-8');
             header('Content-Disposition: attachment; filename="' . $nome_arquivo . '.json"');
 
-            echo json_encode([
-                'exportacao' => date('Y-m-d H:i:s'),
-                'total' => count($vendas),
-                'vendas' => $vendas
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $dados_limpos = array_map(function($v) {
+                return [
+                    'id' => $v['id'],
+                    'data_cadastro' => $v['data_cadastro'],
+                    'titular' => $v['titular'],
+                    'cpf' => $v['cpf'],
+                    'produto_original' => $v['produto_original'],
+                    'produto_atual' => $v['produto_atual'],
+                    'consultor' => $v['consultor'],
+                    'status' => $v['status'],
+                    'forma_pagamento' => $v['forma_pagamento'] ?? '',
+                    'valor_pago' => $v['valor_pago'],
+                    'primeira_parcela_paga' => $v['primeira_parcela_paga'] ?? false
+                ];
+            }, $vendas);
+
+            echo json_encode($dados_limpos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             break;
 
         case 'excel':
@@ -321,9 +282,9 @@ function exportarVendas($vendas, $formato) {
             echo '<head><meta charset="UTF-8"></head><body>';
             echo '<table border="1"><thead><tr>';
             echo '<th>ID</th><th>Data Cadastro</th><th>Titular</th><th>CPF</th>';
-            echo '<th>Produto Original</th><th>Produto Atual</th><th>Produto Alterado</th>';
+            echo '<th>Produto Original</th><th>Produto Atual</th>';
             echo '<th>Consultor</th><th>Status</th><th>Forma Pagamento</th>';
-            echo '<th>Valor Total</th><th>Valor Pago</th><th>Primeira Parcela</th>';
+            echo '<th>Valor Pago</th><th>Primeira Parcela</th>';
             echo '</tr></thead><tbody>';
 
             foreach ($vendas as $v) {
@@ -334,11 +295,9 @@ function exportarVendas($vendas, $formato) {
                 echo '<td>' . htmlspecialchars($v['cpf']) . '</td>';
                 echo '<td>' . htmlspecialchars($v['produto_original']) . '</td>';
                 echo '<td>' . htmlspecialchars($v['produto_atual']) . '</td>';
-                echo '<td>' . (($v['produto_alterado'] ?? false) ? 'Sim' : 'Não') . '</td>';
                 echo '<td>' . htmlspecialchars($v['consultor']) . '</td>';
                 echo '<td>' . htmlspecialchars($v['status']) . '</td>';
                 echo '<td>' . htmlspecialchars($v['forma_pagamento'] ?? '') . '</td>';
-                echo '<td>' . number_format($v['valor_total'], 2, ',', '.') . '</td>';
                 echo '<td>' . number_format($v['valor_pago'], 2, ',', '.') . '</td>';
                 echo '<td>' . (($v['primeira_parcela_paga'] ?? false) ? 'Sim' : 'Não') . '</td>';
                 echo '</tr>';
@@ -348,6 +307,186 @@ function exportarVendas($vendas, $formato) {
             break;
     }
 }
+
+// ===== PROCESSAMENTO DE EXPORTAÇÃO =====
+if (isset($_GET['exportar'])) {
+    $formato = $_GET['exportar'];
+
+    // Reaplica filtros
+    $filtros_export = [
+        'cpf' => $_GET['filtro_cpf'] ?? '',
+        'titular' => $_GET['filtro_titular'] ?? '',
+        'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
+        'status' => $_GET['filtro_status'] ?? '',
+        'data_inicio' => $_GET['data_inicio'] ?? '',
+        'data_fim' => $_GET['data_fim'] ?? '',
+        'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
+        'produto_alterado' => isset($_GET['filtro_produto_alterado']),
+        'venda_a_vista' => isset($_GET['filtro_venda_a_vista']),
+        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
+        'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
+        'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
+        'apenas_duplicadas' => isset($_GET['apenas_duplicadas']),
+        'csv_selecionado' => $_GET['filtro_csv'] ?? ''
+    ];
+
+    // Busca arquivos CSV
+    $arquivos = listarCSVs('vendas');
+    $todas_vendas = [];
+
+    if (!empty($filtros_export['csv_selecionado'])) {
+        // CSV específico
+        foreach ($arquivos as $arquivo) {
+            if ($arquivo['caminho'] === $filtros_export['csv_selecionado']) {
+                $resultado = processarVendasCSV($arquivo['caminho']);
+                $todas_vendas = $resultado['vendas'];
+                break;
+            }
+        }
+    } else {
+        // Todos os CSVs
+        foreach ($arquivos as $arquivo) {
+            $resultado = processarVendasCSV($arquivo['caminho']);
+            $todas_vendas = array_merge($todas_vendas, $resultado['vendas']);
+        }
+    }
+
+    $vendas_export = aplicarFiltrosAvancados($todas_vendas, $filtros_export);
+    exportarVendas($vendas_export, $formato);
+    exit;
+}
+
+// ===== PROCESSAMENTO AJAX (retorna JSON) =====
+if (isset($_GET['ajax'])) {
+    header('Content-Type: application/json');
+
+    $filtros_ajax = [
+        'cpf' => $_GET['filtro_cpf'] ?? '',
+        'titular' => $_GET['filtro_titular'] ?? '',
+        'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
+        'status' => $_GET['filtro_status'] ?? '',
+        'data_inicio' => $_GET['data_inicio'] ?? '',
+        'data_fim' => $_GET['data_fim'] ?? '',
+        'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
+        'produto_alterado' => isset($_GET['filtro_produto_alterado']) && $_GET['filtro_produto_alterado'] === 'true',
+        'venda_a_vista' => isset($_GET['filtro_venda_a_vista']) && $_GET['filtro_venda_a_vista'] === 'true',
+        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
+        'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
+        'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
+        'apenas_duplicadas' => isset($_GET['apenas_duplicadas']) && $_GET['apenas_duplicadas'] === 'true',
+        'csv_selecionado' => $_GET['filtro_csv'] ?? ''
+    ];
+
+    // Busca arquivos CSV
+    $arquivos = listarCSVs('vendas');
+    $todas_vendas_ajax = [];
+
+    if (!empty($filtros_ajax['csv_selecionado'])) {
+        // CSV específico
+        foreach ($arquivos as $arquivo) {
+            if ($arquivo['caminho'] === $filtros_ajax['csv_selecionado']) {
+                $resultado = processarVendasCSV($arquivo['caminho']);
+                $todas_vendas_ajax = $resultado['vendas'];
+                break;
+            }
+        }
+    } else {
+        // Todos os CSVs
+        foreach ($arquivos as $arquivo) {
+            $resultado = processarVendasCSV($arquivo['caminho']);
+            $todas_vendas_ajax = array_merge($todas_vendas_ajax, $resultado['vendas']);
+        }
+    }
+
+    $vendas_ajax = aplicarFiltrosAvancados($todas_vendas_ajax, $filtros_ajax);
+    $duplicidades_ajax = detectarDuplicidadesPorCPF($vendas_ajax);
+
+    // Ordena por CPF
+    usort($vendas_ajax, function($a, $b) use ($duplicidades_ajax) {
+        $cpf_a = preg_replace('/[^0-9]/', '', $a['cpf'] ?? '');
+        $cpf_b = preg_replace('/[^0-9]/', '', $b['cpf'] ?? '');
+
+        $cmp_cpf = strcmp($cpf_a, $cpf_b);
+        if ($cmp_cpf !== 0) return $cmp_cpf;
+
+        return strtotime($b['data_cadastro']) - strtotime($a['data_cadastro']);
+    });
+
+    $total_principais_ajax = 0;
+    foreach ($duplicidades_ajax as $grupo) {
+        foreach ($grupo as $v) {
+            if (isset($v['e_principal'])) $total_principais_ajax++;
+        }
+    }
+
+    echo json_encode([
+        'total_sem_filtro' => count($todas_vendas_ajax),
+        'total_duplicados' => count($duplicidades_ajax),
+        'total_principais' => $total_principais_ajax,
+        'total_filtrados' => count($vendas_ajax),
+        'vendas' => $vendas_ajax,
+        'duplicidades' => $duplicidades_ajax
+    ]);
+    exit;
+}
+
+// ===== CARREGA DADOS INICIAIS =====
+$arquivos_vendas = listarCSVs('vendas');
+$csv_selecionado = $_GET['filtro_csv'] ?? '';
+$todas_vendas = [];
+
+if (!empty($csv_selecionado)) {
+    // CSV específico
+    foreach ($arquivos_vendas as $arquivo) {
+        if ($arquivo['caminho'] === $csv_selecionado) {
+            $vendas_processadas = processarVendasCSV($arquivo['caminho']);
+            $todas_vendas = $vendas_processadas['vendas'];
+            break;
+        }
+    }
+} else {
+    // Todos os CSVs
+    foreach ($arquivos_vendas as $arquivo) {
+        $vendas_processadas = processarVendasCSV($arquivo['caminho']);
+        $todas_vendas = array_merge($todas_vendas, $vendas_processadas['vendas']);
+    }
+}
+
+$total_sem_filtro = count($todas_vendas);
+
+// Aplica filtros iniciais
+$filtros = [
+    'cpf' => $_GET['filtro_cpf'] ?? '',
+    'titular' => $_GET['filtro_titular'] ?? '',
+    'titulo_id' => $_GET['filtro_titulo_id'] ?? '',
+    'status' => $_GET['filtro_status'] ?? '',
+    'data_inicio' => $_GET['data_inicio'] ?? '',
+    'data_fim' => $_GET['data_fim'] ?? '',
+    'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
+    'produto_alterado' => isset($_GET['filtro_produto_alterado']),
+    'venda_a_vista' => isset($_GET['filtro_venda_a_vista']),
+    'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
+    'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
+    'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
+    'apenas_duplicadas' => isset($_GET['apenas_duplicadas']),
+    'csv_selecionado' => $csv_selecionado
+];
+
+$vendas_filtradas = aplicarFiltrosAvancados($todas_vendas, $filtros);
+
+// Detecta duplicidades
+$duplicidades = detectarDuplicidadesPorCPF($vendas_filtradas);
+
+// Ordena por CPF
+usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
+    $cpf_a = preg_replace('/[^0-9]/', '', $a['cpf'] ?? '');
+    $cpf_b = preg_replace('/[^0-9]/', '', $b['cpf'] ?? '');
+
+    $cmp_cpf = strcmp($cpf_a, $cpf_b);
+    if ($cmp_cpf !== 0) return $cmp_cpf;
+
+    return strtotime($b['data_cadastro']) - strtotime($a['data_cadastro']);
+});
 
 ?>
 
@@ -367,7 +506,9 @@ function exportarVendas($vendas, $formato) {
         <div class="card-header bg-warning text-dark">
             <h4 class="mb-0">
                 <i class="fas fa-tasks"></i> Gestão Avançada de Vendas
-                <span class="badge badge-secondary">📄 Todos os CSVs</span>
+                <span class="badge badge-secondary" id="badgeCSV">
+                    📄 <?= empty($csv_selecionado) ? 'Todos os CSVs' : basename($csv_selecionado) ?>
+                </span>
             </h4>
         </div>
         <div class="card-body">
@@ -377,7 +518,7 @@ function exportarVendas($vendas, $formato) {
                 <div class="col-md-3">
                     <div class="card bg-primary text-white">
                         <div class="card-body text-center">
-                            <h3><?= number_format($total_sem_filtro) ?></h3>
+                            <h3 id="statTotal"><?= number_format($total_sem_filtro) ?></h3>
                             <p class="mb-0">Total de Vendas</p>
                         </div>
                     </div>
@@ -385,7 +526,7 @@ function exportarVendas($vendas, $formato) {
                 <div class="col-md-3">
                     <div class="card bg-danger text-white">
                         <div class="card-body text-center">
-                            <h3><?= count($duplicidades) ?></h3>
+                            <h3 id="statDuplicados"><?= count($duplicidades) ?></h3>
                             <p class="mb-0">CPFs Duplicados</p>
                         </div>
                     </div>
@@ -401,7 +542,7 @@ function exportarVendas($vendas, $formato) {
                                 }
                             }
                             ?>
-                            <h3><?= $total_principais ?></h3>
+                            <h3 id="statPrincipais"><?= $total_principais ?></h3>
                             <p class="mb-0">Vendas Principais</p>
                         </div>
                     </div>
@@ -409,7 +550,7 @@ function exportarVendas($vendas, $formato) {
                 <div class="col-md-3">
                     <div class="card bg-info text-white">
                         <div class="card-body text-center">
-                            <h3><?= count($vendas_filtradas) ?></h3>
+                            <h3 id="statFiltrados"><?= count($vendas_filtradas) ?></h3>
                             <p class="mb-0">Resultados Filtrados</p>
                         </div>
                     </div>
@@ -419,18 +560,15 @@ function exportarVendas($vendas, $formato) {
             <!-- Botões de Exportação -->
             <div class="mb-3 text-right">
                 <div class="btn-group">
-                    <a href="?page=gestao_vendas&exportar=csv&<?= http_build_query(array_filter($filtros)) ?>"
-                       class="btn btn-success">
+                    <button class="btn btn-success" onclick="exportarDados('csv')">
                         <i class="fas fa-file-csv"></i> CSV
-                    </a>
-                    <a href="?page=gestao_vendas&exportar=excel&<?= http_build_query(array_filter($filtros)) ?>"
-                       class="btn btn-primary">
+                    </button>
+                    <button class="btn btn-primary" onclick="exportarDados('excel')">
                         <i class="fas fa-file-excel"></i> Excel
-                    </a>
-                    <a href="?page=gestao_vendas&exportar=json&<?= http_build_query(array_filter($filtros)) ?>"
-                       class="btn btn-secondary">
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportarDados('json')">
                         <i class="fas fa-file-code"></i> JSON
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -440,14 +578,28 @@ function exportarVendas($vendas, $formato) {
                     <h5 class="mb-0"><i class="fas fa-filter"></i> Filtros Avançados</h5>
                 </div>
                 <div class="card-body">
-                    <form method="get">
-                        <input type="hidden" name="page" value="gestao_vendas">
+                    <form id="formFiltros">
 
                         <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label><i class="fas fa-file-csv"></i> Arquivo CSV</label>
+                                    <select class="form-control form-control-sm" name="filtro_csv" id="filtro_csv">
+                                        <option value="">📄 Todos os CSVs</option>
+                                        <?php foreach ($arquivos_vendas as $arquivo): ?>
+                                            <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
+                                                    <?= $csv_selecionado === $arquivo['caminho'] ? 'selected' : '' ?>>
+                                                📄 <?= htmlspecialchars($arquivo['nome']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-id-card"></i> CPF</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_cpf"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_cpf" id="filtro_cpf"
                                            placeholder="000.000.000-00"
                                            value="<?= htmlspecialchars($filtros['cpf']) ?>">
                                 </div>
@@ -456,7 +608,7 @@ function exportarVendas($vendas, $formato) {
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label><i class="fas fa-user"></i> Nome Cliente</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_titular"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_titular" id="filtro_titular"
                                            placeholder="Nome do titular"
                                            value="<?= htmlspecialchars($filtros['titular']) ?>">
                                 </div>
@@ -465,7 +617,7 @@ function exportarVendas($vendas, $formato) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-ticket-alt"></i> ID Cota</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_titulo_id"
+                                    <input type="text" class="form-control form-control-sm" name="filtro_titulo_id" id="filtro_titulo_id"
                                            placeholder="SFA-12345"
                                            value="<?= htmlspecialchars($filtros['titulo_id']) ?>">
                                 </div>
@@ -474,20 +626,12 @@ function exportarVendas($vendas, $formato) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-flag"></i> Status</label>
-                                    <select class="form-control form-control-sm" name="filtro_status">
+                                    <select class="form-control form-control-sm" name="filtro_status" id="filtro_status">
                                         <option value="">Todos</option>
-                                        <option value="Ativo" <?= $filtros['status'] === 'Ativo' ? 'selected' : '' ?>>Ativo</option>
-                                        <option value="Desativado" <?= $filtros['status'] === 'Desativado' ? 'selected' : '' ?>>Desativado</option>
+                                        <option value="Ativa" <?= $filtros['status'] === 'Ativa' ? 'selected' : '' ?>>Ativa</option>
+                                        <option value="Bloqueada" <?= $filtros['status'] === 'Bloqueada' ? 'selected' : '' ?>>Bloqueada</option>
+                                        <option value="Cancelada" <?= $filtros['status'] === 'Cancelada' ? 'selected' : '' ?>>Cancelada</option>
                                     </select>
-                                </div>
-                            </div>
-
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label><i class="fas fa-credit-card"></i> Forma Pgto</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_forma_pagamento"
-                                           placeholder="PIX, Boleto, etc"
-                                           value="<?= htmlspecialchars($filtros['forma_pagamento']) ?>">
                                 </div>
                             </div>
                         </div>
@@ -496,7 +640,7 @@ function exportarVendas($vendas, $formato) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-calendar"></i> Data Início</label>
-                                    <input type="date" class="form-control form-control-sm" name="data_inicio"
+                                    <input type="date" class="form-control form-control-sm" name="data_inicio" id="data_inicio"
                                            value="<?= htmlspecialchars($filtros['data_inicio']) ?>">
                                 </div>
                             </div>
@@ -504,15 +648,24 @@ function exportarVendas($vendas, $formato) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-calendar"></i> Data Fim</label>
-                                    <input type="date" class="form-control form-control-sm" name="data_fim"
+                                    <input type="date" class="form-control form-control-sm" name="data_fim" id="data_fim"
                                            value="<?= htmlspecialchars($filtros['data_fim']) ?>">
                                 </div>
                             </div>
 
                             <div class="col-md-2">
                                 <div class="form-group">
+                                    <label><i class="fas fa-credit-card"></i> Forma Pgto</label>
+                                    <input type="text" class="form-control form-control-sm" name="filtro_forma_pagamento" id="filtro_forma_pagamento"
+                                           placeholder="PIX, Boleto, etc"
+                                           value="<?= htmlspecialchars($filtros['forma_pagamento']) ?>">
+                                </div>
+                            </div>
+
+                            <div class="col-md-2">
+                                <div class="form-group">
                                     <label><i class="fas fa-money-bill"></i> Valor Pago Min</label>
-                                    <input type="number" class="form-control form-control-sm" name="valor_pago_min"
+                                    <input type="number" class="form-control form-control-sm" name="valor_pago_min" id="valor_pago_min"
                                            step="0.01" placeholder="0.00"
                                            value="<?= htmlspecialchars($filtros['valor_pago_min']) ?>">
                                 </div>
@@ -521,30 +674,43 @@ function exportarVendas($vendas, $formato) {
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label><i class="fas fa-money-bill"></i> Valor Pago Max</label>
-                                    <input type="number" class="form-control form-control-sm" name="valor_pago_max"
+                                    <input type="number" class="form-control form-control-sm" name="valor_pago_max" id="valor_pago_max"
                                            step="0.01" placeholder="0.00"
                                            value="<?= htmlspecialchars($filtros['valor_pago_max']) ?>">
                                 </div>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label><i class="fas fa-check-circle"></i> 1ª Parcela</label>
+                                    <select class="form-control form-control-sm" name="filtro_primeira_parcela" id="filtro_primeira_parcela">
+                                        <option value="">Todas</option>
+                                        <option value="paga" <?= $filtros['primeira_parcela'] === 'paga' ? 'selected' : '' ?>>Paga</option>
+                                        <option value="nao_paga" <?= $filtros['primeira_parcela'] === 'nao_paga' ? 'selected' : '' ?>>Não Paga</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
                                 <div class="form-group">
                                     <label>&nbsp;</label>
                                     <div>
                                         <div class="custom-control custom-checkbox custom-control-inline">
                                             <input type="checkbox" class="custom-control-input"
-                                                   id="filtro_primeira_parcela" name="filtro_primeira_parcela"
-                                                   <?= $filtros['primeira_parcela_paga'] ? 'checked' : '' ?>>
-                                            <label class="custom-control-label" for="filtro_primeira_parcela">
-                                                <small>1ª Parcela</small>
+                                                   id="filtro_produto_alterado" name="filtro_produto_alterado"
+                                                   <?= $filtros['produto_alterado'] ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="filtro_produto_alterado">
+                                                <small>Produto Alterado</small>
                                             </label>
                                         </div>
                                         <div class="custom-control custom-checkbox custom-control-inline">
                                             <input type="checkbox" class="custom-control-input"
-                                                   id="filtro_produto_alterado" name="filtro_produto_alterado"
-                                                   <?= $filtros['produto_alterado'] ? 'checked' : '' ?>>
-                                            <label class="custom-control-label" for="filtro_produto_alterado">
-                                                <small>Alterado</small>
+                                                   id="filtro_venda_a_vista" name="filtro_venda_a_vista"
+                                                   <?= $filtros['venda_a_vista'] ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="filtro_venda_a_vista">
+                                                <small>Venda à Vista</small>
                                             </label>
                                         </div>
                                         <div class="custom-control custom-checkbox custom-control-inline">
@@ -552,7 +718,7 @@ function exportarVendas($vendas, $formato) {
                                                    id="apenas_duplicadas" name="apenas_duplicadas"
                                                    <?= $filtros['apenas_duplicadas'] ? 'checked' : '' ?>>
                                             <label class="custom-control-label" for="apenas_duplicadas">
-                                                <small>Duplicadas</small>
+                                                <small>Apenas Duplicadas</small>
                                             </label>
                                         </div>
                                     </div>
@@ -561,12 +727,9 @@ function exportarVendas($vendas, $formato) {
                         </div>
 
                         <div class="text-right">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-search"></i> Filtrar
-                            </button>
-                            <a href="?page=gestao_vendas" class="btn btn-secondary">
+                            <button type="button" class="btn btn-secondary" onclick="limparFiltros()">
                                 <i class="fas fa-times"></i> Limpar
-                            </a>
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -587,14 +750,13 @@ function exportarVendas($vendas, $formato) {
                             <th>Status</th>
                             <th>Forma Pgto</th>
                             <th class="text-right">Valor Pago</th>
-                            <th class="text-right">Valor Total</th>
                             <th class="text-center">Duplicidade</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="tabelaBody">
                         <?php if (empty($vendas_filtradas)): ?>
                             <tr>
-                                <td colspan="12" class="text-center">Nenhuma venda encontrada.</td>
+                                <td colspan="11" class="text-center">Nenhuma venda encontrada.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($vendas_filtradas as $venda):
@@ -628,7 +790,7 @@ function exportarVendas($vendas, $formato) {
                                 <td><small><?= htmlspecialchars($venda['produto_original']) ?></small></td>
                                 <td><small><?= htmlspecialchars($venda['consultor']) ?></small></td>
                                 <td>
-                                    <span class="badge badge-<?= $venda['status'] === 'Ativo' ? 'success' : 'danger' ?> badge-sm">
+                                    <span class="badge badge-<?= $venda['status'] === 'Ativa' ? 'success' : ($venda['status'] === 'Bloqueada' ? 'warning' : 'danger') ?> badge-sm">
                                         <?= $venda['status'] ?>
                                     </span>
                                 </td>
@@ -638,9 +800,6 @@ function exportarVendas($vendas, $formato) {
                                     <?php if (!empty($venda['primeira_parcela_paga']) || $venda['valor_pago'] > 0): ?>
                                         <i class="fas fa-check-circle text-success" title="1ª Parcela Paga"></i>
                                     <?php endif; ?>
-                                </td>
-                                <td class="text-right">
-                                    <small>R$ <?= number_format($venda['valor_total'], 2, ',', '.') ?></small>
                                 </td>
                                 <td class="text-center">
                                     <?php if ($e_principal): ?>
@@ -684,15 +843,163 @@ function exportarVendas($vendas, $formato) {
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
 
 <script>
+let dataTable;
+
 $(document).ready(function() {
-    $('#tabelaGestaoVendas').DataTable({
+    // Inicializa DataTable
+    dataTable = $('#tabelaGestaoVendas').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
         },
         order: [[1, 'desc']],
         pageLength: 50
     });
+
+    // Filtros AJAX em tempo real
+    $('#formFiltros input, #formFiltros select').on('change keyup', function() {
+        clearTimeout(window.filtroTimeout);
+        window.filtroTimeout = setTimeout(aplicarFiltrosAjax, 500);
+    });
+
+    $('#formFiltros input[type="checkbox"]').on('change', function() {
+        aplicarFiltrosAjax();
+    });
 });
+
+function aplicarFiltrosAjax() {
+    const formData = {
+        ajax: '1',
+        filtro_csv: $('#filtro_csv').val(),
+        filtro_cpf: $('#filtro_cpf').val(),
+        filtro_titular: $('#filtro_titular').val(),
+        filtro_titulo_id: $('#filtro_titulo_id').val(),
+        filtro_status: $('#filtro_status').val(),
+        data_inicio: $('#data_inicio').val(),
+        data_fim: $('#data_fim').val(),
+        filtro_primeira_parcela: $('#filtro_primeira_parcela').val(),
+        filtro_forma_pagamento: $('#filtro_forma_pagamento').val(),
+        valor_pago_min: $('#valor_pago_min').val(),
+        valor_pago_max: $('#valor_pago_max').val(),
+        filtro_produto_alterado: $('#filtro_produto_alterado').is(':checked') ? 'true' : '',
+        filtro_venda_a_vista: $('#filtro_venda_a_vista').is(':checked') ? 'true' : '',
+        apenas_duplicadas: $('#apenas_duplicadas').is(':checked') ? 'true' : ''
+    };
+
+    $.get('?page=gestao_vendas', formData, function(response) {
+        // Atualiza estatísticas
+        $('#statTotal').text(response.total_sem_filtro.toLocaleString('pt-BR'));
+        $('#statDuplicados').text(response.total_duplicados);
+        $('#statPrincipais').text(response.total_principais);
+        $('#statFiltrados').text(response.total_filtrados);
+
+        // Atualiza badge CSV
+        const csvSelecionado = $('#filtro_csv option:selected').text();
+        $('#badgeCSV').text(csvSelecionado);
+
+        // Reconstrói tabela
+        dataTable.destroy();
+        $('#tabelaBody').html(renderizarLinhas(response.vendas, response.duplicidades));
+
+        dataTable = $('#tabelaGestaoVendas').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
+            },
+            order: [[1, 'desc']],
+            pageLength: 50
+        });
+    });
+}
+
+function renderizarLinhas(vendas, duplicidades) {
+    if (vendas.length === 0) {
+        return '<tr><td colspan="11" class="text-center">Nenhuma venda encontrada.</td></tr>';
+    }
+
+    let html = '';
+    vendas.forEach(venda => {
+        const cpfLimpo = venda.cpf.replace(/[^0-9]/g, '');
+        const eDuplicada = duplicidades.hasOwnProperty(cpfLimpo);
+        let ePrincipal = false;
+
+        if (eDuplicada) {
+            duplicidades[cpfLimpo].forEach(v => {
+                if (v.id === venda.id && v.e_principal) {
+                    ePrincipal = true;
+                }
+            });
+        }
+
+        const produtoAlterado = venda.produto_alterado || false;
+        const classeLinha = ePrincipal ? 'table-success' : (eDuplicada ? 'table-warning' : '');
+        const primeiraParcela = venda.primeira_parcela_paga || venda.valor_pago > 0;
+
+        let badgeStatus = 'secondary';
+        if (venda.status === 'Ativa') badgeStatus = 'success';
+        else if (venda.status === 'Bloqueada') badgeStatus = 'warning';
+        else if (venda.status === 'Cancelada') badgeStatus = 'danger';
+
+        html += `<tr class="${classeLinha}">
+            <td><small>${venda.id}</small></td>
+            <td><small>${new Date(venda.data_cadastro).toLocaleDateString('pt-BR')}</small></td>
+            <td><small>${venda.titular}</small></td>
+            <td><small>${venda.cpf}</small></td>
+            <td>
+                <small>${venda.produto_atual}</small>
+                ${produtoAlterado ? '<i class="fas fa-exclamation-triangle text-warning" title="Alterado"></i>' : ''}
+            </td>
+            <td><small>${venda.produto_original}</small></td>
+            <td><small>${venda.consultor}</small></td>
+            <td><span class="badge badge-${badgeStatus} badge-sm">${venda.status}</span></td>
+            <td><small>${venda.forma_pagamento || '-'}</small></td>
+            <td class="text-right">
+                <small>R$ ${venda.valor_pago.toFixed(2).replace('.', ',')}</small>
+                ${primeiraParcela ? '<i class="fas fa-check-circle text-success" title="1ª Parcela Paga"></i>' : ''}
+            </td>
+            <td class="text-center">
+                ${ePrincipal ? '<span class="badge badge-success"><i class="fas fa-star"></i> Principal</span>' :
+                  (eDuplicada ? '<span class="badge badge-warning"><i class="fas fa-copy"></i> Duplicada</span>' :
+                   '<span class="badge badge-secondary"><i class="fas fa-check"></i> Única</span>')}
+            </td>
+        </tr>`;
+    });
+
+    return html;
+}
+
+function exportarDados(formato) {
+    const formData = new URLSearchParams({
+        page: 'gestao_vendas',
+        exportar: formato,
+        filtro_csv: $('#filtro_csv').val(),
+        filtro_cpf: $('#filtro_cpf').val(),
+        filtro_titular: $('#filtro_titular').val(),
+        filtro_titulo_id: $('#filtro_titulo_id').val(),
+        filtro_status: $('#filtro_status').val(),
+        data_inicio: $('#data_inicio').val(),
+        data_fim: $('#data_fim').val(),
+        filtro_primeira_parcela: $('#filtro_primeira_parcela').val(),
+        filtro_forma_pagamento: $('#filtro_forma_pagamento').val(),
+        valor_pago_min: $('#valor_pago_min').val(),
+        valor_pago_max: $('#valor_pago_max').val()
+    });
+
+    if ($('#filtro_produto_alterado').is(':checked')) {
+        formData.append('filtro_produto_alterado', 'true');
+    }
+    if ($('#filtro_venda_a_vista').is(':checked')) {
+        formData.append('filtro_venda_a_vista', 'true');
+    }
+    if ($('#apenas_duplicadas').is(':checked')) {
+        formData.append('apenas_duplicadas', 'true');
+    }
+
+    window.location.href = '?' + formData.toString();
+}
+
+function limparFiltros() {
+    $('#formFiltros')[0].reset();
+    aplicarFiltrosAjax();
+}
 </script>
 
 </body>
