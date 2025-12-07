@@ -980,15 +980,26 @@ function converterPontosPadrao($pontos_padrao) {
 /**
  * Calcula pontos com ranges de pontuação por data (CORRIGIDO)
  */
-function calcularPontosComRanges($vendas_detalhes) {
+function calcularPontosComRanges($vendas_detalhes, $nome_consultor = '') {
     $pontos_total = 0;
     $detalhamento_por_range = [];
 
     // DEBUG: Armazena info para exibir na tela com godmode
     $debug_info = [];
+    $debug_todas_vendas = []; // Para mostrar TODAS as vendas de um consultor
 
     foreach ($vendas_detalhes as $detalhe) {
-        // DEBUG: Captura info para venda específica SFA-9340
+        // DEBUG: Captura TODAS as vendas se for consultor específico
+        if (isGodMode() && !empty($nome_consultor) && stripos($nome_consultor, 'LUCIANA') !== false) {
+            // Adiciona info básica de CADA venda
+            $debug_todas_vendas[] = [
+                'id' => $detalhe['id_venda'] ?? 'N/A',
+                'vagas' => $detalhe['num_vagas'] ?? 0,
+                'data_usada' => substr($detalhe['data_venda'] ?? '', 0, 10),
+            ];
+        }
+
+        // DEBUG: Captura info detalhada para venda específica SFA-9340
         if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
             $debug_info['SFA-9340'] = [
                 'data_venda_usada' => $detalhe['data_venda'] ?? 'NULL',
@@ -1025,6 +1036,15 @@ function calcularPontosComRanges($vendas_detalhes) {
         // Identifica qual range foi usado
         $range_usado = identificarRange($detalhe['data_venda']);
 
+        // DEBUG: Adiciona pontos de TODAS as vendas da LUCIANA
+        if (isGodMode() && !empty($nome_consultor) && stripos($nome_consultor, 'LUCIANA') !== false) {
+            $ultimo_indice = count($debug_todas_vendas) - 1;
+            if ($ultimo_indice >= 0) {
+                $debug_todas_vendas[$ultimo_indice]['range'] = $range_usado;
+                $debug_todas_vendas[$ultimo_indice]['pontos'] = $pontos;
+            }
+        }
+
         // DEBUG: Adiciona info do range usado para SFA-9340
         if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
             $debug_info['SFA-9340']['range_usado'] = $range_usado;
@@ -1058,19 +1078,43 @@ function calcularPontosComRanges($vendas_detalhes) {
     }
 
     // DEBUG: Exibe na tela se godmode ativo
-    if (!empty($debug_info) && isGodMode()) {
-        echo '<div class="alert alert-warning mt-3"><strong>🔍 DEBUG PONTUAÇÃO (GodMode):</strong><br>';
-        foreach ($debug_info as $id => $info) {
-            echo "<strong>Venda {$id}:</strong><br>";
-            echo "• Data usada para pontuação: <strong>{$info['data_venda_usada']}</strong><br>";
-            echo "• DataCadastro (original): {$info['data_cadastro_original']}<br>";
-            echo "• DataVenda (alteração): {$info['data_venda_original']}<br>";
-            echo "• Número de vagas: {$info['num_vagas']}<br>";
-            echo "• Range aplicado: <strong class='text-danger'>{$info['range_usado']}</strong><br>";
-            echo "• Categoria: {$info['categoria']}<br>";
-            echo "• Pontos calculados: <strong>{$info['pontos_calculados']}</strong><br>";
+    if (isGodMode()) {
+        // DEBUG da venda SFA-9340
+        if (!empty($debug_info)) {
+            echo '<div class="alert alert-warning mt-3"><strong>🔍 DEBUG PONTUAÇÃO - SFA-9340 (GodMode):</strong><br>';
+            foreach ($debug_info as $id => $info) {
+                echo "<strong>Venda {$id}:</strong><br>";
+                echo "• Data usada para pontuação: <strong>{$info['data_venda_usada']}</strong><br>";
+                echo "• DataCadastro (original): {$info['data_cadastro_original']}<br>";
+                echo "• DataVenda (alteração): {$info['data_venda_original']}<br>";
+                echo "• Número de vagas: {$info['num_vagas']}<br>";
+                echo "• Range aplicado: <strong class='text-danger'>{$info['range_usado']}</strong><br>";
+                echo "• Categoria: {$info['categoria']}<br>";
+                echo "• Pontos calculados: <strong>{$info['pontos_calculados']}</strong><br>";
+            }
+            echo '</div>';
         }
-        echo '</div>';
+
+        // DEBUG de TODAS as vendas da LUCIANA
+        if (!empty($debug_todas_vendas)) {
+            $total_pts = array_sum(array_column($debug_todas_vendas, 'pontos'));
+            echo '<div class="alert alert-info mt-3">';
+            echo '<strong>🔍 DEBUG TODAS AS VENDAS - ' . htmlspecialchars($nome_consultor) . ':</strong><br>';
+            echo '<strong>TOTAL CALCULADO: ' . $total_pts . ' pontos</strong><br><br>';
+            echo '<table class="table table-sm table-bordered mt-2">';
+            echo '<thead><tr><th>ID</th><th>Vagas</th><th>Data Usada</th><th>Range</th><th>Pontos</th></tr></thead><tbody>';
+            foreach ($debug_todas_vendas as $v) {
+                echo '<tr>';
+                echo '<td>' . htmlspecialchars($v['id']) . '</td>';
+                echo '<td>' . $v['vagas'] . '</td>';
+                echo '<td>' . $v['data_usada'] . '</td>';
+                echo '<td>' . htmlspecialchars($v['range']) . '</td>';
+                echo '<td><strong>' . $v['pontos'] . '</strong></td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+            echo '</div>';
+        }
     }
 
     // Monta detalhamento final
@@ -1153,14 +1197,14 @@ function processarVendasComRanges($arquivo, $filtros = []) {
     
     foreach ($resultado['por_consultor'] as $consultor) {
         $consultor_nome = $consultor['consultor'];
-        
-        // Calcula pontos com ranges
-        $calculo_pontos = calcularPontosComRanges($consultor['vendas_detalhes']);
-        
+
+        // Calcula pontos com ranges (passa nome do consultor para debug)
+        $calculo_pontos = calcularPontosComRanges($consultor['vendas_detalhes'], $consultor_nome);
+
         $consultor['pontos'] = $calculo_pontos['pontos_total'];
         $consultor['detalhamento_pontos'] = $calculo_pontos['detalhamento'];
         $consultor['detalhamento_por_range'] = $calculo_pontos['detalhamento_por_range'];
-        
+
         $por_consultor[] = $consultor;
     }
     
