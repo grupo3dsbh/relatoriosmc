@@ -346,7 +346,10 @@ function processarVendasCSV($arquivo, $filtros = []) {
             $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
                 'num_vagas' => $venda['num_vagas'],
                 'e_vista' => $venda['e_vista'],
-                'data_venda' => $venda['data_para_pontuacao'],  // Usa data original para ranges
+                'data_venda' => $venda['data_para_pontuacao'],  // Usa data original (DataCadastro) para ranges
+                'data_cadastro_original' => $venda['data_cadastro'], // DEBUG: guardar para verificação
+                'data_venda_original' => $venda['data_venda'], // DEBUG: guardar para verificação
+                'id_venda' => $venda['id'], // DEBUG: para rastreamento
                 'valor_total' => $venda['valor_total'],
                 'valor_pago' => $venda['valor_pago']
             ];
@@ -912,6 +915,9 @@ function obterConfiguracaoPontosPorData($data_venda) {
         $data_fim->setTime(23, 59, 59); // Fim do dia
 
         if ($data >= $data_inicio && $data <= $data_fim) {
+            // DEBUG: Log do range encontrado
+            error_log("DEBUG obterConfiguracaoPontosPorData: Data " . $data_venda . " está no range: " . ($range['nome'] ?? 'sem nome') . " (" . $range['data_inicio'] . " a " . $range['data_fim'] . ")");
+
             // Verifica se os pontos estão em um objeto "pontos" ou diretamente no range
             if (isset($range['pontos']) && is_array($range['pontos'])) {
                 return $range['pontos'];
@@ -979,7 +985,15 @@ function calcularPontosComRanges($vendas_detalhes) {
     $detalhamento_por_range = [];
     
     foreach ($vendas_detalhes as $detalhe) {
-        // Obtm configuração de pontos baseada na data da venda
+        // DEBUG: Log para venda específica SFA-9340
+        if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
+            error_log("DEBUG SFA-9340:");
+            error_log("  data_venda (usado para pontuação): " . ($detalhe['data_venda'] ?? 'NULL'));
+            error_log("  data_cadastro_original: " . ($detalhe['data_cadastro_original'] ?? 'NULL'));
+            error_log("  data_venda_original: " . ($detalhe['data_venda_original'] ?? 'NULL'));
+        }
+
+        // Obtém configuração de pontos baseada na data da venda (que deveria ser DataCadastro!)
         $config_pontos_raw = obterConfiguracaoPontosPorData($detalhe['data_venda']);
         
         // Converte para formato compatível se necessário
