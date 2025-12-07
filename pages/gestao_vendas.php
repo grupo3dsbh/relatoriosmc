@@ -280,8 +280,7 @@ function exportarVendas($vendas, $formato) {
             ], ';');
 
             foreach ($vendas as $v) {
-                $tipo_pgto = (stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
-                              stripos($v['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+                $tipo_pgto = $v['tipo_pagamento'] ?? 'Parcelado';
 
                 fputcsv($output, [
                     $v['id'],
@@ -307,8 +306,7 @@ function exportarVendas($vendas, $formato) {
             header('Content-Disposition: attachment; filename="' . $nome_arquivo . '.json"');
 
             $dados_limpos = array_map(function($v) {
-                $tipo_pgto = (stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
-                              stripos($v['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+                $tipo_pgto = $v['tipo_pagamento'] ?? 'Parcelado';
 
                 return [
                     'id' => $v['id'],
@@ -343,8 +341,7 @@ function exportarVendas($vendas, $formato) {
             echo '</tr></thead><tbody>';
 
             foreach ($vendas as $v) {
-                $tipo_pgto = (stripos($v['forma_pagamento'] ?? '', 'vista') !== false ||
-                              stripos($v['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+                $tipo_pgto = $v['tipo_pagamento'] ?? 'Parcelado';
 
                 echo '<tr>';
                 echo '<td>' . htmlspecialchars($v['id']) . '</td>';
@@ -756,8 +753,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                 <td><small><?= htmlspecialchars($venda['forma_pagamento'] ?? '-') ?></small></td>
                                 <td class="text-center">
                                     <?php
-                                    $tipo_pgto = (stripos($venda['forma_pagamento'] ?? '', 'vista') !== false ||
-                                                  stripos($venda['forma_pagamento'] ?? '', 'à vista') !== false) ? 'À Vista' : 'Parcelado';
+                                    $tipo_pgto = $venda['tipo_pagamento'] ?? 'Parcelado';
                                     $badge_tipo = ($tipo_pgto === 'À Vista') ? 'info' : 'secondary';
                                     ?>
                                     <span class="badge badge-<?= $badge_tipo ?> badge-sm"><?= $tipo_pgto ?></span>
