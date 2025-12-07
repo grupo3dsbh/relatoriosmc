@@ -5,6 +5,22 @@ require_once 'functions/vendas.php';
 require_once 'functions/promotores.php';
 require_once 'functions/pin_manager.php';
 
+/**
+ * Exibe nome do consultor com apelido (se existir) e tooltip com nome original
+ */
+function exibirNomeConsultor($nome_original) {
+    $apelidos = carregarApelidosConsultores();
+
+    if (isset($apelidos[$nome_original])) {
+        $apelido = $apelidos[$nome_original]['apelido'];
+        return '<span title="' . htmlspecialchars($nome_original) . '" data-toggle="tooltip" style="cursor: help; border-bottom: 1px dotted #999;">'
+               . htmlspecialchars($apelido)
+               . '</span>';
+    }
+
+    return htmlspecialchars($nome_original);
+}
+
 // Inicializa variáveis de sessão
 if (!isset($_SESSION['detalhes_vendas'])) {
     $_SESSION['detalhes_vendas'] = [
@@ -353,7 +369,7 @@ $(document).ready(function() {
                                     <option value="">-- Selecione seu nome --</option>
                                     <?php foreach ($consultores_disponiveis as $consultor): ?>
                                         <option value="<?= htmlspecialchars($consultor) ?>">
-                                            <?= htmlspecialchars($consultor) ?>
+                                            <?= exibirNomeConsultor($consultor) ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -377,7 +393,7 @@ $(document).ready(function() {
                         <!-- Validação com PIN -->
                         <div class="alert alert-success">
                             <i class="fas fa-star"></i>
-                            <strong>Bem-vindo de volta, <?= htmlspecialchars($consultor_selecionado_temp) ?>!</strong><br>
+                            <strong>Bem-vindo de volta, <?= exibirNomeConsultor($consultor_selecionado_temp) ?>!</strong><br>
                             Digite seu PIN de 4 dígitos para acessar suas vendas.
                         </div>
 
@@ -655,8 +671,8 @@ $(document).ready(function() {
                 
                 <div class="alert alert-success">
                     <h5>
-                        <i class="fas fa-user-check"></i> 
-                        Bem-vindo(a), <strong><?= htmlspecialchars($consultor_nome) ?></strong>!
+                        <i class="fas fa-user-check"></i>
+                        Bem-vindo(a), <strong><?= exibirNomeConsultor($consultor_nome) ?></strong>!
                     </h5>
                     <p class="mb-0">Suas vendas foram carregadas com sucesso.</p>
                 </div>
