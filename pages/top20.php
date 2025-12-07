@@ -3,13 +3,6 @@
 
 require_once 'functions/vendas.php';
 
-// Tenta carregar banco de dados (se disponível)
-$usar_banco = false;
-if (file_exists(BASE_DIR . '/database/queries.php')) {
-    require_once BASE_DIR . '/database/queries.php';
-    $usar_banco = bancoDadosDisponivel();
-}
-
 // Carrega configurações
 $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
 $periodo_config = $config['periodo_relatorio'] ?? obterPeriodoRelatorio();
@@ -26,7 +19,6 @@ $arquivos_vendas = listarCSVs('vendas');
 if (!empty($arquivos_vendas)) {
     // Pega o arquivo mais recente
     $arquivo_selecionado = $arquivos_vendas[0]['caminho'];
-    $mes_referencia_arquivo = $arquivos_vendas[0]['mes_referencia'] ?? null;
 
     // Aplica filtros do admin
     $filtros = [
@@ -38,31 +30,7 @@ if (!empty($arquivos_vendas)) {
     ];
 
     if (file_exists($arquivo_selecionado)) {
-        // Usa banco de dados se disponível e tiver mês de referência
-        if ($usar_banco && !empty($mes_referencia_arquivo)) {
-            // Busca do banco de dados
-            $resultado_vendas = buscarVendasDoBanco($mes_referencia_arquivo, $filtros);
-
-            // Calcula pontos com ranges
-            foreach ($resultado_vendas['por_consultor'] as &$consultor) {
-                $resultado_pontos = calcularPontosComRanges($consultor['vendas_detalhes']);
-                $consultor['pontos'] = $resultado_pontos['pontos_total'];
-                $consultor['detalhamento_pontos'] = $resultado_pontos['detalhamento_por_range'];
-            }
-
-            $vendas_processadas = $resultado_vendas;
-
-            if (isGodMode()) {
-                echo "<div class='alert alert-success'><strong>📊 Usando BANCO DE DADOS</strong> (mês: $mes_referencia_arquivo)</div>";
-            }
-        } else {
-            // Processa do CSV (modo legado)
-            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
-
-            if (isGodMode()) {
-                echo "<div class='alert alert-warning'><strong>📄 Usando CSV</strong> (modo legado)</div>";
-            }
-        }
+        $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
         // Ordena e pega top 20
         // Prioriza consultores com vendas ativas, depois por pontos
