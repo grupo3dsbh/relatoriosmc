@@ -3,6 +3,22 @@
 
 require_once 'functions/vendas.php';
 
+/**
+ * Exibe nome do consultor com apelido (se existir) e tooltip com nome original
+ */
+function exibirNomeConsultor($nome_original) {
+    $apelidos = carregarApelidosConsultores();
+
+    if (isset($apelidos[$nome_original])) {
+        $apelido = $apelidos[$nome_original]['apelido'];
+        return '<span title="' . htmlspecialchars($nome_original) . '" data-toggle="tooltip" style="cursor: help; border-bottom: 1px dotted #999;">'
+               . htmlspecialchars($apelido)
+               . '</span>';
+    }
+
+    return htmlspecialchars($nome_original);
+}
+
 // Carrega configurações para obter período padrão
 $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
 $periodo_padrao = $config['periodo_relatorio'] ?? [
@@ -488,7 +504,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                             <div class="card-body text-center">
                                 <i class="fas <?= $medal['icon'] ?> fa-3x <?= $medal['class'] ?> mb-3"></i>
                                 <h5 class="card-title"><?= $medal['label'] ?></h5>
-                                <h3><?= htmlspecialchars($consultor['consultor']) ?></h3>
+                                <h3><?= exibirNomeConsultor($consultor['consultor']) ?></h3>
                                 <hr class="bg-white">
                                 <div class="row">
                                     <div class="col-6">
@@ -565,9 +581,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <strong><?= htmlspecialchars($consultor['consultor']) ?></strong>
+                                    <strong><?= exibirNomeConsultor($consultor['consultor']) ?></strong>
                                 </td>
-                                
+
                                 <?php if ($campos_visiveis['pontos']): ?>
                                     <td class="text-center">
                                         <span class="badge badge-primary badge-lg" style="font-size: 1.1em;">

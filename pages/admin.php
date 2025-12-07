@@ -121,6 +121,27 @@ if (isset($_POST['upload_promotores']) && isset($_FILES['csv_promotores'])) {
     }
 }
 
+// Processa gerenciamento de apelidos de consultores
+if (isset($_POST['adicionar_apelido'])) {
+    $nome_original = trim($_POST['nome_original'] ?? '');
+    $apelido = trim($_POST['apelido'] ?? '');
+
+    if (!empty($nome_original) && !empty($apelido)) {
+        adicionarApelidoConsultor($nome_original, $apelido);
+        $mensagem_sucesso = "Apelido adicionado com sucesso!";
+    } else {
+        $mensagem_erro = "Nome original e apelido são obrigatórios!";
+    }
+}
+
+if (isset($_POST['remover_apelido'])) {
+    $nome_original = $_POST['nome_original'] ?? '';
+    if (!empty($nome_original)) {
+        removerApelidoConsultor($nome_original);
+        $mensagem_sucesso = "Apelido removido com sucesso!";
+    }
+}
+
 // Processa exclusão de arquivo
 if (isset($_POST['excluir_arquivo'])) {
     $arquivo = $_POST['arquivo_path'];
@@ -799,6 +820,123 @@ if (!verificarAdmin()):
                         <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Promotores
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gerenciamento de Apelidos de Consultores -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-user-tag"></i> Apelidos de Consultores
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure apelidos para consultores que querem aparecer com outro nome no ranking.
+                    O nome original ficará visível apenas para você ao passar o mouse.
+                </p>
+
+                <!-- Formulário para adicionar apelido -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Nome Original do Consultor</strong></label>
+                                <input type="text" class="form-control" name="nome_original"
+                                       placeholder="Ex: João Silva" required
+                                       list="consultores-list">
+                                <datalist id="consultores-list">
+                                    <?php
+                                    // Lista consultores existentes (dos arquivos CSV)
+                                    $arquivos_vendas = listarCSVs('vendas');
+                                    $consultores_unicos = [];
+
+                                    foreach ($arquivos_vendas as $arquivo) {
+                                        $vendas_data = processarVendasCSV($arquivo['caminho']);
+                                        foreach ($vendas_data['por_consultor'] as $cons) {
+                                            $consultores_unicos[$cons['consultor']] = true;
+                                        }
+                                    }
+
+                                    foreach (array_keys($consultores_unicos) as $consultor):
+                                    ?>
+                                        <option value="<?= htmlspecialchars($consultor) ?>">
+                                    <?php endforeach; ?>
+                                </datalist>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Apelido (Nome para Exibir)</strong></label>
+                                <input type="text" class="form-control" name="apelido"
+                                       placeholder="Ex: J. Silva" required>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="adicionar_apelido" class="btn btn-warning btn-block">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Lista de apelidos existentes -->
+                <?php
+                $apelidos = carregarApelidosConsultores();
+                if (empty($apelidos)):
+                ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nenhum apelido configurado ainda.
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="35%">Nome Original</th>
+                                    <th width="35%">Apelido (Exibição)</th>
+                                    <th width="20%">Data Alteração</th>
+                                    <th width="10%" class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($apelidos as $nome_orig => $dados): ?>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-user text-muted"></i>
+                                        <strong><?= htmlspecialchars($nome_orig) ?></strong>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-tag text-warning"></i>
+                                        <?= htmlspecialchars($dados['apelido']) ?>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <?= date('d/m/Y H:i', strtotime($dados['data_alteracao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="nome_original" value="<?= htmlspecialchars($nome_orig) ?>">
+                                            <button type="submit" name="remover_apelido"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Remover apelido de <?= htmlspecialchars($nome_orig) ?>?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

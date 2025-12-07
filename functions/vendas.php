@@ -277,18 +277,25 @@ function processarVendasCSV($arquivo, $filtros = []) {
             $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
 
-            // IMPORTANTE: SEMPRE usa DataCadastro para filtros e pontuação
+            // IMPORTANTE: Validação defensiva de datas
             // Para vendas alteradas:
             //   - DataCadastro = data original da venda
             //   - DataVenda = data da alteração
             // Para vendas normais:
             //   - DataCadastro = DataVenda = data da venda
 
-            // Para FILTROS de período: SEMPRE usa DataCadastro (data original/real da venda)
-            $venda['data_para_filtro'] = $venda['data_cadastro'];
+            // VALIDAÇÃO DEFENSIVA: Se data_cadastro estiver vazia/inválida, usa data_venda como fallback
+            $data_cadastro_valida = !empty($venda['data_cadastro']) && strtotime($venda['data_cadastro']) !== false;
+            $data_venda_valida = !empty($venda['data_venda']) && strtotime($venda['data_venda']) !== false;
 
-            // Para PONTUAÇÃO/RANGES: SEMPRE usa DataCadastro (data original para aplicar range correto)
-            $venda['data_para_pontuacao'] = $venda['data_cadastro'];
+            // Escolhe qual data usar (prioriza data_cadastro)
+            $data_para_usar = $data_cadastro_valida ? $venda['data_cadastro'] : ($data_venda_valida ? $venda['data_venda'] : $venda['data_venda']);
+
+            // Para FILTROS de período: SEMPRE DataCadastro (data original) com fallback
+            $venda['data_para_filtro'] = $data_para_usar;
+
+            // Para PONTUAÇÃO/RANGES: SEMPRE DataCadastro (data original) com fallback
+            $venda['data_para_pontuacao'] = $data_para_usar;
 
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
@@ -1149,6 +1156,72 @@ function formatarNomeCategoria($categoria) {
     ];
     
     return $mapa[$categoria] ?? $categoria;
+}
+
+/**
+ * Carrega apelidos/nomes alternativos de consultores
+ */
+function carregarApelidosConsultores() {
+    $arquivo = DATA_DIR . '/consultores_apelidos.json';
+
+    if (!file_exists($arquivo)) {
+        return [];
+    }
+
+    $conteudo = file_get_contents($arquivo);
+    $apelidos = json_decode($conteudo, true);
+
+    return $apelidos ?: [];
+}
+
+/**
+ * Salva apelidos/nomes alternativos de consultores
+ */
+function salvarApelidosConsultores($apelidos) {
+    $arquivo = DATA_DIR . '/consultores_apelidos.json';
+
+    $json = json_encode($apelidos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    file_put_contents($arquivo, $json);
+}
+
+/**
+ * Obtém nome de exibição do consultor (apelido se existir, senão nome original)
+ */
+function obterNomeExibicaoConsultor($nome_original) {
+    static $apelidos = null;
+
+    if ($apelidos === null) {
+        $apelidos = carregarApelidosConsultores();
+    }
+
+    return $apelidos[$nome_original]['apelido'] ?? $nome_original;
+}
+
+/**
+ * Adiciona ou atualiza apelido de um consultor
+ */
+function adicionarApelidoConsultor($nome_original, $apelido) {
+    $apelidos = carregarApelidosConsultores();
+
+    $apelidos[$nome_original] = [
+        'nome_original' => $nome_original,
+        'apelido' => $apelido,
+        'data_alteracao' => date('Y-m-d H:i:s')
+    ];
+
+    salvarApelidosConsultores($apelidos);
+}
+
+/**
+ * Remove apelido de um consultor
+ */
+function removerApelidoConsultor($nome_original) {
+    $apelidos = carregarApelidosConsultores();
+
+    if (isset($apelidos[$nome_original])) {
+        unset($apelidos[$nome_original]);
+        salvarApelidosConsultores($apelidos);
+    }
 }
 
 ?>
