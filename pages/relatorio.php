@@ -2066,6 +2066,28 @@ function iniciarVerificacaoDinamica() {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-20px); }
         }
+
+        /* Ajustes para mobile */
+        @media (max-width: 768px) {
+            #congratsModal {
+                max-width: calc(100% - 10px);
+                margin: 0 5px;
+                padding: 20px 5px;
+                border-radius: 10px;
+            }
+
+            #congratsModal h2 {
+                font-size: 1.8em;
+            }
+
+            #congratsModal p {
+                font-size: 1em;
+            }
+
+            .trophy-animation {
+                font-size: 3em;
+            }
+        }
     </style>
 
     <canvas id="fireworksCanvas"></canvas>

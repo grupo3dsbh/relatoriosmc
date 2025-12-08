@@ -72,30 +72,42 @@ if (!empty($arquivos_vendas)) {
 
         // Se aplicou filtro, recalcula pontuação dos consultores
         if ($regra_dia08['aplicar_filtro']) {
-            // Calcula quantas vendas cada consultor perdeu
-            foreach ($vendas_processadas_original['vendas'] as $venda) {
-                $consultor_nome = $venda['consultor'];
-
-                // Verifica se venda foi removida (cancelada)
-                if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
-                    strcasecmp($venda['status'], 'Cancelada') === 0) {
-                    $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
-                }
-                // Verifica se venda foi removida (sem primeira parcela)
-                elseif (!($venda['primeira_parcela_paga'] ?? false)) {
-                    $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
-                }
-            }
-
-            // Reagrupa vendas por consultor (APÓS remover vendas)
+            // Reagrupa vendas por consultor (APÓS aplicar filtro)
             $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
-            // Filtra novamente as vendas processadas
+            // Aplica filtro novamente para ter vendas_filtradas
             $regra_dia08 = aplicarRegraDia08(
                 $vendas_processadas['vendas'],
                 $filtros['data_inicial'],
                 $filtros['data_final']
             );
+
+            // Conta vendas REMOVIDAS (que estão no original mas NÃO no filtrado)
+            foreach ($vendas_processadas_original['vendas'] as $venda_original) {
+                $consultor_nome = $venda_original['consultor'];
+
+                // Verifica se esta venda foi REMOVIDA (não está no array filtrado)
+                $foi_removida = true;
+                foreach ($regra_dia08['vendas_filtradas'] as $venda_filtrada) {
+                    // Compara por título/cliente (identificador único)
+                    if ($venda_filtrada['titulo'] === $venda_original['titulo'] &&
+                        $venda_filtrada['consultor'] === $venda_original['consultor']) {
+                        $foi_removida = false;
+                        break;
+                    }
+                }
+
+                // Se foi removida, conta como cancelada ou sem pagamento
+                if ($foi_removida) {
+                    if (strcasecmp($venda_original['status'], 'Cancelado') === 0 ||
+                        strcasecmp($venda_original['status'], 'Cancelada') === 0) {
+                        $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
+                    }
+                    elseif (!($venda_original['primeira_parcela_paga'] ?? false)) {
+                        $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
+                    }
+                }
+            }
 
             // Calcula pontos perdidos por consultor
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
@@ -104,8 +116,8 @@ if (!empty($arquivos_vendas)) {
                 $pontos_antes = $pontos_originais[$consultor_nome] ?? $pontos_atuais;
 
                 $consultor['pontos_perdidos'] = $pontos_antes - $pontos_atuais;
-                $consultor['vendas_canceladas'] = $vendas_removidas_por_consultor[$consultor_nome]['canceladas'];
-                $consultor['vendas_sem_pagamento'] = $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento'];
+                $consultor['vendas_canceladas'] = $vendas_removidas_por_consultor[$consultor_nome]['canceladas'] ?? 0;
+                $consultor['vendas_sem_pagamento'] = $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento'] ?? 0;
                 $consultor['pontos_originais'] = $pontos_antes;
             }
         } else {
@@ -295,8 +307,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             <i class="fas fa-arrow-left"></i> Voltar
         </a>
     </div>
-    
-    <!-- Tabela Top 20 -->
+
+    <!-- Tabela Top 20 - Wrapper com overflow para mobile -->
+    <div class="table-responsive">
     <table class="table table-bordered table-hover" id="rankingTable">
         <thead class="thead-dark">
             <tr>
@@ -399,8 +412,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             <?php endforeach; ?>
         </tbody>
     </table>
-    
-    
+    </div><!-- /.table-responsive -->
+
+
     
     <?php endif; ?>
 
@@ -553,6 +567,28 @@ $(document).ready(function() {
         @keyframes trophyFloat {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-20px); }
+        }
+
+        /* Ajustes para mobile */
+        @media (max-width: 768px) {
+            #congratsModal {
+                max-width: calc(100% - 10px);
+                margin: 0 5px;
+                padding: 20px 5px;
+                border-radius: 10px;
+            }
+
+            #congratsModal h2 {
+                font-size: 1.8em;
+            }
+
+            #congratsModal p {
+                font-size: 1em;
+            }
+
+            .trophy-animation {
+                font-size: 3em;
+            }
         }
 
         @media print {
