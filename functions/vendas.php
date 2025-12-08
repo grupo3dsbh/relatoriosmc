@@ -1447,6 +1447,130 @@ function obterArquivoRealPorNomeAmigavel($nome_amigavel) {
 }
 
 /**
+ * Carrega mensagens de parabéns para relatórios finais
+ */
+function carregarMensagensParabens() {
+    $arquivo = DATA_DIR . '/mensagens_parabens.json';
+
+    if (!file_exists($arquivo)) {
+        // Cria arquivo com 3 mensagens padrão
+        $mensagens_padrao = [
+            [
+                'id' => uniqid('msg_', true),
+                'titulo' => 'Parabéns aos Campeões!',
+                'mensagem' => 'Parabéns a todos os consultores que alcançaram o TOP 20! Seu esforço e dedicação são inspiradores! 🏆',
+                'ativo' => true,
+                'data_criacao' => date('Y-m-d H:i:s')
+            ],
+            [
+                'id' => uniqid('msg_', true),
+                'titulo' => 'Celebrando o Sucesso!',
+                'mensagem' => 'Este é o ranking oficial final! Parabéns aos vencedores e a todos que se esforçaram para chegar até aqui! 🎉',
+                'ativo' => true,
+                'data_criacao' => date('Y-m-d H:i:s')
+            ],
+            [
+                'id' => uniqid('msg_', true),
+                'titulo' => 'Você é Incrível!',
+                'mensagem' => 'Resultado oficial disponível! Parabéns aos TOP 20 e a todos que fizeram parte desta jornada incrível! 🌟',
+                'ativo' => true,
+                'data_criacao' => date('Y-m-d H:i:s')
+            ]
+        ];
+        salvarMensagensParabens($mensagens_padrao);
+        return $mensagens_padrao;
+    }
+
+    $conteudo = file_get_contents($arquivo);
+    $mensagens = json_decode($conteudo, true);
+
+    return $mensagens ?: [];
+}
+
+/**
+ * Salva mensagens de parabéns
+ */
+function salvarMensagensParabens($mensagens) {
+    $arquivo = DATA_DIR . '/mensagens_parabens.json';
+
+    $json = json_encode($mensagens, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    file_put_contents($arquivo, $json);
+}
+
+/**
+ * Adiciona nova mensagem de parabéns
+ */
+function adicionarMensagemParabens($titulo, $mensagem) {
+    $mensagens = carregarMensagensParabens();
+
+    $mensagens[] = [
+        'id' => uniqid('msg_', true),
+        'titulo' => $titulo,
+        'mensagem' => $mensagem,
+        'ativo' => true,
+        'data_criacao' => date('Y-m-d H:i:s')
+    ];
+
+    salvarMensagensParabens($mensagens);
+}
+
+/**
+ * Remove mensagem de parabéns
+ */
+function removerMensagemParabens($id) {
+    $mensagens = carregarMensagensParabens();
+
+    $mensagens = array_filter($mensagens, function($msg) use ($id) {
+        return $msg['id'] !== $id;
+    });
+
+    // Reindexar array
+    $mensagens = array_values($mensagens);
+
+    salvarMensagensParabens($mensagens);
+}
+
+/**
+ * Alterna status ativo/inativo de uma mensagem
+ */
+function alternarStatusMensagem($id) {
+    $mensagens = carregarMensagensParabens();
+
+    foreach ($mensagens as &$msg) {
+        if ($msg['id'] === $id) {
+            $msg['ativo'] = !$msg['ativo'];
+            break;
+        }
+    }
+
+    salvarMensagensParabens($mensagens);
+}
+
+/**
+ * Obtém uma mensagem aleatória de parabéns (apenas ativas)
+ */
+function obterMensagemAleatoriaParabens() {
+    $mensagens = carregarMensagensParabens();
+
+    // Filtra apenas mensagens ativas
+    $mensagens_ativas = array_filter($mensagens, function($msg) {
+        return $msg['ativo'] ?? true;
+    });
+
+    if (empty($mensagens_ativas)) {
+        return [
+            'titulo' => 'Parabéns!',
+            'mensagem' => 'Ranking oficial disponível! Parabéns a todos! 🎉'
+        ];
+    }
+
+    // Seleciona uma mensagem aleatória
+    $mensagem = $mensagens_ativas[array_rand($mensagens_ativas)];
+
+    return $mensagem;
+}
+
+/**
  * Verifica se é dia 08 ou posterior do mês seguinte ao período do relatório
  * E filtra/conta vendas canceladas e sem primeira parcela paga
  */

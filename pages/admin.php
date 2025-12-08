@@ -291,6 +291,35 @@ if (isset($_POST['salvar_config_top20'])) {
     $mensagem_sucesso = "Configurações do Top20 / Período de Relatório atualizadas com sucesso!";
 }
 
+// Processar gerenciamento de mensagens de parabéns
+if (isset($_POST['adicionar_mensagem_parabens'])) {
+    $titulo = trim($_POST['titulo_mensagem'] ?? '');
+    $mensagem = trim($_POST['texto_mensagem'] ?? '');
+
+    if (!empty($titulo) && !empty($mensagem)) {
+        adicionarMensagemParabens($titulo, $mensagem);
+        $mensagem_sucesso = "Mensagem de parabéns adicionada com sucesso!";
+    } else {
+        $mensagem_erro = "Título e mensagem são obrigatórios!";
+    }
+}
+
+if (isset($_POST['remover_mensagem_parabens'])) {
+    $id = $_POST['mensagem_id'] ?? '';
+    if (!empty($id)) {
+        removerMensagemParabens($id);
+        $mensagem_sucesso = "Mensagem removida com sucesso!";
+    }
+}
+
+if (isset($_POST['alternar_status_mensagem'])) {
+    $id = $_POST['mensagem_id'] ?? '';
+    if (!empty($id)) {
+        alternarStatusMensagem($id);
+        $mensagem_sucesso = "Status da mensagem alterado com sucesso!";
+    }
+}
+
 // Se não estiver autenticado, mostra tela de login
 if (!verificarAdmin()):
 ?>
@@ -876,6 +905,117 @@ if (!verificarAdmin()):
                         <i class="fas fa-save"></i> Salvar Configurações do Top20
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mensagens de Parabéns para Relatórios Finais -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-trophy"></i> Mensagens de Parabéns (Relatórios Finais)
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure mensagens que serão exibidas aleatoriamente nos relatórios FINAIS (após dia 08).
+                    As mensagens ativas são selecionadas randomicamente ao carregar a página.
+                </p>
+
+                <!-- Formulário para adicionar mensagem -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label><strong>Título da Mensagem</strong></label>
+                                <input type="text" class="form-control" name="titulo_mensagem"
+                                       placeholder="Ex: Parabéns aos Campeões!" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Mensagem</strong></label>
+                                <textarea class="form-control" name="texto_mensagem" rows="2"
+                                          placeholder="Digite a mensagem de parabéns..." required></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="adicionar_mensagem_parabens" class="btn btn-success btn-block">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Lista de mensagens -->
+                <?php
+                $mensagens_parabens = carregarMensagensParabens();
+                ?>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th width="25%">Título</th>
+                                <th width="45%">Mensagem</th>
+                                <th width="10%" class="text-center">Status</th>
+                                <th width="12%">Data Criação</th>
+                                <th width="8%" class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($mensagens_parabens)): ?>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <i class="fas fa-info-circle"></i> Nenhuma mensagem cadastrada ainda.
+                                </td>
+                            </tr>
+                            <?php else: ?>
+                                <?php foreach ($mensagens_parabens as $msg): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($msg['titulo']) ?></strong></td>
+                                    <td><?= htmlspecialchars($msg['mensagem']) ?></td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="mensagem_id" value="<?= htmlspecialchars($msg['id']) ?>">
+                                            <button type="submit" name="alternar_status_mensagem"
+                                                    class="btn btn-sm btn-<?= $msg['ativo'] ? 'success' : 'secondary' ?>"
+                                                    title="Clique para <?= $msg['ativo'] ? 'desativar' : 'ativar' ?>">
+                                                <?= $msg['ativo'] ? 'Ativa' : 'Inativa' ?>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <?= date('d/m/Y', strtotime($msg['data_criacao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="mensagem_id" value="<?= htmlspecialchars($msg['id']) ?>">
+                                            <button type="submit" name="remover_mensagem_parabens"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Remover esta mensagem?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-info mb-0 mt-3">
+                    <i class="fas fa-lightbulb"></i>
+                    <strong>Dica:</strong> Mantenha pelo menos 3 mensagens ativas para maior variedade.
+                    As mensagens inativas não serão exibidas, mas ficam salvas para reativação futura.
+                </div>
             </div>
         </div>
     </div>

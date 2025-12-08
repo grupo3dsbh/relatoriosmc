@@ -412,5 +412,198 @@ $(document).ready(function() {
 });
 </script>
 
+<!-- Fogos de Artifício e Mensagem para Relatório FINAL -->
+<?php if (isset($tipo_relatorio) && $tipo_relatorio === 'FINAL'): ?>
+    <?php $mensagem_parabens = obterMensagemAleatoriaParabens(); ?>
+
+    <style>
+        #fireworksCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        #congratsModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 600px;
+            animation: modalBounce 0.8s ease-out;
+        }
+
+        @keyframes modalBounce {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        #congratsModal h2 {
+            font-size: 2.5em;
+            color: #28a745;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #congratsModal p {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .trophy-animation {
+            font-size: 5em;
+            animation: trophyFloat 2s ease-in-out infinite;
+        }
+
+        @keyframes trophyFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @media print {
+            #fireworksCanvas, #congratsModal { display: none !important; }
+        }
+    </style>
+
+    <canvas id="fireworksCanvas"></canvas>
+    <div id="congratsModal" style="display: none;">
+        <div class="trophy-animation">🏆</div>
+        <h2><?= htmlspecialchars($mensagem_parabens['titulo']) ?></h2>
+        <p><?= htmlspecialchars($mensagem_parabens['mensagem']) ?></p>
+        <button onclick="closeCongratsModal()" class="btn btn-success btn-lg">
+            <i class="fas fa-check"></i> Continuar
+        </button>
+    </div>
+
+    <script>
+        // Classe para Partícula de Fogo de Artifício
+        class FireworkParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.velocity = {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                };
+                this.gravity = 0.15;
+                this.opacity = 1;
+                this.decay = Math.random() * 0.015 + 0.010;
+            }
+
+            update() {
+                this.velocity.y += this.gravity;
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.opacity -= this.decay;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Configuração do Canvas
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let particles = [];
+        let fireworksActive = true;
+        let animationId;
+
+        // Cores vibrantes para fogos
+        const colors = ['#ff0844', '#ffb900', '#00e5ff', '#00ff88', '#b900ff', '#ff006e'];
+
+        // Criar explosão de fogos
+        function createFirework(x, y) {
+            const particleCount = 50;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new FireworkParticle(x, y, color));
+            }
+        }
+
+        // Animação dos fogos
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Atualizar e desenhar partículas
+            particles = particles.filter(particle => {
+                particle.update();
+                particle.draw(ctx);
+                return particle.opacity > 0;
+            });
+
+            // Criar novos fogos aleatoriamente
+            if (fireworksActive && Math.random() < 0.08) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height * 0.5;
+                createFirework(x, y);
+            }
+
+            if (fireworksActive) {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+
+        // Fechar modal e parar fogos
+        function closeCongratsModal() {
+            document.getElementById('congratsModal').style.display = 'none';
+            fireworksActive = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            // Fade out do canvas
+            setTimeout(() => {
+                canvas.style.transition = 'opacity 1s';
+                canvas.style.opacity = '0';
+                setTimeout(() => canvas.remove(), 1000);
+            }, 100);
+        }
+
+        // Iniciar animação quando página carregar
+        window.addEventListener('load', function() {
+            // Aguarda 500ms para garantir que a página carregou
+            setTimeout(() => {
+                // Mostrar modal
+                document.getElementById('congratsModal').style.display = 'block';
+
+                // Iniciar fogos
+                animate();
+
+                // Fechar automaticamente após 8 segundos
+                setTimeout(closeCongratsModal, 8000);
+            }, 500);
+        });
+
+        // Redimensionar canvas
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+<?php endif; ?>
+
 </body>
 </html>
