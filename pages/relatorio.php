@@ -1884,41 +1884,38 @@ jQuery(document).ready(function($) {
 
 <!-- Verificação Dinâmica de Relatório FINAL - JavaScript Puro -->
 <script>
-alert('🔍 SCRIPT DE VERIFICAÇÃO CARREGADO!');
-console.log('🔍 SCRIPT DE VERIFICAÇÃO CARREGADO - TESTE INICIAL');
-
 // Aguarda DOM carregar
 if (document.readyState === 'loading') {
-    console.log('⏳ DOM ainda carregando, aguardando DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', iniciarVerificacaoDinamica);
 } else {
-    console.log('✅ DOM já carregado, iniciando imediatamente...');
     iniciarVerificacaoDinamica();
 }
 
 function iniciarVerificacaoDinamica() {
-    console.log('🔍 INICIANDO VERIFICAÇÃO DINÂMICA (JavaScript Puro)');
-
     // Busca elementos
     const campoDataInicial = document.getElementById('data_inicial');
     const campoDataFinal = document.getElementById('data_final');
     const checkbox = document.getElementById('primeira_parcela_paga');
 
-    console.log('Campo data_inicial:', campoDataInicial ? 'ENCONTRADO ✅' : 'NÃO ENCONTRADO ❌');
-    console.log('Campo data_final:', campoDataFinal ? 'ENCONTRADO ✅' : 'NÃO ENCONTRADO ❌');
-    console.log('Checkbox:', checkbox ? 'ENCONTRADO ✅' : 'NÃO ENCONTRADO ❌');
-
     if (!campoDataFinal || !checkbox) {
-        console.error('❌ Elementos não encontrados! Abortando.');
-        return;
+        return; // Elementos não encontrados, abortar silenciosamente
     }
+
+    // VERIFICA PARÂMETRO temp=on NA URL (permite desbloquear checkbox mesmo em relatório FINAL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const modoTemporario = urlParams.get('temp') === 'on';
 
     /**
      * Verifica se as datas selecionadas caracterizam um relatório FINAL
      */
     function verificarRelatorioFinal() {
+        // Se modo temporário está ON, sempre desbloquear
+        if (modoTemporario) {
+            desbloquearCheckbox();
+            return;
+        }
+
         const dataFinal = campoDataFinal.value;
-        console.log('🔄 verificarRelatorioFinal() - dataFinal:', dataFinal);
 
         if (!dataFinal) {
             desbloquearCheckbox();
@@ -1934,11 +1931,6 @@ function iniciarVerificacaoDinamica() {
         mesSeguinte.setMonth(mesSeguinte.getMonth() + 1);
         mesSeguinte.setDate(8);
         mesSeguinte.setHours(0, 0, 0, 0);
-
-        console.log('Hoje:', hoje.toLocaleDateString('pt-BR'));
-        console.log('Período até:', fimPeriodo.toLocaleDateString('pt-BR'));
-        console.log('Dia 08 mês seguinte:', mesSeguinte.toLocaleDateString('pt-BR'));
-        console.log('É FINAL?', hoje >= mesSeguinte);
 
         if (hoje >= mesSeguinte) {
             bloquearCheckbox();
@@ -1984,7 +1976,6 @@ function iniciarVerificacaoDinamica() {
         small.innerHTML = '<i class="fas fa-info-circle"></i> Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)';
         formCheck.appendChild(small);
 
-        console.log('✅ Checkbox BLOQUEADO');
     }
 
     /**
@@ -2001,29 +1992,19 @@ function iniciarVerificacaoDinamica() {
 
         // Remove badges e textos
         formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
-
-        console.log('🔓 Checkbox DESBLOQUEADO');
     }
 
     // Listeners
     if (campoDataInicial) {
-        campoDataInicial.addEventListener('change', function() {
-            console.log('📅 Data inicial alterada:', this.value);
-            verificarRelatorioFinal();
-        });
+        campoDataInicial.addEventListener('change', verificarRelatorioFinal);
     }
 
     if (campoDataFinal) {
-        campoDataFinal.addEventListener('change', function() {
-            console.log('📅 Data final alterada:', this.value);
-            verificarRelatorioFinal();
-        });
+        campoDataFinal.addEventListener('change', verificarRelatorioFinal);
     }
 
     // Verificação inicial
     verificarRelatorioFinal();
-
-    console.log('✅ Verificação dinâmica ATIVADA!');
 }
 </script>
 
