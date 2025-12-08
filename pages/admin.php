@@ -142,6 +142,36 @@ if (isset($_POST['remover_apelido'])) {
     }
 }
 
+// Processa gerenciamento de nomes amigáveis de CSVs
+if (isset($_POST['definir_nome_amigavel'])) {
+    $nome_arquivo = trim($_POST['nome_arquivo_csv'] ?? '');
+    $nome_amigavel = trim($_POST['nome_amigavel_csv'] ?? '');
+
+    if (!empty($nome_arquivo) && !empty($nome_amigavel)) {
+        // Valida que nome amigável não contém caracteres especiais
+        if (preg_match('/^[a-z0-9\-]+$/', $nome_amigavel)) {
+            definirNomeAmigavel($nome_arquivo, $nome_amigavel);
+            $mensagem_sucesso = "Nome amigável definido com sucesso!";
+        } else {
+            $mensagem_erro = "Nome amigável deve conter apenas letras minúsculas, números e hífens!";
+        }
+    } else {
+        $mensagem_erro = "Nome do arquivo e nome amigável são obrigatórios!";
+    }
+}
+
+if (isset($_POST['remover_nome_amigavel'])) {
+    $nome_arquivo = $_POST['nome_arquivo_remover'] ?? '';
+    if (!empty($nome_arquivo)) {
+        $mapeamento = carregarMapeamentoNomes();
+        if (isset($mapeamento[$nome_arquivo])) {
+            unset($mapeamento[$nome_arquivo]);
+            salvarMapeamentoNomes($mapeamento);
+            $mensagem_sucesso = "Nome amigável removido com sucesso!";
+        }
+    }
+}
+
 // Processa exclusão de arquivo
 if (isset($_POST['excluir_arquivo'])) {
     $arquivo = $_POST['arquivo_path'];
@@ -244,6 +274,21 @@ if (isset($_POST['salvar_config_premiacoes'])) {
     salvarConfiguracoes($_SESSION['config_sistema']);
 
     $mensagem_sucesso = "Configurações de premiação atualizadas com sucesso!";
+}
+
+// Processar configurações do Top20 / Período de Relatório
+if (isset($_POST['salvar_config_top20'])) {
+    $_SESSION['config_sistema']['periodo_relatorio'] = [
+        'data_inicial' => $_POST['periodo_data_inicial'],
+        'data_final' => $_POST['periodo_data_final'],
+        'apenas_primeira_parcela' => isset($_POST['periodo_apenas_primeira_parcela']),
+        'apenas_vista' => isset($_POST['periodo_apenas_vista']),
+        'filtro_status' => $_POST['periodo_filtro_status'] ?? 'Ativo'
+    ];
+
+    salvarConfiguracoes($_SESSION['config_sistema']);
+
+    $mensagem_sucesso = "Configurações do Top20 / Período de Relatório atualizadas com sucesso!";
 }
 
 // Se não estiver autenticado, mostra tela de login
@@ -728,6 +773,114 @@ if (!verificarAdmin()):
     </div>
 </div>
 
+<!-- Configurações do Top20 / Período de Relatório -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-alt"></i> Configurações do Top20 / Período de Relatório
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure o período padrão e filtros que serão aplicados automaticamente no Top20.
+                    Essas configurações também são usadas como padrão nos relatórios.
+                </p>
+
+                <form method="post">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Data Inicial do Período</strong></label>
+                                <input type="date" class="form-control" name="periodo_data_inicial"
+                                       value="<?= $_SESSION['config_sistema']['periodo_relatorio']['data_inicial'] ?? date('Y-m-01') ?>"
+                                       required>
+                                <small class="text-muted">Data de início para contagem de vendas</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Data Final do Período</strong></label>
+                                <input type="date" class="form-control" name="periodo_data_final"
+                                       value="<?= $_SESSION['config_sistema']['periodo_relatorio']['data_final'] ?? date('Y-m-t') ?>"
+                                       required>
+                                <small class="text-muted">Data final para contagem de vendas</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label><strong>Filtro de Status</strong></label>
+                                <select class="form-control" name="periodo_filtro_status">
+                                    <?php
+                                    $status_atual = $_SESSION['config_sistema']['periodo_relatorio']['filtro_status'] ?? 'Ativo';
+                                    ?>
+                                    <option value="Ativo" <?= $status_atual === 'Ativo' ? 'selected' : '' ?>>Apenas Ativo</option>
+                                    <option value="" <?= $status_atual === '' ? 'selected' : '' ?>>Todos os Status</option>
+                                    <option value="Cancelado" <?= $status_atual === 'Cancelado' ? 'selected' : '' ?>>Apenas Cancelado</option>
+                                </select>
+                                <small class="text-muted">Filtrar vendas por status</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <div class="custom-control custom-checkbox mt-4">
+                                    <input type="checkbox" class="custom-control-input"
+                                           id="periodo_apenas_primeira_parcela"
+                                           name="periodo_apenas_primeira_parcela"
+                                           <?= ($_SESSION['config_sistema']['periodo_relatorio']['apenas_primeira_parcela'] ?? false) ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="periodo_apenas_primeira_parcela">
+                                        <strong>Apenas com 1ª Parcela Paga</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block">Considerar apenas vendas que já receberam a primeira parcela</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <div class="custom-control custom-checkbox mt-4">
+                                    <input type="checkbox" class="custom-control-input"
+                                           id="periodo_apenas_vista"
+                                           name="periodo_apenas_vista"
+                                           <?= ($_SESSION['config_sistema']['periodo_relatorio']['apenas_vista'] ?? false) ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="periodo_apenas_vista">
+                                        <strong>Apenas Vendas à Vista</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block">Considerar apenas vendas à vista</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="alert alert-warning mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Importante:</strong> Após o dia 08 do mês seguinte ao período, o sistema
+                        automaticamente remove vendas canceladas e sem primeira parcela paga do ranking,
+                        independentemente dos filtros configurados aqui (Regra do Dia 08).
+                    </div>
+
+                    <hr>
+
+                    <button type="submit" name="salvar_config_top20" class="btn btn-info btn-block">
+                        <i class="fas fa-save"></i> Salvar Configurações do Top20
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Configurações de Senha -->
 <div class="row mb-4">
     <div class="col-md-12">
@@ -937,6 +1090,169 @@ if (!verificarAdmin()):
                         </table>
                     </div>
                 <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gerenciamento de Nomes Amigáveis de Relatórios -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-link"></i> Nomes Amigáveis de Relatórios (URLs)
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure nomes amigáveis para os arquivos CSV de vendas, facilitando o compartilhamento de links.<br>
+                    <strong>Exemplo:</strong> <code>vendas-novembro25</code> em vez de <code>2025-12-01_034017_vendas.csv</code>
+                </p>
+
+                <!-- Formulário para definir nome amigável -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Arquivo CSV</strong></label>
+                                <select class="form-control" name="nome_arquivo_csv" required>
+                                    <option value="">Selecione um arquivo...</option>
+                                    <?php
+                                    $arquivos_vendas = listarCSVs('vendas');
+                                    foreach ($arquivos_vendas as $arquivo):
+                                        $nome_arquivo = $arquivo['nome'];
+                                        $nome_amigavel_atual = gerarNomeAmigavel($nome_arquivo);
+                                    ?>
+                                        <option value="<?= htmlspecialchars($nome_arquivo) ?>">
+                                            <?= htmlspecialchars($nome_arquivo) ?>
+                                            (atual: <?= htmlspecialchars($nome_amigavel_atual) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Nome Amigável (para URL)</strong></label>
+                                <input type="text" class="form-control" name="nome_amigavel_csv"
+                                       placeholder="Ex: vendas-novembro25" required
+                                       pattern="[a-z0-9\-]+"
+                                       title="Apenas letras minúsculas, números e hífens">
+                                <small class="form-text text-muted">
+                                    Apenas letras minúsculas, números e hífens (-)
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="definir_nome_amigavel" class="btn btn-primary btn-block">
+                                <i class="fas fa-save"></i> Definir
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Lista de nomes amigáveis personalizados -->
+                <?php
+                $mapeamento_nomes = carregarMapeamentoNomes();
+                if (empty($mapeamento_nomes)):
+                ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nenhum nome amigável personalizado configurado.
+                        Os nomes são gerados automaticamente a partir da data do arquivo.
+                    </div>
+                <?php else: ?>
+                    <h6 class="mb-3"><strong>Nomes Personalizados:</strong></h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="40%">Arquivo CSV</th>
+                                    <th width="30%">Nome Amigável</th>
+                                    <th width="20%">Data Definição</th>
+                                    <th width="10%" class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($mapeamento_nomes as $nome_arquivo => $dados): ?>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-file-csv text-muted"></i>
+                                        <code><?= htmlspecialchars($nome_arquivo) ?></code>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-link text-primary"></i>
+                                        <strong><?= htmlspecialchars($dados['nome_amigavel']) ?></strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            <i class="fas fa-external-link-alt"></i>
+                                            <code>?page=relatorio&arquivo=<?= htmlspecialchars($dados['nome_amigavel']) ?></code>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <?= date('d/m/Y H:i', strtotime($dados['data_definicao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="nome_arquivo_remover" value="<?= htmlspecialchars($nome_arquivo) ?>">
+                                            <button type="submit" name="remover_nome_amigavel"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Remover nome amigável?\nO arquivo voltará a usar o nome automático.')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Tabela de nomes automáticos (referência) -->
+                <hr class="my-4">
+                <h6 class="mb-3"><strong>Todos os Arquivos e Seus Nomes Amigáveis:</strong></h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="thead-light">
+                            <tr>
+                                <th width="50%">Arquivo CSV</th>
+                                <th width="30%">Nome Amigável Atual</th>
+                                <th width="20%">Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $arquivos_vendas = listarCSVs('vendas');
+                            foreach ($arquivos_vendas as $arquivo):
+                                $nome_arquivo = $arquivo['nome'];
+                                $nome_amigavel = gerarNomeAmigavel($nome_arquivo);
+                                $e_personalizado = isset($mapeamento_nomes[$nome_arquivo]);
+                            ?>
+                            <tr class="<?= $e_personalizado ? 'table-primary' : '' ?>">
+                                <td>
+                                    <i class="fas fa-file-csv text-muted"></i>
+                                    <code><?= htmlspecialchars($nome_arquivo) ?></code>
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($nome_amigavel) ?></strong>
+                                </td>
+                                <td>
+                                    <?php if ($e_personalizado): ?>
+                                        <span class="badge badge-primary">Personalizado</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-secondary">Automático</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

@@ -1319,10 +1319,64 @@ function removerApelidoConsultor($nome_original) {
 }
 
 /**
+ * Carrega mapeamento de nomes amigáveis personalizados
+ */
+function carregarMapeamentoNomes() {
+    $arquivo = DATA_DIR . '/nomes_amigaveis.json';
+
+    if (!file_exists($arquivo)) {
+        return [];
+    }
+
+    $conteudo = file_get_contents($arquivo);
+    $mapeamento = json_decode($conteudo, true);
+
+    return $mapeamento ?: [];
+}
+
+/**
+ * Salva mapeamento de nomes amigáveis personalizados
+ */
+function salvarMapeamentoNomes($mapeamento) {
+    $arquivo = DATA_DIR . '/nomes_amigaveis.json';
+
+    $json = json_encode($mapeamento, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    file_put_contents($arquivo, $json);
+}
+
+/**
+ * Define um nome amigável personalizado para um arquivo CSV
+ */
+function definirNomeAmigavel($nome_arquivo, $nome_amigavel) {
+    $mapeamento = carregarMapeamentoNomes();
+
+    // Remove a extensão .csv se foi passada
+    $nome_arquivo = basename($nome_arquivo);
+
+    $mapeamento[$nome_arquivo] = [
+        'nome_amigavel' => $nome_amigavel,
+        'nome_arquivo' => $nome_arquivo,
+        'data_definicao' => date('Y-m-d H:i:s')
+    ];
+
+    salvarMapeamentoNomes($mapeamento);
+}
+
+/**
  * Gera nome amigável para arquivo CSV baseado na data
  * Ex: 2025-12-01_034017_vendas.csv → vendas-novembro25
+ * Verifica primeiro se há mapeamento personalizado
  */
 function gerarNomeAmigavel($nome_arquivo) {
+    // Remove caminho se tiver
+    $nome_arquivo = basename($nome_arquivo);
+
+    // Verifica se há mapeamento personalizado
+    $mapeamento = carregarMapeamentoNomes();
+    if (isset($mapeamento[$nome_arquivo])) {
+        return $mapeamento[$nome_arquivo]['nome_amigavel'];
+    }
+
     // Tenta extrair a data do nome do arquivo (formato: YYYY-MM-DD_HHMMSS_vendas.csv)
     if (preg_match('/(\d{4})-(\d{2})-(\d{2})_/', $nome_arquivo, $matches)) {
         $ano = $matches[1];
@@ -1348,8 +1402,19 @@ function gerarNomeAmigavel($nome_arquivo) {
 /**
  * Converte nome amigável de volta para arquivo CSV real
  * Ex: vendas-novembro25 → 2025-12-01_034017_vendas.csv (procura no diretório)
+ * Verifica primeiro se há mapeamento personalizado
  */
 function obterArquivoRealPorNomeAmigavel($nome_amigavel) {
+    // Verifica primeiro se há mapeamento personalizado
+    $mapeamento = carregarMapeamentoNomes();
+    foreach ($mapeamento as $nome_arquivo => $dados) {
+        if ($dados['nome_amigavel'] === $nome_amigavel) {
+            // Encontrou mapeamento personalizado, retorna o caminho completo
+            return VENDAS_DIR . '/' . $nome_arquivo;
+        }
+    }
+
+    // Se não encontrou mapeamento personalizado, tenta extrair pelo padrão de nome
     // Extrai mês e ano do nome amigável (ex: vendas-novembro25)
     if (preg_match('/vendas-(\w+)(\d{2})/', $nome_amigavel, $matches)) {
         $nome_mes = $matches[1];

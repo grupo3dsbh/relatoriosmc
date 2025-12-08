@@ -48,6 +48,31 @@ if (!empty($arquivos_vendas)) {
     if (file_exists($arquivo_selecionado)) {
         $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
+        // ===== APLICA REGRA DO DIA 08 (remove canceladas e sem 1ª parcela) =====
+        $regra_dia08 = aplicarRegraDia08(
+            $vendas_processadas['vendas'],
+            $filtros['data_inicial'],
+            $filtros['data_final']
+        );
+
+        // Se aplicou filtro, recalcula pontuação dos consultores
+        if ($regra_dia08['aplicar_filtro']) {
+            // Reagrupa vendas por consultor
+            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+
+            // Filtra novamente as vendas processadas
+            $regra_dia08 = aplicarRegraDia08(
+                $vendas_processadas['vendas'],
+                $filtros['data_inicial'],
+                $filtros['data_final']
+            );
+        }
+
+        // Determina se é relatório FINAL ou TEMPORÁRIO
+        $nome_arquivo_base = basename($arquivo_selecionado);
+        $nome_amigavel = gerarNomeAmigavel($nome_arquivo_base);
+        $tipo_relatorio = $regra_dia08['aplicar_filtro'] ? 'FINAL' : 'TEMPORÁRIO';
+
         // Ordena e pega top 20
         // Prioriza consultores com vendas ativas, depois por pontos
         usort($vendas_processadas['por_consultor'], function($a, $b) {
@@ -147,6 +172,39 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             </small>
         </p>
     </div>
+
+    <!-- Notificação de Relatório FINAL ou TEMPORÁRIO -->
+    <?php if (isset($nome_amigavel)): ?>
+    <div class="alert alert-<?= $tipo_relatorio === 'FINAL' ? 'success' : 'warning' ?> mb-3">
+        <h5>
+            <i class="fas fa-<?= $tipo_relatorio === 'FINAL' ? 'check-circle' : 'clock' ?>"></i>
+            Relatório: <strong><?= htmlspecialchars($nome_amigavel) ?></strong>
+            <span class="badge badge-<?= $tipo_relatorio === 'FINAL' ? 'success' : 'warning' ?> ml-2"><?= $tipo_relatorio ?></span>
+        </h5>
+
+        <?php if ($tipo_relatorio === 'FINAL'): ?>
+            <p class="mb-0">
+                ✅ Este é o <strong>ranking oficial final</strong> para premiação.
+                <?php if ($regra_dia08['removidas_canceladas'] > 0 || $regra_dia08['removidas_sem_pagamento'] > 0): ?>
+                    <br>
+                    <strong>Cotas removidas do ranking:</strong>
+                    <?php if ($regra_dia08['removidas_canceladas'] > 0): ?>
+                        <span class="badge badge-danger"><?= $regra_dia08['removidas_canceladas'] ?> canceladas</span>
+                    <?php endif; ?>
+                    <?php if ($regra_dia08['removidas_sem_pagamento'] > 0): ?>
+                        <span class="badge badge-warning"><?= $regra_dia08['removidas_sem_pagamento'] ?> sem 1ª parcela</span>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </p>
+        <?php else: ?>
+            <p class="mb-0">
+                ⚠️ <strong>Atenção:</strong> Este ranking é <strong>temporário</strong>!
+                As posições e pontuações <strong>podem mudar</strong> até o dia 08 do próximo mês.
+                <br>O ranking final será disponibilizado após essa data.
+            </p>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <!-- Barra de Busca -->
     <div class="card mb-4 no-print">
