@@ -450,17 +450,17 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                 <label>
                                                     <i class="fas fa-calendar-alt"></i> Data Inicial
                                                 </label>
-                                                <input type="date" class="form-control" name="data_inicial"
+                                                <input type="date" class="form-control" id="data_inicial" name="data_inicial"
                                                        value="<?= $_POST['data_inicial'] ?? $periodo_padrao['data_inicial'] ?>">
                                             </div>
                                         </div>
-                                        
+
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label>
                                                     <i class="fas fa-calendar-check"></i> Data Final
                                                 </label>
-                                                <input type="date" class="form-control" name="data_final"
+                                                <input type="date" class="form-control" id="data_final" name="data_final"
                                                        value="<?= $_POST['data_final'] ?? $periodo_padrao['data_final'] ?>">
                                             </div>
                                         </div>
