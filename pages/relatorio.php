@@ -55,6 +55,31 @@ if (!isset($_SESSION['campos_visiveis_consultores'])) {
 
 $campos_visiveis = $_SESSION['campos_visiveis_consultores'];
 
+// PRÉ-VERIFICAÇÃO: Detecta se é relatório FINAL ANTES de processar
+// Isso permite marcar o checkbox automaticamente no formulário
+$e_relatorio_final_pre_check = false;
+$data_inicial_check = $_POST['data_inicial'] ?? $periodo_padrao['data_inicial'];
+$data_final_check = $_POST['data_final'] ?? $periodo_padrao['data_final'];
+
+if (!empty($data_final_check)) {
+    $hoje = new DateTime();
+    $fim_periodo = new DateTime($data_final_check);
+
+    // Calcula o dia 08 do mês seguinte ao período
+    $mes_seguinte = clone $fim_periodo;
+    $mes_seguinte->modify('first day of next month');
+    $mes_seguinte->setDate(
+        (int)$mes_seguinte->format('Y'),
+        (int)$mes_seguinte->format('m'),
+        8
+    );
+
+    // Se já é dia 08 ou posterior, é relatório FINAL
+    if ($hoje >= $mes_seguinte) {
+        $e_relatorio_final_pre_check = true;
+    }
+}
+
 // Processa relatório
 if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
 
@@ -462,29 +487,28 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                         
                                         <div class="col-md-4">
                                             <div class="form-check mt-4 pt-2">
-                                                <?php
-                                                // Verifica se é relatório FINAL (dia 08 ou posterior)
-                                                $e_relatorio_final = false;
-                                                if (isset($regra_dia08) && $regra_dia08['aplicar_filtro']) {
-                                                    $e_relatorio_final = true;
-                                                }
-                                                ?>
                                                 <input type="checkbox" class="form-check-input"
                                                        name="primeira_parcela_paga" id="primeira_parcela_paga"
-                                                       <?= (isset($_POST['primeira_parcela_paga']) || $e_relatorio_final) ? 'checked' : '' ?>
-                                                       <?= $e_relatorio_final ? 'disabled' : '' ?>>
+                                                       <?= (isset($_POST['primeira_parcela_paga']) || $e_relatorio_final_pre_check) ? 'checked' : '' ?>
+                                                       <?= $e_relatorio_final_pre_check ? 'disabled' : '' ?>>
                                                 <!-- Campo hidden para enviar valor quando checkbox está disabled -->
-                                                <?php if ($e_relatorio_final): ?>
+                                                <?php if ($e_relatorio_final_pre_check): ?>
                                                     <input type="hidden" name="primeira_parcela_paga" value="on">
                                                 <?php endif; ?>
                                                 <label class="form-check-label" for="primeira_parcela_paga">
                                                     <i class="fas fa-money-bill-wave"></i> Apenas com 1ª Parcela Paga
-                                                    <?php if ($e_relatorio_final): ?>
+                                                    <?php if ($e_relatorio_final_pre_check): ?>
                                                         <span class="badge badge-success ml-2" title="Obrigatório em relatórios finais">
-                                                            OBRIGATÓRIO
+                                                            OBRIGATÓRIO (Dia 08 ou posterior)
                                                         </span>
                                                     <?php endif; ?>
                                                 </label>
+                                                <?php if ($e_relatorio_final_pre_check): ?>
+                                                    <small class="form-text text-success">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)
+                                                    </small>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                         

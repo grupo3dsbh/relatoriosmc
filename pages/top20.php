@@ -46,7 +46,22 @@ if (!empty($arquivos_vendas)) {
     ];
 
     if (file_exists($arquivo_selecionado)) {
-        $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+        // PRIMEIRO: Processa vendas SEM filtro do dia 08 para ter pontos originais
+        $vendas_processadas_original = processarVendasComRanges($arquivo_selecionado, $filtros);
+
+        // Salva pontos originais por consultor (ANTES de remover vendas)
+        $pontos_originais = [];
+        $vendas_removidas_por_consultor = [];
+        foreach ($vendas_processadas_original['por_consultor'] as $consultor) {
+            $pontos_originais[$consultor['consultor']] = $consultor['pontos'];
+            $vendas_removidas_por_consultor[$consultor['consultor']] = [
+                'canceladas' => 0,
+                'sem_pagamento' => 0,
+                'pontos_perdidos' => 0
+            ];
+        }
+
+        $vendas_processadas = $vendas_processadas_original;
 
         // ===== APLICA REGRA DO DIA 08 (remove canceladas e sem 1ª parcela) =====
         $regra_dia08 = aplicarRegraDia08(
@@ -57,7 +72,22 @@ if (!empty($arquivos_vendas)) {
 
         // Se aplicou filtro, recalcula pontuação dos consultores
         if ($regra_dia08['aplicar_filtro']) {
-            // Reagrupa vendas por consultor
+            // Calcula quantas vendas cada consultor perdeu
+            foreach ($vendas_processadas_original['vendas'] as $venda) {
+                $consultor_nome = $venda['consultor'];
+
+                // Verifica se venda foi removida (cancelada)
+                if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
+                    strcasecmp($venda['status'], 'Cancelada') === 0) {
+                    $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
+                }
+                // Verifica se venda foi removida (sem primeira parcela)
+                elseif (!($venda['primeira_parcela_paga'] ?? false)) {
+                    $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
+                }
+            }
+
+            // Reagrupa vendas por consultor (APÓS remover vendas)
             $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
             // Filtra novamente as vendas processadas
@@ -66,6 +96,26 @@ if (!empty($arquivos_vendas)) {
                 $filtros['data_inicial'],
                 $filtros['data_final']
             );
+
+            // Calcula pontos perdidos por consultor
+            foreach ($vendas_processadas['por_consultor'] as &$consultor) {
+                $consultor_nome = $consultor['consultor'];
+                $pontos_atuais = $consultor['pontos'];
+                $pontos_antes = $pontos_originais[$consultor_nome] ?? $pontos_atuais;
+
+                $consultor['pontos_perdidos'] = $pontos_antes - $pontos_atuais;
+                $consultor['vendas_canceladas'] = $vendas_removidas_por_consultor[$consultor_nome]['canceladas'];
+                $consultor['vendas_sem_pagamento'] = $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento'];
+                $consultor['pontos_originais'] = $pontos_antes;
+            }
+        } else {
+            // Não é relatório final, pontos perdidos = 0
+            foreach ($vendas_processadas['por_consultor'] as &$consultor) {
+                $consultor['pontos_perdidos'] = 0;
+                $consultor['vendas_canceladas'] = 0;
+                $consultor['vendas_sem_pagamento'] = 0;
+                $consultor['pontos_originais'] = $consultor['pontos'];
+            }
         }
 
         // Determina se é relatório FINAL ou TEMPORÁRIO
@@ -255,6 +305,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                 <?php if ($campos_visiveis['pontos']): ?>
                     <th class="text-center">Pontos</th>
                 <?php endif; ?>
+                <?php if ($tipo_relatorio === 'FINAL' && $campos_visiveis['pontos']): ?>
+                    <th class="text-center">Canceladas/Sem Pgto</th>
+                <?php endif; ?>
                 <?php if ($campos_visiveis['vendas']): ?>
                     <th class="text-center">Vendas</th>
                 <?php endif; ?>
@@ -288,7 +341,38 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                         <span class="badge badge-primary"><?= $consultor['pontos'] ?> pts</span>
                     </td>
                 <?php endif; ?>
-                
+
+                <?php if ($tipo_relatorio === 'FINAL' && $campos_visiveis['pontos']): ?>
+                    <td class="text-center">
+                        <?php if ($consultor['pontos_perdidos'] > 0): ?>
+                            <small class="text-muted d-block">
+                                <?= $consultor['pontos_originais'] ?> pts
+                                <i class="fas fa-arrow-right"></i>
+                            </small>
+                            <span class="badge badge-danger">
+                                -<?= $consultor['pontos_perdidos'] ?> pts
+                            </span>
+                            <br>
+                            <small class="text-muted">
+                                <?php if ($consultor['vendas_canceladas'] > 0): ?>
+                                    <span class="badge badge-sm badge-danger" title="Vendas canceladas">
+                                        <?= $consultor['vendas_canceladas'] ?> ❌
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($consultor['vendas_sem_pagamento'] > 0): ?>
+                                    <span class="badge badge-sm badge-warning" title="Sem 1ª parcela">
+                                        <?= $consultor['vendas_sem_pagamento'] ?> ⚠️
+                                    </span>
+                                <?php endif; ?>
+                            </small>
+                        <?php else: ?>
+                            <span class="text-success">
+                                <i class="fas fa-check-circle"></i> 0
+                            </span>
+                        <?php endif; ?>
+                    </td>
+                <?php endif; ?>
+
                 <?php if ($campos_visiveis['vendas']): ?>
                     <td class="text-center"><?= $consultor['quantidade'] ?></td>
                 <?php endif; ?>
