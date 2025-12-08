@@ -1884,10 +1884,15 @@ jQuery(document).ready(function($) {
 
 <!-- Verificação Dinâmica de Relatório FINAL - JavaScript Puro -->
 <script>
+alert('🔍 SCRIPT DE VERIFICAÇÃO CARREGADO!');
+console.log('🔍 SCRIPT DE VERIFICAÇÃO CARREGADO - TESTE INICIAL');
+
 // Aguarda DOM carregar
 if (document.readyState === 'loading') {
+    console.log('⏳ DOM ainda carregando, aguardando DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', iniciarVerificacaoDinamica);
 } else {
+    console.log('✅ DOM já carregado, iniciando imediatamente...');
     iniciarVerificacaoDinamica();
 }
 
