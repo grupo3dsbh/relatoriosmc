@@ -1885,12 +1885,24 @@ jQuery(document).ready(function($) {
 <!-- Verificação Dinâmica de Relatório FINAL -->
 <script>
 $(document).ready(function() {
+    // ========== DIAGNÓSTICO ==========
+    console.log('🔍 INICIANDO VERIFICAÇÃO DINÂMICA DE RELATÓRIO FINAL');
+    console.log('jQuery carregado?', typeof jQuery !== 'undefined');
+    console.log('Campo data_inicial existe?', $('#data_inicial').length > 0);
+    console.log('Campo data_final existe?', $('#data_final').length > 0);
+    console.log('Checkbox primeira_parcela_paga existe?', $('#primeira_parcela_paga').length > 0);
+    console.log('Valor data_inicial:', $('#data_inicial').val());
+    console.log('Valor data_final:', $('#data_final').val());
+    console.log('=================================');
+
     /**
      * Verifica se as datas selecionadas caracterizam um relatório FINAL
      * Relatório FINAL = quando hoje é dia 08 ou posterior do mês seguinte ao período
      */
     function verificarRelatorioFinal() {
         const dataFinal = $('#data_final').val();
+
+        console.log('🔄 verificarRelatorioFinal() chamada - dataFinal:', dataFinal);
 
         if (!dataFinal) {
             // Sem data final, não é relatório FINAL
