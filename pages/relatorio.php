@@ -57,15 +57,26 @@ $campos_visiveis = $_SESSION['campos_visiveis_consultores'];
 
 // Processa relatório
 if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
-    
+
     // Determina qual arquivo usar
     if (isset($_GET['arquivo'])) {
         $nome_arquivo = $_GET['arquivo'];
-        $arquivo_selecionado = VENDAS_DIR . '/' . $nome_arquivo;
+
+        // Verifica se é nome amigável (vendas-novembro25) ou arquivo real
+        if (strpos($nome_arquivo, 'vendas-') === 0 && !strpos($nome_arquivo, '.csv')) {
+            // É nome amigável, converte para arquivo real
+            $arquivo_selecionado = obterArquivoRealPorNomeAmigavel($nome_arquivo);
+            if (!$arquivo_selecionado) {
+                $mensagem_erro = "Relatório '{$nome_arquivo}' não encontrado!";
+            }
+        } else {
+            // É arquivo real (.csv)
+            $arquivo_selecionado = VENDAS_DIR . '/' . $nome_arquivo;
+        }
     } elseif (isset($_POST['arquivo_vendas'])) {
         $arquivo_selecionado = $_POST['arquivo_vendas'];
     }
-    
+
     if ($arquivo_selecionado && file_exists($arquivo_selecionado)) {
         
         // Monta filtros
@@ -143,10 +154,35 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             echo "<br>";
         }
         // ===== DEBUG DETALHADO - FIM =====
-        
+
         // Processa vendas COM RANGES DE PONTUAÇÃO
         $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
-        
+
+        // ===== APLICA REGRA DO DIA 08 (remove canceladas e sem 1ª parcela) =====
+        $regra_dia08 = aplicarRegraDia08(
+            $vendas_processadas['vendas'],
+            $filtros['data_inicial'],
+            $filtros['data_final']
+        );
+
+        // Se aplicou filtro, recalcula pontuação dos consultores
+        if ($regra_dia08['aplicar_filtro']) {
+            // Reagrupa vendas por consultor
+            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+
+            // Filtra novamente as vendas processadas
+            $regra_dia08 = aplicarRegraDia08(
+                $vendas_processadas['vendas'],
+                $filtros['data_inicial'],
+                $filtros['data_final']
+            );
+        }
+
+        // Determina se é relatório FINAL ou TEMPORÁRIO
+        $nome_arquivo_base = basename($arquivo_selecionado);
+        $nome_amigavel = gerarNomeAmigavel($nome_arquivo_base);
+        $tipo_relatorio = $regra_dia08['aplicar_filtro'] ? 'FINAL' : 'TEMPORÁRIO';
+
         // ===== DEBUG: RESULTADO DO PROCESSAMENTO =====
         if (isGodMode()) {
             echo "<strong>✅ Resultado do Processamento:</strong><br>";
@@ -300,7 +336,40 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                     </div>
                 <?php endif; ?>
-                
+
+                <?php if (isset($vendas_processadas) && isset($nome_amigavel)): ?>
+                    <!-- Notificação de Relatório FINAL ou TEMPORÁRIO -->
+                    <div class="alert alert-<?= $tipo_relatorio === 'FINAL' ? 'success' : 'warning' ?> mb-3">
+                        <h5>
+                            <i class="fas fa-<?= $tipo_relatorio === 'FINAL' ? 'check-circle' : 'clock' ?>"></i>
+                            Relatório: <strong><?= htmlspecialchars($nome_amigavel) ?></strong>
+                            <span class="badge badge-<?= $tipo_relatorio === 'FINAL' ? 'success' : 'warning' ?> ml-2"><?= $tipo_relatorio ?></span>
+                        </h5>
+
+                        <?php if ($tipo_relatorio === 'FINAL'): ?>
+                            <p class="mb-0">
+                                ✅ Este é o <strong>relatório oficial final</strong> para premiação.
+                                <?php if ($regra_dia08['removidas_canceladas'] > 0 || $regra_dia08['removidas_sem_pagamento'] > 0): ?>
+                                    <br>
+                                    <strong>Cotas removidas do ranking:</strong>
+                                    <?php if ($regra_dia08['removidas_canceladas'] > 0): ?>
+                                        <span class="badge badge-danger"><?= $regra_dia08['removidas_canceladas'] ?> canceladas</span>
+                                    <?php endif; ?>
+                                    <?php if ($regra_dia08['removidas_sem_pagamento'] > 0): ?>
+                                        <span class="badge badge-warning"><?= $regra_dia08['removidas_sem_pagamento'] ?> sem 1ª parcela</span>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </p>
+                        <?php else: ?>
+                            <p class="mb-0">
+                                ⚠️ <strong>Atenção:</strong> Este relatório é <strong>temporário</strong>!
+                                As posições e pontuações <strong>podem mudar</strong> até o dia 08 do próximo mês.
+                                <br>O relatório final será disponibilizado após essa data.
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php if (empty($arquivos_vendas)): ?>
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>

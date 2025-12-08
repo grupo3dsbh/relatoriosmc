@@ -1318,4 +1318,129 @@ function removerApelidoConsultor($nome_original) {
     }
 }
 
+/**
+ * Gera nome amigável para arquivo CSV baseado na data
+ * Ex: 2025-12-01_034017_vendas.csv → vendas-novembro25
+ */
+function gerarNomeAmigavel($nome_arquivo) {
+    // Tenta extrair a data do nome do arquivo (formato: YYYY-MM-DD_HHMMSS_vendas.csv)
+    if (preg_match('/(\d{4})-(\d{2})-(\d{2})_/', $nome_arquivo, $matches)) {
+        $ano = $matches[1];
+        $mes = intval($matches[2]);
+
+        // Meses em português
+        $meses = [
+            1 => 'janeiro', 2 => 'fevereiro', 3 => 'marco', 4 => 'abril',
+            5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
+            9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
+        ];
+
+        $nome_mes = $meses[$mes] ?? 'desconhecido';
+        $ano_curto = substr($ano, 2, 2);
+
+        return "vendas-{$nome_mes}{$ano_curto}";
+    }
+
+    // Fallback: retorna o nome do arquivo sem extensão
+    return pathinfo($nome_arquivo, PATHINFO_FILENAME);
+}
+
+/**
+ * Converte nome amigável de volta para arquivo CSV real
+ * Ex: vendas-novembro25 → 2025-12-01_034017_vendas.csv (procura no diretório)
+ */
+function obterArquivoRealPorNomeAmigavel($nome_amigavel) {
+    // Extrai mês e ano do nome amigável (ex: vendas-novembro25)
+    if (preg_match('/vendas-(\w+)(\d{2})/', $nome_amigavel, $matches)) {
+        $nome_mes = $matches[1];
+        $ano_curto = $matches[2];
+
+        // Mapeia nome do mês para número
+        $meses = [
+            'janeiro' => '01', 'fevereiro' => '02', 'marco' => '03', 'abril' => '04',
+            'maio' => '05', 'junho' => '06', 'julho' => '07', 'agosto' => '08',
+            'setembro' => '09', 'outubro' => '10', 'novembro' => '11', 'dezembro' => '12'
+        ];
+
+        if (!isset($meses[$nome_mes])) {
+            return null;
+        }
+
+        $mes = $meses[$nome_mes];
+        $ano = '20' . $ano_curto;
+
+        // Lista todos os CSVs e procura por um que corresponda ao mês/ano
+        $arquivos = listarCSVs('vendas');
+        foreach ($arquivos as $arquivo) {
+            if (preg_match("/{$ano}-{$mes}-/", $arquivo['nome'])) {
+                return $arquivo['caminho'];
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Verifica se é dia 08 ou posterior do mês seguinte ao período do relatório
+ * E filtra/conta vendas canceladas e sem primeira parcela paga
+ */
+function aplicarRegraDia08(&$vendas, $data_inicio_periodo, $data_fim_periodo) {
+    // Verifica se é dia 08 ou posterior do mês seguinte
+    $hoje = new DateTime();
+    $fim_periodo = new DateTime($data_fim_periodo);
+
+    // Calcula o dia 08 do mês seguinte ao período
+    $mes_seguinte = clone $fim_periodo;
+    $mes_seguinte->modify('first day of next month');
+    $mes_seguinte->setDate(
+        (int)$mes_seguinte->format('Y'),
+        (int)$mes_seguinte->format('m'),
+        8
+    );
+
+    // Se ainda não chegou no dia 08, não aplica filtro
+    if ($hoje < $mes_seguinte) {
+        return [
+            'aplicar_filtro' => false,
+            'removidas_canceladas' => 0,
+            'removidas_sem_pagamento' => 0
+        ];
+    }
+
+    // É dia 08 ou posterior, aplica filtro
+    $canceladas = 0;
+    $sem_pagamento = 0;
+    $vendas_filtradas = [];
+
+    foreach ($vendas as $venda) {
+        $remover = false;
+
+        // Remove vendas com status Cancelado
+        if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
+            strcasecmp($venda['status'], 'Cancelada') === 0) {
+            $canceladas++;
+            $remover = true;
+        }
+
+        // Remove vendas sem primeira parcela paga
+        if (!$remover && !($venda['primeira_parcela_paga'] ?? false)) {
+            $sem_pagamento++;
+            $remover = true;
+        }
+
+        if (!$remover) {
+            $vendas_filtradas[] = $venda;
+        }
+    }
+
+    $vendas = $vendas_filtradas;
+
+    return [
+        'aplicar_filtro' => true,
+        'removidas_canceladas' => $canceladas,
+        'removidas_sem_pagamento' => $sem_pagamento
+    ];
+}
+
 ?>
