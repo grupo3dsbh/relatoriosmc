@@ -1882,6 +1882,120 @@ jQuery(document).ready(function($) {
 });
 </script>
 
+<!-- Verificação Dinâmica de Relatório FINAL -->
+<script>
+$(document).ready(function() {
+    /**
+     * Verifica se as datas selecionadas caracterizam um relatório FINAL
+     * Relatório FINAL = quando hoje é dia 08 ou posterior do mês seguinte ao período
+     */
+    function verificarRelatorioFinal() {
+        const dataFinal = $('#data_final').val();
+
+        if (!dataFinal) {
+            // Sem data final, não é relatório FINAL
+            desbloquearCheckbox();
+            return;
+        }
+
+        // Hoje
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        // Data final do período selecionado
+        const fimPeriodo = new Date(dataFinal + 'T00:00:00');
+
+        // Calcula o dia 08 do mês seguinte
+        const mesSeguinte = new Date(fimPeriodo);
+        mesSeguinte.setMonth(mesSeguinte.getMonth() + 1);
+        mesSeguinte.setDate(8);
+        mesSeguinte.setHours(0, 0, 0, 0);
+
+        // DEBUG
+        console.log('Verificação Relatório FINAL:');
+        console.log('- Hoje:', hoje.toLocaleDateString('pt-BR'));
+        console.log('- Data Final Período:', fimPeriodo.toLocaleDateString('pt-BR'));
+        console.log('- Dia 08 Mês Seguinte:', mesSeguinte.toLocaleDateString('pt-BR'));
+        console.log('- É FINAL?', hoje >= mesSeguinte);
+
+        // Se hoje >= dia 08 do mês seguinte, é relatório FINAL
+        if (hoje >= mesSeguinte) {
+            bloquearCheckbox();
+        } else {
+            desbloquearCheckbox();
+        }
+    }
+
+    /**
+     * Bloqueia checkbox e mostra avisos (relatório FINAL)
+     */
+    function bloquearCheckbox() {
+        const $checkbox = $('#primeira_parcela_paga');
+        const $label = $checkbox.closest('.form-check');
+
+        // Marca e desabilita checkbox
+        $checkbox.prop('checked', true);
+        $checkbox.prop('disabled', true);
+
+        // Remove campo hidden anterior (se existir)
+        $label.find('input[type="hidden"][name="primeira_parcela_paga"]').remove();
+
+        // Adiciona campo hidden para enviar valor
+        $label.append('<input type="hidden" name="primeira_parcela_paga" value="on">');
+
+        // Remove badges/textos antigos
+        $label.find('.badge, .form-text').remove();
+
+        // Adiciona badge "OBRIGATÓRIO"
+        $label.find('label').append(`
+            <span class="badge badge-success ml-2" title="Obrigatório em relatórios finais">
+                OBRIGATÓRIO (Dia 08 ou posterior)
+            </span>
+        `);
+
+        // Adiciona texto explicativo
+        $label.append(`
+            <small class="form-text text-success">
+                <i class="fas fa-info-circle"></i>
+                Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)
+            </small>
+        `);
+
+        console.log('✅ Checkbox BLOQUEADO (Relatório FINAL)');
+    }
+
+    /**
+     * Desbloqueia checkbox e remove avisos (relatório TEMPORÁRIO)
+     */
+    function desbloquearCheckbox() {
+        const $checkbox = $('#primeira_parcela_paga');
+        const $label = $checkbox.closest('.form-check');
+
+        // Habilita checkbox (mantém marcado se estava marcado)
+        $checkbox.prop('disabled', false);
+
+        // Remove campo hidden
+        $label.find('input[type="hidden"][name="primeira_parcela_paga"]').remove();
+
+        // Remove badges e textos explicativos
+        $label.find('.badge, .form-text').remove();
+
+        console.log('🔓 Checkbox DESBLOQUEADO (Relatório TEMPORÁRIO)');
+    }
+
+    // Escuta mudanças nas datas
+    $('#data_inicial, #data_final').on('change', function() {
+        console.log('📅 Data alterada:', $(this).attr('id'), '=', $(this).val());
+        verificarRelatorioFinal();
+    });
+
+    // Verificação inicial ao carregar a página
+    verificarRelatorioFinal();
+
+    console.log('✅ Verificação dinâmica de relatório FINAL ativada!');
+});
+</script>
+
 <!-- Fogos de Artifício e Mensagem para Relatório FINAL -->
 <?php if (isset($tipo_relatorio) && $tipo_relatorio === 'FINAL'): ?>
     <?php $mensagem_parabens = obterMensagemAleatoriaParabens(); ?>
