@@ -45,11 +45,8 @@ try {
     // Calcula pontos usando a função de ranges
     $calc_pontos = calcularPontosComRanges($vendas_detalhes, $consultor_nome);
 
-    // Cria mapa de pontos por ID
-    $pontos_por_id = [];
-    foreach ($calc_pontos['detalhamento'] as $det) {
-        $pontos_por_id[$det['id_venda']] = $det['pontos_total'];
-    }
+    // Usa o array de pontos por venda retornado pela função
+    $pontos_por_id = $calc_pontos['pontos_por_venda'] ?? [];
 
     $vendas_retorno = [];
     foreach ($vendas_consultor as $venda) {

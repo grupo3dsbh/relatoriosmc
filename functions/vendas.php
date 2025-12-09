@@ -983,6 +983,7 @@ function converterPontosPadrao($pontos_padrao) {
 function calcularPontosComRanges($vendas_detalhes, $nome_consultor = '') {
     $pontos_total = 0;
     $detalhamento_por_range = [];
+    $pontos_por_venda = []; // NOVO: Rastreia pontos por ID de venda
 
     // DEBUG: Armazena info para exibir na tela com godmode
     $debug_info = [];
@@ -1029,10 +1030,15 @@ function calcularPontosComRanges($vendas_detalhes, $nome_consultor = '') {
         
         // Obtém pontos para esta categoria
         $pontos = obterPontosPorCategoria($categoria, $config_pontos);
-        
+
         // IMPORTANTE: Adiciona os pontos apenas UMA VEZ
         $pontos_total += $pontos;
-        
+
+        // NOVO: Armazena pontos por ID de venda
+        if (isset($detalhe['id_venda'])) {
+            $pontos_por_venda[$detalhe['id_venda']] = $pontos;
+        }
+
         // Identifica qual range foi usado
         $range_usado = identificarRange($detalhe['data_venda']);
 
@@ -1128,7 +1134,8 @@ function calcularPontosComRanges($vendas_detalhes, $nome_consultor = '') {
     return [
         'pontos_total' => $pontos_total,
         'detalhamento' => $detalhamento,
-        'detalhamento_por_range' => array_values($detalhamento_por_range)
+        'detalhamento_por_range' => array_values($detalhamento_por_range),
+        'pontos_por_venda' => $pontos_por_venda // NOVO: Array de pontos por ID
     ];
 }
 
