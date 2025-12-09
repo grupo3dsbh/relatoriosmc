@@ -24,10 +24,32 @@ try {
 
     $arquivo_vendas = $arquivos_vendas[0]['caminho'];
     $resultado = processarVendasCSV($arquivo_vendas);
-    
+
     $vendas_consultor = array_filter($resultado['vendas'], function($v) use ($consultor_nome, $vendas_ids) {
         return $v['consultor'] === $consultor_nome && in_array($v['id'], $vendas_ids);
     });
+
+    // Prepara vendas para calcular pontos
+    $vendas_detalhes = [];
+    foreach ($vendas_consultor as $venda) {
+        $vendas_detalhes[] = [
+            'num_vagas' => $venda['num_vagas'],
+            'e_vista' => $venda['e_vista'],
+            'data_venda' => $venda['data_para_pontuacao'],
+            'id_venda' => $venda['id'],
+            'valor_total' => $venda['valor_total'],
+            'valor_pago' => $venda['valor_pago']
+        ];
+    }
+
+    // Calcula pontos usando a função de ranges
+    $calc_pontos = calcularPontosComRanges($vendas_detalhes, $consultor_nome);
+
+    // Cria mapa de pontos por ID
+    $pontos_por_id = [];
+    foreach ($calc_pontos['detalhamento'] as $det) {
+        $pontos_por_id[$det['id_venda']] = $det['pontos_total'];
+    }
 
     $vendas_retorno = [];
     foreach ($vendas_consultor as $venda) {
@@ -49,7 +71,8 @@ try {
             'forma_pagamento' => $venda['forma_pagamento'] ?? '',
             'num_parcelas' => $venda['quantidade_parcelas_venda'], // CORRETO
             'primeira_parcela_paga' => $venda['primeira_parcela_paga'],
-            'valor_pago' => $venda['valor_pago']
+            'valor_pago' => $venda['valor_pago'],
+            'pontos' => $pontos_por_id[$venda['id']] ?? 0
         ];
     }
 

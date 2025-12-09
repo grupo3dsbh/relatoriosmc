@@ -882,6 +882,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             
             <!-- Footer fixo -->
             <div class="modal-footer" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-primary" id="btnExportarPDF">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                </button>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">
                     <i class="fas fa-times"></i> Fechar
                 </button>
@@ -1023,7 +1026,7 @@ body.modal-open {
     width: 100%;
 }
 
-/* Garante que o backdrop no permita scroll */
+/* Garante que o backdrop não permita scroll */
 .modal-backdrop {
     position: fixed;
 }
@@ -1032,6 +1035,108 @@ body.modal-open {
 #modalDetalhamentoConsultor .modal-body {
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
+}
+
+/* Estilos para impressão/PDF */
+@media print {
+    /* Oculta tudo exceto a modal */
+    body * {
+        visibility: hidden;
+    }
+
+    /* Mostra apenas o conteúdo da modal */
+    #modalDetalhamentoConsultor,
+    #modalDetalhamentoConsultor * {
+        visibility: visible;
+    }
+
+    /* Posiciona a modal para impressão */
+    #modalDetalhamentoConsultor {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+
+    #modalDetalhamentoConsultor .modal-dialog {
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+
+    #modalDetalhamentoConsultor .modal-content {
+        max-height: none !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    #modalDetalhamentoConsultor .modal-body {
+        overflow: visible !important;
+        max-height: none !important;
+        padding: 20px !important;
+    }
+
+    /* Oculta elementos de interface */
+    #modalDetalhamentoConsultor .modal-header button.close,
+    #modalDetalhamentoConsultor .modal-footer,
+    #modalDetalhamentoConsultor #buscaTitulo,
+    #modalDetalhamentoConsultor #filtroTipoPagamento,
+    #modalDetalhamentoConsultor #filtroStatus,
+    #modalDetalhamentoConsultor #filtroPrimeiraParcela,
+    #modalDetalhamentoConsultor #btnLimparFiltrosModal,
+    #modalDetalhamentoConsultor .row.mb-3:has(#buscaTitulo),
+    .modal-backdrop {
+        display: none !important;
+    }
+
+    /* Força expansão do collapse */
+    #collapseDetalhamento {
+        display: block !important;
+        height: auto !important;
+    }
+
+    /* Ajusta tabelas */
+    #modalDetalhamentoConsultor table {
+        font-size: 10px !important;
+        page-break-inside: auto;
+    }
+
+    #modalDetalhamentoConsultor tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    /* Remove scroll da tabela */
+    .table-responsive {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    /* Ajusta badges e ícones */
+    .badge {
+        border: 1px solid #000;
+        padding: 2px 4px;
+    }
+
+    /* Remove cores de background */
+    .card {
+        border: 1px solid #ddd !important;
+        page-break-inside: avoid;
+    }
+
+    /* Mantém cores do card de total */
+    .bg-success {
+        background-color: #28a745 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .text-white {
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
 }
 </style>
 <!-- Inicializar DataTables -->
@@ -1460,6 +1565,28 @@ jQuery(document).ready(function($) {
                         <h5 class="mb-0">
                             <i class="fas fa-trophy"></i> TOTAL: ${consultor.pontos} pontos
                         </h5>
+            `;
+
+            // Se tem pontos perdidos (relatório final), mostra o detalhamento
+            if (consultor.pontos_perdidos && consultor.pontos_perdidos > 0) {
+                html += `
+                        <hr class="bg-white my-2">
+                        <p class="mb-0">
+                            <small>
+                                <i class="fas fa-info-circle"></i>
+                                <strong>-${consultor.pontos_perdidos} pontos perdidos</strong><br>
+                                por cancelamento ou falta de pagamento da primeira parcela
+                            </small>
+                        </p>
+                        <p class="mb-0 mt-1">
+                            <small>
+                                Pontos antes das penalidades: <strong>${consultor.pontos_originais || consultor.pontos} pontos</strong>
+                            </small>
+                        </p>
+                `;
+            }
+
+            html += `
                     </div>
                 </div>
             `;
@@ -1560,12 +1687,13 @@ jQuery(document).ready(function($) {
                                 <th>Forma Pag.</th>
                                 <th class="text-center">Parc.</th>
                                 <th class="text-center">1ª?</th>
+                                <th class="text-center">Pontos</th>
                                 <th class="text-right">Vlr. Pago</th>
                             </tr>
                         </thead>
                         <tbody id="corpoTabelaVendas">
                             <tr>
-                                <td colspan="10" class="text-center">
+                                <td colspan="11" class="text-center">
                                     <i class="fas fa-spinner fa-spin"></i> Carregando vendas...
                                 </td>
                             </tr>
@@ -1580,7 +1708,18 @@ jQuery(document).ready(function($) {
         // Atualiza modal e abre
         $('#modalDetalhamentoBody').html(html);
         $('#modalDetalhamentoConsultor').modal('show');
-        
+
+        // Configura botão de exportar PDF
+        $('#btnExportarPDF').off('click').on('click', function() {
+            // Expande o collapse de detalhamento antes de imprimir
+            $('#collapseDetalhamento').collapse('show');
+
+            // Aguarda expansão e depois imprime
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+
         // Configura evento de collapse DEPOIS de inserir o HTML
         setTimeout(function() {
             // Evento de clique no header
@@ -1669,9 +1808,12 @@ jQuery(document).ready(function($) {
                                 </td>
                                 <td class="text-center"><small>${venda.num_parcelas}x</small></td>
                                 <td class="text-center">
-                                    ${venda.primeira_parcela_paga ? 
-                                        '<i class="fas fa-check text-success"></i>' : 
+                                    ${venda.primeira_parcela_paga ?
+                                        '<i class="fas fa-check text-success"></i>' :
                                         '<i class="fas fa-times text-danger"></i>'}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-primary">${venda.pontos || 0} pts</span>
                                 </td>
                                 <td class="text-right">
                                     <small><strong>R$ ${parseFloat(venda.valor_pago).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></small>
@@ -1688,7 +1830,7 @@ jQuery(document).ready(function($) {
                     configurarFiltrosModal();
                 } else {
                     $('#corpoTabelaVendas').html(
-                        '<tr><td colspan="9" class="text-center text-warning">Nenhuma venda encontrada</td></tr>'
+                        '<tr><td colspan="11" class="text-center text-warning">Nenhuma venda encontrada</td></tr>'
                     );
                 }
             },
@@ -1696,7 +1838,7 @@ jQuery(document).ready(function($) {
                 console.error('Erro ao carregar vendas:', error);
                 console.error('Response:', xhr.responseText);
                 $('#corpoTabelaVendas').html(
-                    '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar vendas. Tente novamente.</td></tr>'
+                    '<tr><td colspan="11" class="text-center text-danger">Erro ao carregar vendas. Tente novamente.</td></tr>'
                 );
             }
         });
