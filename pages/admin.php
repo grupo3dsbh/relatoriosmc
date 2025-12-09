@@ -99,7 +99,8 @@ if (isset($_POST['alterar_senha_consultores'])) {
 if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
     if ($_FILES['csv_vendas']['error'] === UPLOAD_ERR_OK) {
         $substituir = isset($_POST['substituir_vendas']) && $_POST['substituir_vendas'] == '1';
-        $resultado = salvarCSV($_FILES['csv_vendas']['tmp_name'], 'vendas', $substituir);
+        $arquivo_alvo = $substituir && !empty($_POST['arquivo_substituir_vendas']) ? $_POST['arquivo_substituir_vendas'] : null;
+        $resultado = salvarCSV($_FILES['csv_vendas']['tmp_name'], 'vendas', $substituir, $arquivo_alvo);
         if ($resultado['sucesso']) {
             $acao = $resultado['substituiu'] ? 'substituído' : 'criado';
             $mensagem_sucesso = "CSV de vendas {$acao} com sucesso! Arquivo: {$resultado['nome']}";
@@ -113,13 +114,14 @@ if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
 if (isset($_POST['upload_promotores']) && isset($_FILES['csv_promotores'])) {
     if ($_FILES['csv_promotores']['error'] === UPLOAD_ERR_OK) {
         $substituir = isset($_POST['substituir_promotores']) && $_POST['substituir_promotores'] == '1';
-        $resultado = salvarCSV($_FILES['csv_promotores']['tmp_name'], 'promotores', $substituir);
+        $arquivo_alvo = $substituir && !empty($_POST['arquivo_substituir_promotores']) ? $_POST['arquivo_substituir_promotores'] : null;
+        $resultado = salvarCSV($_FILES['csv_promotores']['tmp_name'], 'promotores', $substituir, $arquivo_alvo);
         if ($resultado['sucesso']) {
             require_once 'functions/promotores.php';
             $_SESSION['promotores'] = processarPromotoresCSV($resultado['caminho']);
             $acao = $resultado['substituiu'] ? 'substituído' : 'criado';
             $mensagem_sucesso = "CSV de promotores {$acao} com sucesso! {$_SESSION['promotores']['total']} promotores carregados.";
-        } else {
+        } else{
             $erro_upload = $resultado['erro'];
         }
     }
@@ -1088,14 +1090,32 @@ if (!verificarAdmin()):
                     <div class="form-group">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input"
-                                   id="substituir_vendas" name="substituir_vendas" value="1">
+                                   id="substituir_vendas" name="substituir_vendas" value="1"
+                                   onchange="toggleArquivoSubstituir('vendas')">
                             <label class="custom-control-label" for="substituir_vendas">
-                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente (se houver)
+                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente
                             </label>
                         </div>
                         <small class="form-text text-muted">
                             Se desmarcado, será criado um novo arquivo com timestamp
                         </small>
+                    </div>
+
+                    <!-- Dropdown de arquivos (oculto por padrão) -->
+                    <div class="form-group" id="select_arquivo_vendas" style="display: none;">
+                        <label><strong>Escolha qual arquivo substituir:</strong></label>
+                        <select class="form-control" name="arquivo_substituir_vendas">
+                            <option value="">Selecione o arquivo...</option>
+                            <?php
+                            $arquivos_vendas_list = listarCSVs('vendas');
+                            foreach ($arquivos_vendas_list as $arq):
+                            ?>
+                                <option value="<?= htmlspecialchars($arq['nome']) ?>">
+                                    <?= htmlspecialchars($arq['nome']) ?>
+                                    (<?= date('d/m/Y H:i', $arq['data']) ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
 
                     <button type="submit" name="upload_vendas" class="btn btn-primary btn-block">
@@ -1129,14 +1149,32 @@ if (!verificarAdmin()):
                     <div class="form-group">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input"
-                                   id="substituir_promotores" name="substituir_promotores" value="1">
+                                   id="substituir_promotores" name="substituir_promotores" value="1"
+                                   onchange="toggleArquivoSubstituir('promotores')">
                             <label class="custom-control-label" for="substituir_promotores">
-                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente (se houver)
+                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente
                             </label>
                         </div>
                         <small class="form-text text-muted">
                             Se desmarcado, será criado um novo arquivo com timestamp
                         </small>
+                    </div>
+
+                    <!-- Dropdown de arquivos (oculto por padrão) -->
+                    <div class="form-group" id="select_arquivo_promotores" style="display: none;">
+                        <label><strong>Escolha qual arquivo substituir:</strong></label>
+                        <select class="form-control" name="arquivo_substituir_promotores">
+                            <option value="">Selecione o arquivo...</option>
+                            <?php
+                            $arquivos_promotores_list = listarCSVs('promotores');
+                            foreach ($arquivos_promotores_list as $arq):
+                            ?>
+                                <option value="<?= htmlspecialchars($arq['nome']) ?>">
+                                    <?= htmlspecialchars($arq['nome']) ?>
+                                    (<?= date('d/m/Y H:i', $arq['data']) ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
 
                     <button type="submit" name="upload_promotores" class="btn btn-info btn-block">
@@ -1558,5 +1596,23 @@ if (!verificarAdmin()):
         </div>
     </div>
 </div>
+
+<script>
+// Função para mostrar/ocultar dropdown de arquivos quando checkbox for marcado
+function toggleArquivoSubstituir(tipo) {
+    const checkbox = document.getElementById('substituir_' + tipo);
+    const selectDiv = document.getElementById('select_arquivo_' + tipo);
+    const select = selectDiv.querySelector('select');
+
+    if (checkbox.checked) {
+        selectDiv.style.display = 'block';
+        select.required = true;
+    } else {
+        selectDiv.style.display = 'none';
+        select.required = false;
+        select.value = '';
+    }
+}
+</script>
 
 <?php endif; ?>
