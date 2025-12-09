@@ -70,10 +70,39 @@ if (!empty($arquivos_vendas)) {
             $filtros['data_final']
         );
 
+        // DEBUG: Informações de debug
+        $debug_info = [
+            'aplicar_filtro' => $regra_dia08['aplicar_filtro'],
+            'total_vendas_original' => count($vendas_processadas_original['vendas']),
+            'status_unicos' => [],
+            'exemplos_vendas' => []
+        ];
+
+        // Coleta status únicos e exemplos
+        $status_encontrados = [];
+        foreach ($vendas_processadas_original['vendas'] as $idx => $venda) {
+            if (!in_array($venda['status'], $status_encontrados)) {
+                $status_encontrados[] = $venda['status'];
+            }
+
+            // Pega primeiras 3 vendas como exemplo
+            if ($idx < 3) {
+                $debug_info['exemplos_vendas'][] = [
+                    'consultor' => $venda['consultor'],
+                    'status' => $venda['status'],
+                    'primeira_parcela_paga' => isset($venda['primeira_parcela_paga']) ?
+                        ($venda['primeira_parcela_paga'] ? 'SIM' : 'NÃO') : 'CAMPO NÃO EXISTE'
+                ];
+            }
+        }
+        $debug_info['status_unicos'] = $status_encontrados;
+
         // Se aplicou filtro, calcula vendas removidas
         if ($regra_dia08['aplicar_filtro']) {
             // Conta vendas removidas POR CONSULTOR (do array original, antes do filtro)
             $vendas_por_consultor_original = [];
+            $debug_contadores = ['canceladas' => 0, 'sem_pagamento' => 0, 'ativas' => 0];
+
             foreach ($vendas_processadas_original['vendas'] as $venda) {
                 $nome = $venda['consultor'];
                 if (!isset($vendas_por_consultor_original[$nome])) {
@@ -87,12 +116,19 @@ if (!empty($arquivos_vendas)) {
                 if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
                     strcasecmp($venda['status'], 'Cancelada') === 0) {
                     $vendas_por_consultor_original[$nome]['canceladas']++;
+                    $debug_contadores['canceladas']++;
                 }
                 // Conta se não tem primeira parcela (e não é cancelada)
                 elseif (!($venda['primeira_parcela_paga'] ?? false)) {
                     $vendas_por_consultor_original[$nome]['sem_pagamento']++;
+                    $debug_contadores['sem_pagamento']++;
+                } else {
+                    $debug_contadores['ativas']++;
                 }
             }
+
+            $debug_info['contadores'] = $debug_contadores;
+            $debug_info['vendas_por_consultor_sample'] = array_slice($vendas_por_consultor_original, 0, 5, true);
 
             // Agora atribui aos consultores no array processado
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
@@ -250,6 +286,43 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                 <br>O ranking final será disponibilizado após essa data.
             </p>
         <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- DEBUG: Informações de Diagnóstico -->
+    <?php if (isset($debug_info)): ?>
+    <div class="alert alert-info">
+        <h5><i class="fas fa-bug"></i> Debug - Contagem de Vendas</h5>
+        <pre style="font-size: 0.85em; background: #f8f9fa; padding: 10px; border-radius: 5px;"><?php
+            echo "Filtro Dia 08 Aplicado: " . ($debug_info['aplicar_filtro'] ? 'SIM' : 'NÃO') . "\n";
+            echo "Total de Vendas no Array Original: " . $debug_info['total_vendas_original'] . "\n\n";
+
+            echo "Status Únicos Encontrados:\n";
+            foreach ($debug_info['status_unicos'] as $status) {
+                echo "  - '" . $status . "'\n";
+            }
+
+            echo "\nExemplos de Vendas (3 primeiras):\n";
+            foreach ($debug_info['exemplos_vendas'] as $ex) {
+                echo "  Consultor: {$ex['consultor']}\n";
+                echo "  Status: '{$ex['status']}'\n";
+                echo "  Primeira Parcela: {$ex['primeira_parcela_paga']}\n\n";
+            }
+
+            if (isset($debug_info['contadores'])) {
+                echo "Contadores Totais:\n";
+                echo "  Canceladas: " . $debug_info['contadores']['canceladas'] . "\n";
+                echo "  Sem Pagamento: " . $debug_info['contadores']['sem_pagamento'] . "\n";
+                echo "  Ativas: " . $debug_info['contadores']['ativas'] . "\n\n";
+
+                if (!empty($debug_info['vendas_por_consultor_sample'])) {
+                    echo "Amostra por Consultor (5 primeiros):\n";
+                    foreach ($debug_info['vendas_por_consultor_sample'] as $nome => $dados) {
+                        echo "  {$nome}: {$dados['canceladas']} canceladas, {$dados['sem_pagamento']} sem pgto\n";
+                    }
+                }
+            }
+        ?></pre>
     </div>
     <?php endif; ?>
 
