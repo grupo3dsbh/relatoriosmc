@@ -72,6 +72,9 @@ if (!empty($arquivos_vendas)) {
 
         // Se aplicou filtro, recalcula pontuação dos consultores
         if ($regra_dia08['aplicar_filtro']) {
+            // DEBUG: Log total de vendas
+            error_log("Total vendas originais: " . count($vendas_processadas_original['vendas']));
+
             // Conta vendas REMOVIDAS diretamente (canceladas e sem 1ª parcela)
             foreach ($vendas_processadas_original['vendas'] as $venda) {
                 $consultor_nome = $venda['consultor'];
@@ -81,13 +84,22 @@ if (!empty($arquivos_vendas)) {
                     strcasecmp($venda['status'], 'Cancelada') === 0) {
                     if (isset($vendas_removidas_por_consultor[$consultor_nome])) {
                         $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
+                        error_log("Cancelada encontrada: {$consultor_nome} - Status: {$venda['status']}");
                     }
                 }
                 // Verifica se está sem primeira parcela paga (e NÃO é cancelada)
                 elseif (!($venda['primeira_parcela_paga'] ?? false)) {
                     if (isset($vendas_removidas_por_consultor[$consultor_nome])) {
                         $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
+                        error_log("Sem pagamento encontrada: {$consultor_nome} - 1ª Parcela: " . ($venda['primeira_parcela_paga'] ? 'SIM' : 'NÃO'));
                     }
+                }
+            }
+
+            // DEBUG: Log do que foi contado
+            foreach ($vendas_removidas_por_consultor as $nome => $dados) {
+                if ($dados['canceladas'] > 0 || $dados['sem_pagamento'] > 0) {
+                    error_log("Consultor $nome: {$dados['canceladas']} canceladas, {$dados['sem_pagamento']} sem pgto");
                 }
             }
 
