@@ -1076,6 +1076,21 @@ if (!verificarAdmin()):
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
+                    <?php
+                    $arquivos_vendas_existentes = listarCSVs('vendas');
+                    if (!empty($arquivos_vendas_existentes)):
+                    ?>
+                    <div class="alert alert-info">
+                        <small>
+                            <strong><i class="fas fa-info-circle"></i> Arquivos CSV de Vendas Existentes:</strong><br>
+                            <?php foreach ($arquivos_vendas_existentes as $idx => $arq): ?>
+                                <?= $idx + 1 ?>. <strong><?= htmlspecialchars($arq['nome']) ?></strong>
+                                (<?= date('d/m/Y H:i', $arq['data']) ?>)<br>
+                            <?php endforeach; ?>
+                        </small>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="form-group">
                         <label>
                             <i class="fas fa-file-csv"></i> Arquivo CSV
@@ -1135,6 +1150,21 @@ if (!verificarAdmin()):
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
+                    <?php
+                    $arquivos_promotores_existentes = listarCSVs('promotores');
+                    if (!empty($arquivos_promotores_existentes)):
+                    ?>
+                    <div class="alert alert-info">
+                        <small>
+                            <strong><i class="fas fa-info-circle"></i> Arquivos CSV de Promotores Existentes:</strong><br>
+                            <?php foreach ($arquivos_promotores_existentes as $idx => $arq): ?>
+                                <?= $idx + 1 ?>. <strong><?= htmlspecialchars($arq['nome']) ?></strong>
+                                (<?= date('d/m/Y H:i', $arq['data']) ?>)<br>
+                            <?php endforeach; ?>
+                        </small>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="form-group">
                         <label>
                             <i class="fas fa-file-csv"></i> Arquivo CSV
@@ -1600,17 +1630,39 @@ if (!verificarAdmin()):
 <script>
 // Função para mostrar/ocultar dropdown de arquivos quando checkbox for marcado
 function toggleArquivoSubstituir(tipo) {
+    console.log('toggleArquivoSubstituir chamado para:', tipo);
+
     const checkbox = document.getElementById('substituir_' + tipo);
     const selectDiv = document.getElementById('select_arquivo_' + tipo);
+
+    if (!checkbox) {
+        console.error('Checkbox não encontrado:', 'substituir_' + tipo);
+        return;
+    }
+
+    if (!selectDiv) {
+        console.error('Div de seleção não encontrada:', 'select_arquivo_' + tipo);
+        return;
+    }
+
     const select = selectDiv.querySelector('select');
+
+    if (!select) {
+        console.error('Select não encontrado dentro de:', 'select_arquivo_' + tipo);
+        return;
+    }
+
+    console.log('Checkbox checked:', checkbox.checked);
 
     if (checkbox.checked) {
         selectDiv.style.display = 'block';
         select.required = true;
+        console.log('Dropdown mostrado para:', tipo);
     } else {
         selectDiv.style.display = 'none';
         select.required = false;
         select.value = '';
+        console.log('Dropdown ocultado para:', tipo);
     }
 }
 </script>
