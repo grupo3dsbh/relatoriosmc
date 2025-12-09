@@ -1882,131 +1882,6 @@ jQuery(document).ready(function($) {
 });
 </script>
 
-<!-- Verificação Dinâmica de Relatório FINAL - JavaScript Puro -->
-<script>
-// Aguarda DOM carregar
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', iniciarVerificacaoDinamica);
-} else {
-    iniciarVerificacaoDinamica();
-}
-
-function iniciarVerificacaoDinamica() {
-    // Busca elementos
-    const campoDataInicial = document.getElementById('data_inicial');
-    const campoDataFinal = document.getElementById('data_final');
-    const checkbox = document.getElementById('primeira_parcela_paga');
-
-    if (!campoDataFinal || !checkbox) {
-        return; // Elementos não encontrados, abortar silenciosamente
-    }
-
-    // VERIFICA PARÂMETRO temp=on NA URL (permite desbloquear checkbox mesmo em relatório FINAL)
-    const urlParams = new URLSearchParams(window.location.search);
-    const modoTemporario = urlParams.get('temp') === 'on';
-
-    /**
-     * Verifica se as datas selecionadas caracterizam um relatório FINAL
-     */
-    function verificarRelatorioFinal() {
-        // Se modo temporário está ON, sempre desbloquear
-        if (modoTemporario) {
-            desbloquearCheckbox();
-            return;
-        }
-
-        const dataFinal = campoDataFinal.value;
-
-        if (!dataFinal) {
-            desbloquearCheckbox();
-            return;
-        }
-
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-
-        const fimPeriodo = new Date(dataFinal + 'T00:00:00');
-
-        const mesSeguinte = new Date(fimPeriodo);
-        mesSeguinte.setMonth(mesSeguinte.getMonth() + 1);
-        mesSeguinte.setDate(8);
-        mesSeguinte.setHours(0, 0, 0, 0);
-
-        if (hoje >= mesSeguinte) {
-            bloquearCheckbox();
-        } else {
-            desbloquearCheckbox();
-        }
-    }
-
-    /**
-     * Bloqueia checkbox (relatório FINAL)
-     */
-    function bloquearCheckbox() {
-        const formCheck = checkbox.closest('.form-check');
-
-        checkbox.checked = true;
-        checkbox.disabled = true;
-
-        // Remove hidden anterior
-        const hiddenAntigo = formCheck.querySelector('input[type="hidden"][name="primeira_parcela_paga"]');
-        if (hiddenAntigo) hiddenAntigo.remove();
-
-        // Adiciona hidden
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'primeira_parcela_paga';
-        hidden.value = 'on';
-        formCheck.appendChild(hidden);
-
-        // Remove badges/textos antigos
-        formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
-
-        // Adiciona badge
-        const label = formCheck.querySelector('label');
-        const badge = document.createElement('span');
-        badge.className = 'badge badge-success ml-2';
-        badge.title = 'Obrigatório em relatórios finais';
-        badge.textContent = 'OBRIGATÓRIO (Dia 08 ou posterior)';
-        label.appendChild(badge);
-
-        // Adiciona texto explicativo
-        const small = document.createElement('small');
-        small.className = 'form-text text-success';
-        small.innerHTML = '<i class="fas fa-info-circle"></i> Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)';
-        formCheck.appendChild(small);
-
-    }
-
-    /**
-     * Desbloqueia checkbox (relatório TEMPORÁRIO)
-     */
-    function desbloquearCheckbox() {
-        const formCheck = checkbox.closest('.form-check');
-
-        checkbox.disabled = false;
-
-        // Remove hidden
-        const hidden = formCheck.querySelector('input[type="hidden"][name="primeira_parcela_paga"]');
-        if (hidden) hidden.remove();
-
-        // Remove badges e textos
-        formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
-    }
-
-    // Listeners
-    if (campoDataInicial) {
-        campoDataInicial.addEventListener('change', verificarRelatorioFinal);
-    }
-
-    if (campoDataFinal) {
-        campoDataFinal.addEventListener('change', verificarRelatorioFinal);
-    }
-
-    // Verificação inicial
-    verificarRelatorioFinal();
-}
-</script>
 
 <!-- Fogos de Artifício e Mensagem para Relatório FINAL -->
 <?php if (isset($tipo_relatorio) && $tipo_relatorio === 'FINAL'): ?>
@@ -2070,9 +1945,9 @@ function iniciarVerificacaoDinamica() {
         /* Ajustes para mobile */
         @media (max-width: 768px) {
             #congratsModal {
-                max-width: calc(100% - 10px);
-                margin: 0 5px;
-                padding: 20px 5px;
+                max-width: calc(100% - 6px);
+                margin: 0 3px;
+                padding: 10px 3px;
                 border-radius: 10px;
             }
 
@@ -2224,3 +2099,127 @@ function iniciarVerificacaoDinamica() {
 <?php endif; ?>
 
 
+<!-- Verificação Dinâmica de Relatório FINAL - SEMPRE PRESENTE -->
+<script>
+// Aguarda DOM carregar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', iniciarVerificacaoDinamica);
+} else {
+    iniciarVerificacaoDinamica();
+}
+
+function iniciarVerificacaoDinamica() {
+    // Busca elementos
+    const campoDataInicial = document.getElementById('data_inicial');
+    const campoDataFinal = document.getElementById('data_final');
+    const checkbox = document.getElementById('primeira_parcela_paga');
+
+    if (!campoDataFinal || !checkbox) {
+        return; // Elementos não encontrados, abortar silenciosamente
+    }
+
+    // VERIFICA PARÂMETRO temp=on NA URL (permite desbloquear checkbox mesmo em relatório FINAL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const modoTemporario = urlParams.get('temp') === 'on';
+
+    /**
+     * Verifica se as datas selecionadas caracterizam um relatório FINAL
+     */
+    function verificarRelatorioFinal() {
+        // Se modo temporário está ON, sempre desbloquear
+        if (modoTemporario) {
+            desbloquearCheckbox();
+            return;
+        }
+
+        const dataFinal = campoDataFinal.value;
+
+        if (!dataFinal) {
+            desbloquearCheckbox();
+            return;
+        }
+
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        const fimPeriodo = new Date(dataFinal + 'T00:00:00');
+
+        const mesSeguinte = new Date(fimPeriodo);
+        mesSeguinte.setMonth(mesSeguinte.getMonth() + 1);
+        mesSeguinte.setDate(8);
+        mesSeguinte.setHours(0, 0, 0, 0);
+
+        if (hoje >= mesSeguinte) {
+            bloquearCheckbox();
+        } else {
+            desbloquearCheckbox();
+        }
+    }
+
+    /**
+     * Bloqueia checkbox (relatório FINAL)
+     */
+    function bloquearCheckbox() {
+        const formCheck = checkbox.closest('.form-check');
+
+        checkbox.checked = true;
+        checkbox.disabled = true;
+
+        // Remove hidden anterior
+        const hiddenAntigo = formCheck.querySelector('input[type="hidden"][name="primeira_parcela_paga"]');
+        if (hiddenAntigo) hiddenAntigo.remove();
+
+        // Adiciona hidden
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'primeira_parcela_paga';
+        hidden.value = 'on';
+        formCheck.appendChild(hidden);
+
+        // Remove badges/textos antigos
+        formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
+
+        // Adiciona badge
+        const label = formCheck.querySelector('label');
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-success ml-2';
+        badge.title = 'Obrigatório em relatórios finais';
+        badge.textContent = 'OBRIGATÓRIO (Dia 08 ou posterior)';
+        label.appendChild(badge);
+
+        // Adiciona texto explicativo
+        const small = document.createElement('small');
+        small.className = 'form-text text-success';
+        small.innerHTML = '<i class="fas fa-info-circle"></i> Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)';
+        formCheck.appendChild(small);
+    }
+
+    /**
+     * Desbloqueia checkbox (relatório TEMPORÁRIO)
+     */
+    function desbloquearCheckbox() {
+        const formCheck = checkbox.closest('.form-check');
+
+        checkbox.disabled = false;
+
+        // Remove hidden
+        const hidden = formCheck.querySelector('input[type="hidden"][name="primeira_parcela_paga"]');
+        if (hidden) hidden.remove();
+
+        // Remove badges e textos
+        formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
+    }
+
+    // Listeners
+    if (campoDataInicial) {
+        campoDataInicial.addEventListener('change', verificarRelatorioFinal);
+    }
+
+    if (campoDataFinal) {
+        campoDataFinal.addEventListener('change', verificarRelatorioFinal);
+    }
+
+    // Verificação inicial
+    verificarRelatorioFinal();
+}
+</script>

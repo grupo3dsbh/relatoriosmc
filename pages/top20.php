@@ -572,9 +572,9 @@ $(document).ready(function() {
         /* Ajustes para mobile */
         @media (max-width: 768px) {
             #congratsModal {
-                max-width: calc(100% - 10px);
-                margin: 0 5px;
-                padding: 20px 5px;
+                max-width: calc(100% - 6px);
+                margin: 0 3px;
+                padding: 10px 3px;
                 border-radius: 10px;
             }
 
