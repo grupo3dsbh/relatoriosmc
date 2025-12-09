@@ -268,13 +268,21 @@ function processarVendasCSV($arquivo, $filtros = []) {
             
             // Processa dados adicionais
             $venda['num_vagas'] = extrairNumeroVagas($venda['produto_atual']);
+            $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
+
+            // Se produto foi alterado, extrai vagas originais para comparação de pontos
+            if ($venda['produto_alterado']) {
+                $venda['num_vagas_original'] = extrairNumeroVagas($venda['produto_original']);
+            } else {
+                $venda['num_vagas_original'] = $venda['num_vagas'];
+            }
+
             $venda['e_vista'] = (
                 $venda['tipo_pagamento'] === 'À Vista' ||
                 stripos($venda['tipo_pagamento'], 'vista') !== false ||
                 $venda['quantidade_parcelas_venda'] <= 1
             );
             $venda['primeira_parcela_paga'] = ($venda['parcelas_pagas'] > 0);
-            $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
 
             // CRÍTICO: SEMPRE usa DataCadastro para filtros e pontuação

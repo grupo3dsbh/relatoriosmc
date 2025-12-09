@@ -1834,6 +1834,9 @@ jQuery(document).ready(function($) {
                                 </td>
                                 <td class="text-center">
                                     <span class="badge badge-primary">${venda.pontos || 0} pts</span>
+                                    ${venda.produto_alterado && venda.pontos_original !== null && venda.pontos_original !== venda.pontos ?
+                                        `<br><small class="text-danger"><del>${venda.pontos_original} pts</del></small>` :
+                                        ''}
                                 </td>
                                 <td class="text-right">
                                     <small><strong>R$ ${parseFloat(venda.valor_pago).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></small>

@@ -48,6 +48,28 @@ try {
     // Usa o array de pontos por venda retornado pela função
     $pontos_por_id = $calc_pontos['pontos_por_venda'] ?? [];
 
+    // Para produtos alterados, calcula pontos com vagas originais
+    $pontos_originais_por_id = [];
+    $vendas_com_produto_alterado = array_filter($vendas_consultor, function($v) {
+        return $v['produto_alterado'] && isset($v['num_vagas_original']);
+    });
+
+    if (!empty($vendas_com_produto_alterado)) {
+        $vendas_detalhes_originais = [];
+        foreach ($vendas_com_produto_alterado as $venda) {
+            $vendas_detalhes_originais[] = [
+                'num_vagas' => $venda['num_vagas_original'],
+                'e_vista' => $venda['e_vista'],
+                'data_venda' => $venda['data_para_pontuacao'],
+                'id_venda' => $venda['id'],
+                'valor_total' => $venda['valor_total'],
+                'valor_pago' => $venda['valor_pago']
+            ];
+        }
+        $calc_pontos_originais = calcularPontosComRanges($vendas_detalhes_originais, $consultor_nome);
+        $pontos_originais_por_id = $calc_pontos_originais['pontos_por_venda'] ?? [];
+    }
+
     $vendas_retorno = [];
     foreach ($vendas_consultor as $venda) {
         // Usa data_cadastro para exibição (data_para_filtro já é usada internamente)
@@ -55,6 +77,9 @@ try {
         if (!$data) {
             $data = DateTime::createFromFormat('Y-m-d H:i:s', $venda['data_cadastro']);
         }
+
+        $pontos_atuais = $pontos_por_id[$venda['id']] ?? 0;
+        $pontos_originais = isset($pontos_originais_por_id[$venda['id']]) ? $pontos_originais_por_id[$venda['id']] : null;
 
         $vendas_retorno[] = [
             'id' => $venda['id'],
@@ -69,7 +94,8 @@ try {
             'num_parcelas' => $venda['quantidade_parcelas_venda'], // CORRETO
             'primeira_parcela_paga' => $venda['primeira_parcela_paga'],
             'valor_pago' => $venda['valor_pago'],
-            'pontos' => $pontos_por_id[$venda['id']] ?? 0
+            'pontos' => $pontos_atuais,
+            'pontos_original' => $pontos_originais // Null se não foi alterado
         ];
     }
 
