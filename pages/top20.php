@@ -47,15 +47,15 @@ if (!empty($arquivos_vendas)) {
 
     if (file_exists($arquivo_selecionado)) {
         // ===== PASSO 1: Processar vendas SEM FILTRO DE STATUS (para contar canceladas) =====
-        $filtros_completos = [
+        $filtros_sem_status = [
             'data_inicial' => $periodo_config['data_inicial'],
             'data_final' => $periodo_config['data_final'],
-            'primeira_parcela_paga' => false, // NÃO filtrar, queremos contar as sem pagamento
-            'apenas_vista' => false, // NÃO filtrar
-            // SEM filtro de status - queremos TODAS as vendas
+            'primeira_parcela_paga' => false, // NÃO filtrar primeira parcela
+            'apenas_vista' => false, // NÃO filtrar à vista
+            'status' => '' // Desabilita filtro de status (string vazia)
         ];
 
-        $vendas_todas = processarVendasComRanges($arquivo_selecionado, $filtros_completos);
+        $vendas_todas = processarVendasComRanges($arquivo_selecionado, $filtros_sem_status);
 
         // ===== PASSO 2: Processar vendas COM FILTROS (para ranking oficial) =====
         $vendas_processadas_original = processarVendasComRanges($arquivo_selecionado, $filtros);

@@ -1714,9 +1714,29 @@ jQuery(document).ready(function($) {
             // Expande o collapse de detalhamento antes de imprimir
             $('#collapseDetalhamento').collapse('show');
 
+            // Remove max-height e overflow da tabela para impressão
+            const $tableDiv = $('.table-responsive');
+            const originalStyle = $tableDiv.attr('style');
+            $tableDiv.css({
+                'max-height': 'none',
+                'overflow-y': 'visible'
+            });
+
             // Aguarda expansão e depois imprime
             setTimeout(function() {
                 window.print();
+
+                // Restaura estilos originais após impressão
+                setTimeout(function() {
+                    if (originalStyle) {
+                        $tableDiv.attr('style', originalStyle);
+                    } else {
+                        $tableDiv.css({
+                            'max-height': '400px',
+                            'overflow-y': 'auto'
+                        });
+                    }
+                }, 500);
             }, 500);
         });
 
