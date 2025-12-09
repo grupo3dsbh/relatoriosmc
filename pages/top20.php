@@ -46,7 +46,18 @@ if (!empty($arquivos_vendas)) {
     ];
 
     if (file_exists($arquivo_selecionado)) {
-        // PRIMEIRO: Processa vendas SEM filtro do dia 08 para ter pontos originais
+        // ===== PASSO 1: Processar vendas SEM FILTRO DE STATUS (para contar canceladas) =====
+        $filtros_completos = [
+            'data_inicial' => $periodo_config['data_inicial'],
+            'data_final' => $periodo_config['data_final'],
+            'primeira_parcela_paga' => false, // NÃO filtrar, queremos contar as sem pagamento
+            'apenas_vista' => false, // NÃO filtrar
+            // SEM filtro de status - queremos TODAS as vendas
+        ];
+
+        $vendas_todas = processarVendasComRanges($arquivo_selecionado, $filtros_completos);
+
+        // ===== PASSO 2: Processar vendas COM FILTROS (para ranking oficial) =====
         $vendas_processadas_original = processarVendasComRanges($arquivo_selecionado, $filtros);
 
         // Salva pontos originais por consultor (ANTES de remover vendas)
@@ -73,20 +84,21 @@ if (!empty($arquivos_vendas)) {
         // DEBUG: Informações de debug
         $debug_info = [
             'aplicar_filtro' => $regra_dia08['aplicar_filtro'],
-            'total_vendas_original' => count($vendas_processadas_original['vendas']),
+            'total_vendas_todas' => count($vendas_todas['vendas']),
+            'total_vendas_filtradas' => count($vendas_processadas_original['vendas']),
             'status_unicos' => [],
             'exemplos_vendas' => []
         ];
 
-        // Coleta status únicos e exemplos
+        // Coleta status únicos e exemplos do array COMPLETO (sem filtro de status)
         $status_encontrados = [];
-        foreach ($vendas_processadas_original['vendas'] as $idx => $venda) {
+        foreach ($vendas_todas['vendas'] as $idx => $venda) {
             if (!in_array($venda['status'], $status_encontrados)) {
                 $status_encontrados[] = $venda['status'];
             }
 
-            // Pega primeiras 3 vendas como exemplo
-            if ($idx < 3) {
+            // Pega primeiras 5 vendas como exemplo
+            if ($idx < 5) {
                 $debug_info['exemplos_vendas'][] = [
                     'consultor' => $venda['consultor'],
                     'status' => $venda['status'],
@@ -99,11 +111,11 @@ if (!empty($arquivos_vendas)) {
 
         // Se aplicou filtro, calcula vendas removidas
         if ($regra_dia08['aplicar_filtro']) {
-            // Conta vendas removidas POR CONSULTOR (do array original, antes do filtro)
+            // Conta vendas removidas POR CONSULTOR (do array COMPLETO, SEM filtro de status)
             $vendas_por_consultor_original = [];
             $debug_contadores = ['canceladas' => 0, 'sem_pagamento' => 0, 'ativas' => 0];
 
-            foreach ($vendas_processadas_original['vendas'] as $venda) {
+            foreach ($vendas_todas['vendas'] as $venda) {
                 $nome = $venda['consultor'];
                 if (!isset($vendas_por_consultor_original[$nome])) {
                     $vendas_por_consultor_original[$nome] = [
@@ -295,14 +307,16 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
         <h5><i class="fas fa-bug"></i> Debug - Contagem de Vendas</h5>
         <pre style="font-size: 0.85em; background: #f8f9fa; padding: 10px; border-radius: 5px;"><?php
             echo "Filtro Dia 08 Aplicado: " . ($debug_info['aplicar_filtro'] ? 'SIM' : 'NÃO') . "\n";
-            echo "Total de Vendas no Array Original: " . $debug_info['total_vendas_original'] . "\n\n";
+            echo "Total de Vendas (SEM filtro status): " . $debug_info['total_vendas_todas'] . "\n";
+            echo "Total de Vendas (COM filtro status Ativo): " . $debug_info['total_vendas_filtradas'] . "\n";
+            echo "Diferença (canceladas no período): " . ($debug_info['total_vendas_todas'] - $debug_info['total_vendas_filtradas']) . "\n\n";
 
-            echo "Status Únicos Encontrados:\n";
+            echo "Status Únicos Encontrados no CSV:\n";
             foreach ($debug_info['status_unicos'] as $status) {
                 echo "  - '" . $status . "'\n";
             }
 
-            echo "\nExemplos de Vendas (3 primeiras):\n";
+            echo "\nExemplos de Vendas (5 primeiras do CSV completo):\n";
             foreach ($debug_info['exemplos_vendas'] as $ex) {
                 echo "  Consultor: {$ex['consultor']}\n";
                 echo "  Status: '{$ex['status']}'\n";
@@ -310,15 +324,23 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             }
 
             if (isset($debug_info['contadores'])) {
-                echo "Contadores Totais:\n";
-                echo "  Canceladas: " . $debug_info['contadores']['canceladas'] . "\n";
-                echo "  Sem Pagamento: " . $debug_info['contadores']['sem_pagamento'] . "\n";
-                echo "  Ativas: " . $debug_info['contadores']['ativas'] . "\n\n";
+                echo "\n📊 CONTADORES TOTAIS (do CSV completo, sem filtro de status):\n";
+                echo "  ✅ Ativas: " . $debug_info['contadores']['ativas'] . "\n";
+                echo "  ❌ Canceladas: " . $debug_info['contadores']['canceladas'] . "\n";
+                echo "  ⚠️  Sem Pagamento: " . $debug_info['contadores']['sem_pagamento'] . "\n\n";
 
                 if (!empty($debug_info['vendas_por_consultor_sample'])) {
-                    echo "Amostra por Consultor (5 primeiros):\n";
+                    echo "Amostra por Consultor (5 primeiros com canceladas/sem pgto):\n";
+                    $count = 0;
                     foreach ($debug_info['vendas_por_consultor_sample'] as $nome => $dados) {
-                        echo "  {$nome}: {$dados['canceladas']} canceladas, {$dados['sem_pagamento']} sem pgto\n";
+                        if ($dados['canceladas'] > 0 || $dados['sem_pagamento'] > 0) {
+                            echo "  {$nome}: {$dados['canceladas']} canceladas, {$dados['sem_pagamento']} sem pgto\n";
+                            $count++;
+                            if ($count >= 5) break;
+                        }
+                    }
+                    if ($count == 0) {
+                        echo "  (Nenhum dos 5 primeiros consultores tem canceladas/sem pgto)\n";
                     }
                 }
             }
