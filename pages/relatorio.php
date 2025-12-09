@@ -1945,22 +1945,34 @@ jQuery(document).ready(function($) {
         /* Ajustes para mobile */
         @media (max-width: 768px) {
             #congratsModal {
-                max-width: calc(100% - 6px);
-                margin: 0 3px;
-                padding: 10px 3px;
-                border-radius: 10px;
+                max-width: 95%;
+                margin: 0 auto;
+                padding: 15px 8px;
+                border-radius: 8px;
+                left: 50%;
+                right: auto;
+                width: 95%;
             }
 
             #congratsModal h2 {
-                font-size: 1.8em;
+                font-size: 1.5em;
+                margin-bottom: 10px;
             }
 
             #congratsModal p {
-                font-size: 1em;
+                font-size: 0.9em;
+                margin-bottom: 15px;
+                line-height: 1.4;
             }
 
             .trophy-animation {
-                font-size: 3em;
+                font-size: 2.5em;
+                margin-bottom: 5px;
+            }
+
+            #congratsModal .btn {
+                font-size: 0.95em;
+                padding: 8px 20px;
             }
         }
     </style>
