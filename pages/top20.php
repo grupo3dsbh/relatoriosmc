@@ -72,42 +72,34 @@ if (!empty($arquivos_vendas)) {
 
         // Se aplicou filtro, recalcula pontuação dos consultores
         if ($regra_dia08['aplicar_filtro']) {
+            // Conta vendas REMOVIDAS diretamente (canceladas e sem 1ª parcela)
+            foreach ($vendas_processadas_original['vendas'] as $venda) {
+                $consultor_nome = $venda['consultor'];
+
+                // Verifica se é cancelada
+                if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
+                    strcasecmp($venda['status'], 'Cancelada') === 0) {
+                    if (isset($vendas_removidas_por_consultor[$consultor_nome])) {
+                        $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
+                    }
+                }
+                // Verifica se está sem primeira parcela paga (e NÃO é cancelada)
+                elseif (!($venda['primeira_parcela_paga'] ?? false)) {
+                    if (isset($vendas_removidas_por_consultor[$consultor_nome])) {
+                        $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
+                    }
+                }
+            }
+
             // Reagrupa vendas por consultor (APÓS aplicar filtro)
             $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
-            // Aplica filtro novamente para ter vendas_filtradas
+            // Aplica filtro novamente
             $regra_dia08 = aplicarRegraDia08(
                 $vendas_processadas['vendas'],
                 $filtros['data_inicial'],
                 $filtros['data_final']
             );
-
-            // Conta vendas REMOVIDAS (que estão no original mas NÃO no filtrado)
-            foreach ($vendas_processadas_original['vendas'] as $venda_original) {
-                $consultor_nome = $venda_original['consultor'];
-
-                // Verifica se esta venda foi REMOVIDA (não está no array filtrado)
-                $foi_removida = true;
-                foreach ($regra_dia08['vendas_filtradas'] as $venda_filtrada) {
-                    // Compara por título/cliente (identificador único)
-                    if ($venda_filtrada['titulo'] === $venda_original['titulo'] &&
-                        $venda_filtrada['consultor'] === $venda_original['consultor']) {
-                        $foi_removida = false;
-                        break;
-                    }
-                }
-
-                // Se foi removida, conta como cancelada ou sem pagamento
-                if ($foi_removida) {
-                    if (strcasecmp($venda_original['status'], 'Cancelado') === 0 ||
-                        strcasecmp($venda_original['status'], 'Cancelada') === 0) {
-                        $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
-                    }
-                    elseif (!($venda_original['primeira_parcela_paga'] ?? false)) {
-                        $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
-                    }
-                }
-            }
 
             // Calcula pontos perdidos por consultor
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
