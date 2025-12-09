@@ -374,19 +374,32 @@ function logout() {
 }
 
 // Função para salvar arquivo CSV
-function salvarCSV($arquivo_temporario, $tipo = 'vendas') {
+function salvarCSV($arquivo_temporario, $tipo = 'vendas', $substituir = false) {
     $diretorio = $tipo === 'vendas' ? VENDAS_DIR : PROMOTORES_DIR;
-    $nome_arquivo = date('Y-m-d_His') . '_' . $tipo . '.csv';
+
+    // Se substituir = true, usa nome fixo; senão, adiciona timestamp
+    if ($substituir) {
+        $nome_arquivo = $tipo . '.csv';
+    } else {
+        $nome_arquivo = date('Y-m-d_His') . '_' . $tipo . '.csv';
+    }
+
     $caminho_destino = $diretorio . '/' . $nome_arquivo;
-    
+
+    // Se substituir e arquivo existe, remove o anterior
+    if ($substituir && file_exists($caminho_destino)) {
+        unlink($caminho_destino);
+    }
+
     if (move_uploaded_file($arquivo_temporario, $caminho_destino)) {
         return [
             'sucesso' => true,
             'caminho' => $caminho_destino,
-            'nome' => $nome_arquivo
+            'nome' => $nome_arquivo,
+            'substituiu' => $substituir
         ];
     }
-    
+
     return ['sucesso' => false, 'erro' => 'Erro ao mover arquivo'];
 }
 

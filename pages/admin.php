@@ -98,9 +98,11 @@ if (isset($_POST['alterar_senha_consultores'])) {
 // Processa upload de CSV de vendas
 if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
     if ($_FILES['csv_vendas']['error'] === UPLOAD_ERR_OK) {
-        $resultado = salvarCSV($_FILES['csv_vendas']['tmp_name'], 'vendas');
+        $substituir = isset($_POST['substituir_vendas']) && $_POST['substituir_vendas'] == '1';
+        $resultado = salvarCSV($_FILES['csv_vendas']['tmp_name'], 'vendas', $substituir);
         if ($resultado['sucesso']) {
-            $mensagem_sucesso = "CSV de vendas enviado com sucesso! Arquivo: {$resultado['nome']}";
+            $acao = $resultado['substituiu'] ? 'substituído' : 'criado';
+            $mensagem_sucesso = "CSV de vendas {$acao} com sucesso! Arquivo: {$resultado['nome']}";
         } else {
             $erro_upload = $resultado['erro'];
         }
@@ -110,11 +112,13 @@ if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
 // Processa upload de CSV de promotores
 if (isset($_POST['upload_promotores']) && isset($_FILES['csv_promotores'])) {
     if ($_FILES['csv_promotores']['error'] === UPLOAD_ERR_OK) {
-        $resultado = salvarCSV($_FILES['csv_promotores']['tmp_name'], 'promotores');
+        $substituir = isset($_POST['substituir_promotores']) && $_POST['substituir_promotores'] == '1';
+        $resultado = salvarCSV($_FILES['csv_promotores']['tmp_name'], 'promotores', $substituir);
         if ($resultado['sucesso']) {
             require_once 'functions/promotores.php';
             $_SESSION['promotores'] = processarPromotoresCSV($resultado['caminho']);
-            $mensagem_sucesso = "CSV de promotores enviado com sucesso! {$_SESSION['promotores']['total']} promotores carregados.";
+            $acao = $resultado['substituiu'] ? 'substituído' : 'criado';
+            $mensagem_sucesso = "CSV de promotores {$acao} com sucesso! {$_SESSION['promotores']['total']} promotores carregados.";
         } else {
             $erro_upload = $resultado['erro'];
         }
@@ -1074,13 +1078,26 @@ if (!verificarAdmin()):
                         <label>
                             <i class="fas fa-file-csv"></i> Arquivo CSV
                         </label>
-                        <input type="file" class="form-control-file" name="csv_vendas" 
+                        <input type="file" class="form-control-file" name="csv_vendas"
                                accept=".csv" required>
                         <small class="form-text text-muted">
                             Formato esperado: Exportaço de vendas do sistema
                         </small>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input"
+                                   id="substituir_vendas" name="substituir_vendas" value="1">
+                            <label class="custom-control-label" for="substituir_vendas">
+                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente (se houver)
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Se desmarcado, será criado um novo arquivo com timestamp
+                        </small>
+                    </div>
+
                     <button type="submit" name="upload_vendas" class="btn btn-primary btn-block">
                         <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Vendas
                     </button>
@@ -1102,13 +1119,26 @@ if (!verificarAdmin()):
                         <label>
                             <i class="fas fa-file-csv"></i> Arquivo CSV
                         </label>
-                        <input type="file" class="form-control-file" name="csv_promotores" 
+                        <input type="file" class="form-control-file" name="csv_promotores"
                                accept=".csv" required>
                         <small class="form-text text-muted">
                             Lista de promotores/consultores
                         </small>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input"
+                                   id="substituir_promotores" name="substituir_promotores" value="1">
+                            <label class="custom-control-label" for="substituir_promotores">
+                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente (se houver)
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Se desmarcado, será criado um novo arquivo com timestamp
+                        </small>
+                    </div>
+
                     <button type="submit" name="upload_promotores" class="btn btn-info btn-block">
                         <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Promotores
                     </button>
