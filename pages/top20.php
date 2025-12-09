@@ -70,60 +70,41 @@ if (!empty($arquivos_vendas)) {
             $filtros['data_final']
         );
 
-        // Se aplicou filtro, recalcula pontuação dos consultores
+        // Se aplicou filtro, calcula vendas removidas
         if ($regra_dia08['aplicar_filtro']) {
-            // DEBUG: Log total de vendas
-            error_log("Total vendas originais: " . count($vendas_processadas_original['vendas']));
-
-            // Conta vendas REMOVIDAS diretamente (canceladas e sem 1ª parcela)
+            // Conta vendas removidas POR CONSULTOR (do array original, antes do filtro)
+            $vendas_por_consultor_original = [];
             foreach ($vendas_processadas_original['vendas'] as $venda) {
-                $consultor_nome = $venda['consultor'];
+                $nome = $venda['consultor'];
+                if (!isset($vendas_por_consultor_original[$nome])) {
+                    $vendas_por_consultor_original[$nome] = [
+                        'canceladas' => 0,
+                        'sem_pagamento' => 0
+                    ];
+                }
 
-                // Verifica se é cancelada
+                // Conta se é cancelada
                 if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
                     strcasecmp($venda['status'], 'Cancelada') === 0) {
-                    if (isset($vendas_removidas_por_consultor[$consultor_nome])) {
-                        $vendas_removidas_por_consultor[$consultor_nome]['canceladas']++;
-                        error_log("Cancelada encontrada: {$consultor_nome} - Status: {$venda['status']}");
-                    }
+                    $vendas_por_consultor_original[$nome]['canceladas']++;
                 }
-                // Verifica se está sem primeira parcela paga (e NÃO é cancelada)
+                // Conta se não tem primeira parcela (e não é cancelada)
                 elseif (!($venda['primeira_parcela_paga'] ?? false)) {
-                    if (isset($vendas_removidas_por_consultor[$consultor_nome])) {
-                        $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento']++;
-                        error_log("Sem pagamento encontrada: {$consultor_nome} - 1ª Parcela: " . ($venda['primeira_parcela_paga'] ? 'SIM' : 'NÃO'));
-                    }
+                    $vendas_por_consultor_original[$nome]['sem_pagamento']++;
                 }
             }
 
-            // DEBUG: Log do que foi contado
-            foreach ($vendas_removidas_por_consultor as $nome => $dados) {
-                if ($dados['canceladas'] > 0 || $dados['sem_pagamento'] > 0) {
-                    error_log("Consultor $nome: {$dados['canceladas']} canceladas, {$dados['sem_pagamento']} sem pgto");
-                }
-            }
-
-            // Reagrupa vendas por consultor (APÓS aplicar filtro)
-            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
-
-            // Aplica filtro novamente
-            $regra_dia08 = aplicarRegraDia08(
-                $vendas_processadas['vendas'],
-                $filtros['data_inicial'],
-                $filtros['data_final']
-            );
-
-            // Calcula pontos perdidos por consultor
+            // Agora atribui aos consultores no array processado
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
-                $consultor_nome = $consultor['consultor'];
-                $pontos_atuais = $consultor['pontos'];
-                $pontos_antes = $pontos_originais[$consultor_nome] ?? $pontos_atuais;
+                $nome = $consultor['consultor'];
+                $pontos_antes = $pontos_originais[$nome] ?? $consultor['pontos'];
 
-                $consultor['pontos_perdidos'] = $pontos_antes - $pontos_atuais;
-                $consultor['vendas_canceladas'] = $vendas_removidas_por_consultor[$consultor_nome]['canceladas'] ?? 0;
-                $consultor['vendas_sem_pagamento'] = $vendas_removidas_por_consultor[$consultor_nome]['sem_pagamento'] ?? 0;
+                $consultor['pontos_perdidos'] = $pontos_antes - $consultor['pontos'];
                 $consultor['pontos_originais'] = $pontos_antes;
+                $consultor['vendas_canceladas'] = $vendas_por_consultor_original[$nome]['canceladas'] ?? 0;
+                $consultor['vendas_sem_pagamento'] = $vendas_por_consultor_original[$nome]['sem_pagamento'] ?? 0;
             }
+            unset($consultor); // Limpa referência
         } else {
             // Não é relatório final, pontos perdidos = 0
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
