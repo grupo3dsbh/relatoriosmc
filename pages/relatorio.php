@@ -1729,36 +1729,51 @@ jQuery(document).ready(function($) {
 
         // Configura botão de exportar PDF
         $('#btnExportarPDF').off('click').on('click', function() {
-            // Expande o collapse de detalhamento antes de imprimir
+            // Expande o collapse de detalhamento
             $('#collapseDetalhamento').collapse('show');
 
-            // Remove max-height e overflow da tabela para impressão
-            const $tableDiv = $('.table-responsive');
-            const originalStyle = $tableDiv.attr('style');
-            $tableDiv.css({
-                'max-height': 'none',
-                'overflow-y': 'visible'
-            });
-
-            // Adiciona classe ao body para controlar impressão
-            $('body').addClass('modal-printing');
-
-            // Aguarda expansão e depois imprime
             setTimeout(function() {
-                window.print();
+                // Clona o conteúdo do modal
+                const conteudo = $('#modalDetalhamentoBody').html();
 
-                // Restaura estilos e remove classe após impressão
-                setTimeout(function() {
-                    $('body').removeClass('modal-printing');
-                    if (originalStyle) {
-                        $tableDiv.attr('style', originalStyle);
-                    } else {
-                        $tableDiv.css({
-                            'max-height': '400px',
-                            'overflow-y': 'auto'
-                        });
-                    }
-                }, 500);
+                // Cria uma nova janela
+                const printWindow = window.open('', '_blank', 'width=800,height=600');
+
+                // Escreve o HTML na nova janela
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Detalhamento de Pontos</title>
+                        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+                        <style>
+                            body { padding: 20px; }
+                            .table-responsive { overflow: visible !important; max-height: none !important; }
+                            .row.mb-3:has(#buscaTitulo) { display: none; }
+                            #buscaTitulo, #filtroTipoPagamento, #filtroStatus,
+                            #filtroPrimeiraParcela, #btnLimparFiltrosModal { display: none; }
+                            #contadorVendasModal { display: none; }
+                            @media print {
+                                .no-print { display: none !important; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${conteudo}
+                        <script>
+                            window.onload = function() {
+                                setTimeout(function() {
+                                    window.print();
+                                    window.close();
+                                }, 500);
+                            };
+                        </script>
+                    </body>
+                    </html>
+                `);
+
+                printWindow.document.close();
             }, 500);
         });
 
