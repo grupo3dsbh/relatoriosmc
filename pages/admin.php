@@ -1085,7 +1085,7 @@ if (!verificarAdmin()):
                             <strong><i class="fas fa-info-circle"></i> Arquivos CSV de Vendas Existentes:</strong><br>
                             <?php foreach ($arquivos_vendas_existentes as $idx => $arq): ?>
                                 <?= $idx + 1 ?>. <strong><?= htmlspecialchars($arq['nome']) ?></strong>
-                                (<?= date('d/m/Y H:i', $arq['data']) ?>)<br>
+                                (<?= htmlspecialchars($arq['data']) ?>)<br>
                             <?php endforeach; ?>
                         </small>
                     </div>
@@ -1127,7 +1127,7 @@ if (!verificarAdmin()):
                             ?>
                                 <option value="<?= htmlspecialchars($arq['nome']) ?>">
                                     <?= htmlspecialchars($arq['nome']) ?>
-                                    (<?= date('d/m/Y H:i', $arq['data']) ?>)
+                                    (<?= htmlspecialchars($arq['data']) ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -1159,7 +1159,7 @@ if (!verificarAdmin()):
                             <strong><i class="fas fa-info-circle"></i> Arquivos CSV de Promotores Existentes:</strong><br>
                             <?php foreach ($arquivos_promotores_existentes as $idx => $arq): ?>
                                 <?= $idx + 1 ?>. <strong><?= htmlspecialchars($arq['nome']) ?></strong>
-                                (<?= date('d/m/Y H:i', $arq['data']) ?>)<br>
+                                (<?= htmlspecialchars($arq['data']) ?>)<br>
                             <?php endforeach; ?>
                         </small>
                     </div>
@@ -1201,7 +1201,7 @@ if (!verificarAdmin()):
                             ?>
                                 <option value="<?= htmlspecialchars($arq['nome']) ?>">
                                     <?= htmlspecialchars($arq['nome']) ?>
-                                    (<?= date('d/m/Y H:i', $arq['data']) ?>)
+                                    (<?= htmlspecialchars($arq['data']) ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
