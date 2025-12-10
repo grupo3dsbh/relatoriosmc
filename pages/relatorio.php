@@ -103,15 +103,51 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
     }
 
     if ($arquivo_selecionado && file_exists($arquivo_selecionado)) {
-        
+
+        // Busca configurações do período para obter datas
+        $periodo_config = $_SESSION['config_sistema']['periodo_relatorio'] ?? [];
+        $data_inicial_config = $periodo_config['data_inicial'] ?? date('Y-m-01');
+        $data_final_config = $periodo_config['data_final'] ?? date('Y-m-t');
+
+        // Verifica se deve aplicar filtro automático (acesso via GET + após dia 08)
+        $aplicar_filtro_automatico = false;
+        if (!isset($_POST['data_inicial'])) {
+            // Acesso via GET - verifica se já passou do dia 08
+            $hoje = new DateTime();
+            $fim_periodo = new DateTime($data_final_config);
+            $mes_seguinte = clone $fim_periodo;
+            $mes_seguinte->modify('first day of next month');
+            $mes_seguinte->setDate(
+                (int)$mes_seguinte->format('Y'),
+                (int)$mes_seguinte->format('m'),
+                8
+            );
+
+            if ($hoje >= $mes_seguinte) {
+                $aplicar_filtro_automatico = true;
+            }
+        }
+
         // Monta filtros
-        $filtros = [
-            'data_inicial' => $_POST['data_inicial'] ?? '',
-            'data_final' => $_POST['data_final'] ?? '',
-            'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']),
-            'apenas_vista' => isset($_POST['apenas_vista']),
-            'status' => $_POST['filtro_status'] ?? ''
-        ];
+        if ($aplicar_filtro_automatico) {
+            // Acesso direto em relatório FINAL - aplica filtros automaticamente
+            $filtros = [
+                'data_inicial' => $data_inicial_config,
+                'data_final' => $data_final_config,
+                'primeira_parcela_paga' => true,  // OBRIGATÓRIO em relatórios finais
+                'apenas_vista' => false,
+                'status' => 'Ativo'  // Apenas vendas ativas
+            ];
+        } else {
+            // Formulário enviado via POST ou relatório temporário
+            $filtros = [
+                'data_inicial' => $_POST['data_inicial'] ?? $data_inicial_config,
+                'data_final' => $_POST['data_final'] ?? $data_final_config,
+                'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']),
+                'apenas_vista' => isset($_POST['apenas_vista']),
+                'status' => $_POST['filtro_status'] ?? ''
+            ];
+        }
         
         // ===== DEBUG DETALHADO - INÍCIO =====
         if (isGodMode()) {
@@ -811,9 +847,28 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                     </div>
                 </div>
 
+                <!-- Modo Senha Mestre (Admin) -->
+                <div id="modoSenhaMestre" style="display: none;">
+                    <p class="text-danger"><i class="fas fa-user-shield"></i> Acesso Administrativo</p>
+                    <div class="form-group">
+                        <label>Senha Mestre</label>
+                        <input type="password" class="form-control" id="inputSenhaMestre"
+                               placeholder="Digite a senha mestre">
+                        <small class="text-muted">Use a senha mestre configurada no painel administrativo</small>
+                    </div>
+                    <div class="text-center mt-2">
+                        <button type="button" class="btn btn-link btn-sm" id="btnVoltarPIN">
+                            <i class="fas fa-arrow-left"></i> Voltar ao PIN
+                        </button>
+                    </div>
+                </div>
+
                 <div id="erroValidacao" class="alert alert-danger" style="display: none;"></div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-link btn-sm" id="btnUsarSenhaMestre">
+                    <i class="fas fa-user-shield"></i> Admin
+                </button>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="btnValidarAcesso">
                     <i class="fas fa-check"></i> Validar
@@ -1234,6 +1289,7 @@ jQuery(document).ready(function($) {
     $('#btnUsarCPF').click(function() {
         $('#modoPin').hide();
         $('#modoCPF').show();
+        $('#modoSenhaMestre').hide();
         $('#erroValidacao').hide();
         setTimeout(function() { $('#inputValidacaoConsultor').focus(); }, 100);
     });
@@ -1241,6 +1297,23 @@ jQuery(document).ready(function($) {
     $('#btnUsarPIN').click(function() {
         $('#modoCPF').hide();
         $('#modoPin').show();
+        $('#modoSenhaMestre').hide();
+        $('#erroValidacao').hide();
+        setTimeout(function() { $('#inputPIN').focus(); }, 100);
+    });
+
+    $('#btnUsarSenhaMestre').click(function() {
+        $('#modoPin').hide();
+        $('#modoCPF').hide();
+        $('#modoSenhaMestre').show();
+        $('#erroValidacao').hide();
+        setTimeout(function() { $('#inputSenhaMestre').focus(); }, 100);
+    });
+
+    $('#btnVoltarPIN').click(function() {
+        $('#modoSenhaMestre').hide();
+        $('#modoPin').show();
+        $('#modoCPF').hide();
         $('#erroValidacao').hide();
         setTimeout(function() { $('#inputPIN').focus(); }, 100);
     });
@@ -1248,7 +1321,7 @@ jQuery(document).ready(function($) {
     // ========================================
     // EVENTO: Enter nos campos
     // ========================================
-    $('#inputPIN, #inputValidacaoConsultor').keypress(function(e) {
+    $('#inputPIN, #inputValidacaoConsultor, #inputSenhaMestre').keypress(function(e) {
         if (e.which === 13) { // Enter
             $('#btnValidarAcesso').click();
         }
@@ -1261,7 +1334,42 @@ jQuery(document).ready(function($) {
         $('#erroValidacao').hide();
 
         // Verifica qual modo está ativo
-        if ($('#modoPin').is(':visible')) {
+        if ($('#modoSenhaMestre').is(':visible')) {
+            // Validação com Senha Mestre
+            const senhaMestre = $('#inputSenhaMestre').val();
+
+            if (!senhaMestre) {
+                $('#erroValidacao').text('Digite a senha mestre').show();
+                return;
+            }
+
+            console.log('Validando Senha Mestre...');
+
+            $.ajax({
+                url: 'ajax/validar_senha_mestre.php',
+                method: 'POST',
+                data: {
+                    senha_mestre: senhaMestre
+                },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Resposta Senha Mestre:', response);
+
+                    if (response.success && response.valido) {
+                        $('#modalValidarConsultor').modal('hide');
+                        mostrarDetalhamento(consultorParaValidar);
+                    } else {
+                        $('#erroValidacao').text(response.mensagem || 'Senha mestre incorreta!').show();
+                        $('#inputSenhaMestre').val('').focus();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro na validação Senha Mestre:', error);
+                    $('#erroValidacao').text('Erro ao validar. Tente novamente.').show();
+                }
+            });
+
+        } else if ($('#modoPin').is(':visible')) {
             // Validação com PIN
             const pin = $('#inputPIN').val().replace(/\D/g, '');
 
