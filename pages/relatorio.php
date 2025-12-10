@@ -1045,51 +1045,65 @@ body.modal-open {
 
 /* Estilos para impressão/PDF */
 @media print {
-    /* Oculta tudo da página EXCETO a modal */
-    body > *:not(.modal) {
+    /* Apenas quando estiver imprimindo o modal */
+    body.modal-printing {
+        background: white !important;
+    }
+
+    /* Oculta TUDO quando estiver imprimindo modal */
+    body.modal-printing > * {
         display: none !important;
     }
 
-    /* Remove backdrop */
-    .modal-backdrop {
-        display: none !important;
-    }
-
-    /* Posiciona a modal para impressão */
-    .modal {
-        position: static !important;
+    /* Mostra APENAS o modal */
+    body.modal-printing #modalDetalhamentoConsultor {
         display: block !important;
+        position: static !important;
         padding: 0 !important;
     }
 
-    .modal-dialog {
+    body.modal-printing .modal-backdrop {
+        display: none !important;
+    }
+
+    body.modal-printing .modal-dialog {
         max-width: 100% !important;
         margin: 0 !important;
     }
 
-    .modal-content {
+    body.modal-printing .modal-content {
         border: none !important;
         box-shadow: none !important;
+        background: white !important;
     }
 
-    /* Oculta header e footer da modal */
-    .modal-header,
-    .modal-footer {
+    /* Oculta header e footer */
+    body.modal-printing .modal-header,
+    body.modal-printing .modal-footer {
         display: none !important;
     }
 
-    .modal-body {
+    /* Mostra o body */
+    body.modal-printing .modal-body {
+        display: block !important;
         padding: 15px !important;
+        overflow: visible !important;
     }
 
-    /* Oculta filtros e botões */
-    .modal-body .row.mb-3:has(#buscaTitulo),
-    #buscaTitulo,
-    #filtroTipoPagamento,
-    #filtroStatus,
-    #filtroPrimeiraParcela,
-    #btnLimparFiltrosModal {
+    /* Oculta filtros */
+    body.modal-printing #buscaTitulo,
+    body.modal-printing #filtroTipoPagamento,
+    body.modal-printing #filtroStatus,
+    body.modal-printing #filtroPrimeiraParcela,
+    body.modal-printing #btnLimparFiltrosModal,
+    body.modal-printing .row.mb-3:has(#buscaTitulo) {
         display: none !important;
+    }
+
+    /* Garante que a tabela seja totalmente visível */
+    body.modal-printing .table-responsive {
+        overflow: visible !important;
+        max-height: none !important;
     }
 
     /* Força expansão do collapse */
@@ -1726,12 +1740,16 @@ jQuery(document).ready(function($) {
                 'overflow-y': 'visible'
             });
 
+            // Adiciona classe ao body para controlar impressão
+            $('body').addClass('modal-printing');
+
             // Aguarda expansão e depois imprime
             setTimeout(function() {
                 window.print();
 
-                // Restaura estilos originais após impressão
+                // Restaura estilos e remove classe após impressão
                 setTimeout(function() {
+                    $('body').removeClass('modal-printing');
                     if (originalStyle) {
                         $tableDiv.attr('style', originalStyle);
                     } else {
