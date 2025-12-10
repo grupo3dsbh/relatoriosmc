@@ -1733,40 +1733,78 @@ jQuery(document).ready(function($) {
             $('#collapseDetalhamento').collapse('show');
 
             setTimeout(function() {
-                // Clona o conteúdo do modal
-                const conteudo = $('#modalDetalhamentoBody').html();
+                // Clona o modal body para manipular
+                const clone = $('#modalDetalhamentoBody').clone();
+
+                // Remove elementos de filtro
+                clone.find('#buscaTitulo').closest('.row').remove();
+                clone.find('#contadorVendasModal').remove();
+
+                // Remove inline styles que limitam altura
+                clone.find('.table-responsive').removeAttr('style');
+
+                // Pega o HTML limpo
+                const conteudo = clone.html();
 
                 // Cria uma nova janela
-                const printWindow = window.open('', '_blank', 'width=800,height=600');
+                const printWindow = window.open('', '_blank', 'width=1024,height=768');
+
+                if (!printWindow) {
+                    alert('Por favor, permita popups para exportar o PDF');
+                    return;
+                }
 
                 // Escreve o HTML na nova janela
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Detalhamento de Pontos</title>
+                        <meta charset="UTF-8">
+                        <title>Detalhamento de Pontos - ${$('#modalDetalhamentoConsultor').data('consultor-nome') || 'Consultor'}</title>
                         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
                         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
                         <style>
-                            body { padding: 20px; }
-                            .table-responsive { overflow: visible !important; max-height: none !important; }
-                            .row.mb-3:has(#buscaTitulo) { display: none; }
-                            #buscaTitulo, #filtroTipoPagamento, #filtroStatus,
-                            #filtroPrimeiraParcela, #btnLimparFiltrosModal { display: none; }
-                            #contadorVendasModal { display: none; }
+                            body {
+                                padding: 20px;
+                                font-family: Arial, sans-serif;
+                            }
+                            .table-responsive {
+                                overflow: visible !important;
+                                max-height: none !important;
+                                height: auto !important;
+                            }
+                            table {
+                                page-break-inside: auto;
+                            }
+                            tr {
+                                page-break-inside: avoid;
+                                page-break-after: auto;
+                            }
+                            thead {
+                                display: table-header-group;
+                            }
                             @media print {
-                                .no-print { display: none !important; }
+                                body { padding: 10px; }
+                                .table-responsive {
+                                    overflow: visible !important;
+                                    max-height: none !important;
+                                }
                             }
                         </style>
                     </head>
                     <body>
                         ${conteudo}
                         <script>
+                            // Aguarda o carregamento do CSS antes de imprimir
                             window.onload = function() {
+                                // Aguarda um pouco mais para garantir que o CSS foi aplicado
                                 setTimeout(function() {
                                     window.print();
-                                    window.close();
-                                }, 500);
+                                    // Fecha a janela após a impressão
+                                    setTimeout(function() {
+                                        window.close();
+                                    }, 1000);
+                                }, 800);
                             };
                         </script>
                     </body>
