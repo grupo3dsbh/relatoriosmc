@@ -1045,54 +1045,50 @@ body.modal-open {
 
 /* Estilos para impressão/PDF */
 @media print {
-    /* Remove todos os fundos e cores de página */
-    body {
-        background: white !important;
-    }
-
-    /* Oculta tudo exceto o corpo da modal */
-    body * {
-        visibility: hidden;
-    }
-
-    /* Mostra apenas o conteúdo da modal */
-    #modalDetalhamentoConsultor .modal-body,
-    #modalDetalhamentoConsultor .modal-body * {
-        visibility: visible;
-    }
-
-    /* Oculta completamente elementos não desejados */
-    .modal-backdrop,
-    #modalDetalhamentoConsultor .modal-dialog,
-    #modalDetalhamentoConsultor .modal-content,
-    #modalDetalhamentoConsultor .modal-header,
-    #modalDetalhamentoConsultor .modal-footer,
-    body > *:not(#modalDetalhamentoConsultor) {
+    /* Oculta tudo da página EXCETO a modal */
+    body > *:not(.modal) {
         display: none !important;
-        visibility: hidden !important;
     }
 
-    /* Posiciona apenas o body da modal para impressão */
-    #modalDetalhamentoConsultor .modal-body {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
+    /* Remove backdrop */
+    .modal-backdrop {
+        display: none !important;
+    }
+
+    /* Posiciona a modal para impressão */
+    .modal {
+        position: static !important;
+        display: block !important;
+        padding: 0 !important;
+    }
+
+    .modal-dialog {
         max-width: 100% !important;
         margin: 0 !important;
-        padding: 20px !important;
-        overflow: visible !important;
-        max-height: none !important;
-        background: white !important;
     }
 
-    /* Oculta elementos de interface do modal */
-    #modalDetalhamentoConsultor #buscaTitulo,
-    #modalDetalhamentoConsultor #filtroTipoPagamento,
-    #modalDetalhamentoConsultor #filtroStatus,
-    #modalDetalhamentoConsultor #filtroPrimeiraParcela,
-    #modalDetalhamentoConsultor #btnLimparFiltrosModal,
-    #modalDetalhamentoConsultor .row.mb-3:has(#buscaTitulo) {
+    .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Oculta header e footer da modal */
+    .modal-header,
+    .modal-footer {
+        display: none !important;
+    }
+
+    .modal-body {
+        padding: 15px !important;
+    }
+
+    /* Oculta filtros e botões */
+    .modal-body .row.mb-3:has(#buscaTitulo),
+    #buscaTitulo,
+    #filtroTipoPagamento,
+    #filtroStatus,
+    #filtroPrimeiraParcela,
+    #btnLimparFiltrosModal {
         display: none !important;
     }
 
