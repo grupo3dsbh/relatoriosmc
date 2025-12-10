@@ -285,6 +285,7 @@ if (isset($_POST['salvar_config_premiacoes'])) {
 // Processar configurações do Top20 / Período de Relatório
 if (isset($_POST['salvar_config_top20'])) {
     $_SESSION['config_sistema']['periodo_relatorio'] = [
+        'arquivo_csv' => $_POST['periodo_arquivo_csv'] ?? '',
         'data_inicial' => $_POST['periodo_data_inicial'],
         'data_final' => $_POST['periodo_data_final'],
         'apenas_primeira_parcela' => isset($_POST['periodo_apenas_primeira_parcela']),
@@ -825,6 +826,30 @@ if (!verificarAdmin()):
                 </p>
 
                 <form method="post">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-group">
+                                <label><strong><i class="fas fa-file-csv"></i> Arquivo CSV de Vendas para o Top20</strong></label>
+                                <select class="form-control" name="periodo_arquivo_csv">
+                                    <option value="">Usar o mais recente (padrão)</option>
+                                    <?php
+                                    $arquivos_disponiveis = listarCSVs('vendas');
+                                    $arquivo_selecionado_config = $_SESSION['config_sistema']['periodo_relatorio']['arquivo_csv'] ?? '';
+                                    foreach ($arquivos_disponiveis as $arq):
+                                    ?>
+                                        <option value="<?= htmlspecialchars($arq['nome']) ?>"
+                                                <?= $arquivo_selecionado_config === $arq['nome'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($arq['nome']) ?> (<?= htmlspecialchars($arq['data']) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Escolha qual arquivo CSV usar no Top20 e relatórios. Se não selecionar, usará o mais recente.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">

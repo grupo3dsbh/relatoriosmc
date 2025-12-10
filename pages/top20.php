@@ -33,8 +33,16 @@ $arquivos_vendas = listarCSVs('vendas');
 
 // Processa automaticamente com período configurado
 if (!empty($arquivos_vendas)) {
-    // Pega o arquivo mais recente
-    $arquivo_selecionado = $arquivos_vendas[0]['caminho'];
+    // Verifica se há arquivo específico configurado
+    $arquivo_config = $periodo_config['arquivo_csv'] ?? '';
+
+    if (!empty($arquivo_config)) {
+        // Usa o arquivo configurado
+        $arquivo_selecionado = VENDAS_DIR . '/' . $arquivo_config;
+    } else {
+        // Usa o arquivo mais recente (padrão)
+        $arquivo_selecionado = $arquivos_vendas[0]['caminho'];
+    }
 
     // Aplica filtros do admin
     $filtros = [
