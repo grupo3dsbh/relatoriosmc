@@ -490,32 +490,26 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
 
                 <?php if ($campos_visiveis['pontos']): ?>
                     <td class="text-center">
-                        <span class="badge badge-primary"><?= $consultor['pontos'] ?> pts</span>
+                        <span class="badge badge-success"><?= $consultor['pontos'] ?> pts</span>
                     </td>
                 <?php endif; ?>
 
                 <?php if ($tipo_relatorio === 'FINAL' && $campos_visiveis['pontos']): ?>
                     <td class="text-center">
                         <?php if ($consultor['pontos_perdidos'] > 0): ?>
-                            <small class="text-muted d-block">
-                                <?= $consultor['pontos_originais'] ?> pts
-                                <i class="fas fa-arrow-right"></i>
-                            </small>
-                            <span class="badge badge-danger">
-                                -<?= $consultor['pontos_perdidos'] ?> pts
-                            </span>
-                            <br>
-                            <small class="text-muted">
-                                <?php if ($consultor['vendas_canceladas'] > 0): ?>
-                                    <span class="badge badge-sm badge-danger" title="Vendas canceladas">
-                                        <?= $consultor['vendas_canceladas'] ?> ❌
-                                    </span>
-                                <?php endif; ?>
-                                <?php if ($consultor['vendas_sem_pagamento'] > 0): ?>
-                                    <span class="badge badge-sm badge-warning" title="Sem 1ª parcela">
-                                        <?= $consultor['vendas_sem_pagamento'] ?> ⚠️
-                                    </span>
-                                <?php endif; ?>
+                            <small style="line-height: 1.5;">
+                                <?= $consultor['pontos_originais'] ?> pts (<span class="text-danger">-<?= $consultor['pontos_perdidos'] ?> pts</span><?php
+                                $detalhes = [];
+                                if ($consultor['vendas_canceladas'] > 0) {
+                                    $detalhes[] = $consultor['vendas_canceladas'] . ' ❌';
+                                }
+                                if ($consultor['vendas_sem_pagamento'] > 0) {
+                                    $detalhes[] = $consultor['vendas_sem_pagamento'] . ' ⚠️';
+                                }
+                                if (!empty($detalhes)) {
+                                    echo ' | ' . implode(' | ', $detalhes);
+                                }
+                                ?>)
                             </small>
                         <?php else: ?>
                             <span class="text-success">
