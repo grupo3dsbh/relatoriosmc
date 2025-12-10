@@ -481,6 +481,12 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                     <option value="Inativo" <?= ($_POST['filtro_status'] ?? '') === 'Inativo' ? 'selected' : '' ?>>
                                                         Inativo
                                                     </option>
+                                                    <option value="Cancelado" <?= ($_POST['filtro_status'] ?? '') === 'Cancelado' ? 'selected' : '' ?>>
+                                                        Cancelado
+                                                    </option>
+                                                    <option value="Bloqueado" <?= ($_POST['filtro_status'] ?? '') === 'Bloqueado' ? 'selected' : '' ?>>
+                                                        Bloqueado
+                                                    </option>
                                                 </select>
                                             </div>
                                         </div>
@@ -1039,54 +1045,54 @@ body.modal-open {
 
 /* Estilos para impressão/PDF */
 @media print {
-    /* Oculta tudo exceto a modal */
+    /* Remove todos os fundos e cores de página */
+    body {
+        background: white !important;
+    }
+
+    /* Oculta tudo exceto o corpo da modal */
     body * {
         visibility: hidden;
     }
 
     /* Mostra apenas o conteúdo da modal */
-    #modalDetalhamentoConsultor,
-    #modalDetalhamentoConsultor * {
+    #modalDetalhamentoConsultor .modal-body,
+    #modalDetalhamentoConsultor .modal-body * {
         visibility: visible;
     }
 
-    /* Posiciona a modal para impressão */
-    #modalDetalhamentoConsultor {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        max-width: 100% !important;
-        margin: 0 !important;
+    /* Oculta completamente elementos não desejados */
+    .modal-backdrop,
+    #modalDetalhamentoConsultor .modal-dialog,
+    #modalDetalhamentoConsultor .modal-content,
+    #modalDetalhamentoConsultor .modal-header,
+    #modalDetalhamentoConsultor .modal-footer,
+    body > *:not(#modalDetalhamentoConsultor) {
+        display: none !important;
+        visibility: hidden !important;
     }
 
-    #modalDetalhamentoConsultor .modal-dialog {
-        max-width: 100% !important;
-        margin: 0 !important;
-    }
-
-    #modalDetalhamentoConsultor .modal-content {
-        max-height: none !important;
-        box-shadow: none !important;
-        border: none !important;
-    }
-
+    /* Posiciona apenas o body da modal para impressão */
     #modalDetalhamentoConsultor .modal-body {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 20px !important;
         overflow: visible !important;
         max-height: none !important;
-        padding: 20px !important;
+        background: white !important;
     }
 
-    /* Oculta elementos de interface */
-    #modalDetalhamentoConsultor .modal-header button.close,
-    #modalDetalhamentoConsultor .modal-footer,
+    /* Oculta elementos de interface do modal */
     #modalDetalhamentoConsultor #buscaTitulo,
     #modalDetalhamentoConsultor #filtroTipoPagamento,
     #modalDetalhamentoConsultor #filtroStatus,
     #modalDetalhamentoConsultor #filtroPrimeiraParcela,
     #modalDetalhamentoConsultor #btnLimparFiltrosModal,
-    #modalDetalhamentoConsultor .row.mb-3:has(#buscaTitulo),
-    .modal-backdrop {
+    #modalDetalhamentoConsultor .row.mb-3:has(#buscaTitulo) {
         display: none !important;
     }
 
@@ -1658,6 +1664,8 @@ jQuery(document).ready(function($) {
                             <option value="">Status</option>
                             <option value="Ativo">Ativo</option>
                             <option value="Inativo">Inativo</option>
+                            <option value="Cancelado">Cancelado</option>
+                            <option value="Bloqueado">Bloqueado</option>
                         </select>
                     </div>
                     <div class="col-md-2">

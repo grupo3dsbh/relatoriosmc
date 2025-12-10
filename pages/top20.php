@@ -360,8 +360,8 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     </div>
     <?php endif; ?>
 
-    <!-- DEBUG: Informações de Diagnóstico -->
-    <?php if (isset($debug_info)): ?>
+    <!-- DEBUG: Informações de Diagnóstico (apenas com godmode=on na URL) -->
+    <?php if (isset($debug_info) && isset($_GET['godmode']) && $_GET['godmode'] === 'on'): ?>
     <div class="alert alert-info">
         <h5><i class="fas fa-bug"></i> Debug - Contagem de Vendas</h5>
         <pre style="font-size: 0.85em; background: #f8f9fa; padding: 10px; border-radius: 5px;"><?php
@@ -547,8 +547,18 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     </table>
     </div><!-- /.table-responsive -->
 
+    <?php if ($tipo_relatorio === 'FINAL'): ?>
+    <!-- Legenda -->
+    <div class="mt-3">
+        <small class="text-muted">
+            <strong><i class="fas fa-info-circle"></i> Legenda:</strong>
+            <span class="ml-2">❌ = Vendas canceladas</span>
+            <span class="ml-3">⚠️ = Vendas sem pagamento da 1ª parcela</span>
+        </small>
+    </div>
+    <?php endif; ?>
 
-    
+
     <?php endif; ?>
 
 </div>
