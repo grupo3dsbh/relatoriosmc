@@ -60,8 +60,12 @@ if (isset($_POST['validar_com_pin'])) {
     $consultor_nome = $_POST['consultor_nome'];
     $pin = preg_replace('/\D/', '', $_POST['pin'] ?? '');
 
-    // BYPASS: Se está logado como admin, não precisa validar PIN
-    if (verificarAdmin()) {
+    // Verifica se é senha mestre
+    $senha_mestre = $_SESSION['config_sistema']['acesso']['senha_mestre'] ?? null;
+    $eh_senha_mestre = (!empty($senha_mestre) && $pin === $senha_mestre);
+
+    // Se for senha mestre, concede acesso administrativo
+    if ($eh_senha_mestre) {
         // Filtra vendas do consultor
         $vendas_consultor = array_filter($_SESSION['detalhes_vendas']['vendas'], function($v) use ($consultor_nome) {
             return $v['consultor'] === $consultor_nome;
@@ -146,8 +150,12 @@ if (isset($_POST['validar_consultor'])) {
 
     $vendas_consultor = array_values($vendas_consultor);
 
-    // BYPASS: Se está logado como admin, não precisa validar CPF/Telefone
-    if (verificarAdmin()) {
+    // Verifica se a identificação é a senha mestre
+    $senha_mestre = $_SESSION['config_sistema']['acesso']['senha_mestre'] ?? null;
+    $eh_senha_mestre = (!empty($senha_mestre) && $identificacao === $senha_mestre);
+
+    // Se for senha mestre, concede acesso administrativo
+    if ($eh_senha_mestre) {
         $_SESSION['detalhes_vendas']['consultor_selecionado'] = $consultor_nome;
         $_SESSION['detalhes_vendas']['vendas_consultor'] = $vendas_consultor;
         $_SESSION['detalhes_vendas']['passo'] = 3;
