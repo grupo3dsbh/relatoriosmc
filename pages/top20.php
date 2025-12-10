@@ -48,25 +48,17 @@ if (!empty($arquivos_vendas)) {
     $filtros = [
         'data_inicial' => $periodo_config['data_inicial'],
         'data_final' => $periodo_config['data_final'],
-        'primeira_parcela_paga' => $periodo_config['apenas_primeira_parcela'] ?? false,
-        'apenas_vista' => $periodo_config['apenas_vista'] ?? false,
-        'status' => $periodo_config['filtro_status'] ?? 'Ativo'
+        'primeira_parcela_paga' => false, // NÃO filtrar - processar todas
+        'apenas_vista' => false, // NÃO filtrar - processar todas
+        'status' => '' // NÃO filtrar - processar todas
     ];
 
     if (file_exists($arquivo_selecionado)) {
-        // ===== PASSO 1: Processar vendas SEM FILTRO DE STATUS (para contar canceladas) =====
-        $filtros_sem_status = [
-            'data_inicial' => $periodo_config['data_inicial'],
-            'data_final' => $periodo_config['data_final'],
-            'primeira_parcela_paga' => false, // NÃO filtrar primeira parcela
-            'apenas_vista' => false, // NÃO filtrar à vista
-            'status' => '' // Desabilita filtro de status (string vazia)
-        ];
+        // ===== PROCESSAR TODAS AS VENDAS (sem filtros) =====
+        $vendas_todas = processarVendasComRanges($arquivo_selecionado, $filtros);
 
-        $vendas_todas = processarVendasComRanges($arquivo_selecionado, $filtros_sem_status);
-
-        // ===== PASSO 2: Processar vendas COM FILTROS (para ranking oficial) =====
-        $vendas_processadas_original = processarVendasComRanges($arquivo_selecionado, $filtros);
+        // Salva o resultado completo
+        $vendas_processadas_original = $vendas_todas;
 
         // Salva pontos originais por consultor (ANTES de remover vendas)
         $pontos_originais = [];
@@ -119,46 +111,105 @@ if (!empty($arquivos_vendas)) {
 
         // Se aplicou filtro, calcula vendas removidas
         if ($regra_dia08['aplicar_filtro']) {
-            // Conta vendas removidas POR CONSULTOR (do array COMPLETO, SEM filtro de status)
-            $vendas_por_consultor_original = [];
+            // Separa vendas e recalcula pontos APENAS com ativas
+            $vendas_removidas_detalhes = [];
             $debug_contadores = ['canceladas' => 0, 'sem_pagamento' => 0, 'ativas' => 0];
+            $vendas_ativas_por_consultor = [];
 
+            // Primeiro, separa as vendas
             foreach ($vendas_todas['vendas'] as $venda) {
                 $nome = $venda['consultor'];
-                if (!isset($vendas_por_consultor_original[$nome])) {
-                    $vendas_por_consultor_original[$nome] = [
+                $is_cancelada = (strcasecmp($venda['status'], 'Cancelado') === 0 ||
+                                 strcasecmp($venda['status'], 'Cancelada') === 0 ||
+                                 strcasecmp($venda['status'], 'Bloqueado') === 0);
+                $tem_primeira_parcela = $venda['primeira_parcela_paga'] ?? false;
+
+                if (!isset($vendas_removidas_detalhes[$nome])) {
+                    $vendas_removidas_detalhes[$nome] = [
                         'canceladas' => 0,
                         'sem_pagamento' => 0
                     ];
+                    $vendas_ativas_por_consultor[$nome] = [];
                 }
 
-                // Conta se é cancelada
-                if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
-                    strcasecmp($venda['status'], 'Cancelada') === 0) {
-                    $vendas_por_consultor_original[$nome]['canceladas']++;
+                // Classifica a venda
+                if ($is_cancelada) {
+                    $vendas_removidas_detalhes[$nome]['canceladas']++;
                     $debug_contadores['canceladas']++;
-                }
-                // Conta se não tem primeira parcela (e não é cancelada)
-                elseif (!($venda['primeira_parcela_paga'] ?? false)) {
-                    $vendas_por_consultor_original[$nome]['sem_pagamento']++;
+                } elseif (!$tem_primeira_parcela) {
+                    $vendas_removidas_detalhes[$nome]['sem_pagamento']++;
                     $debug_contadores['sem_pagamento']++;
                 } else {
+                    // Venda ATIVA e com primeira parcela paga
+                    $vendas_ativas_por_consultor[$nome][] = $venda;
                     $debug_contadores['ativas']++;
                 }
             }
 
             $debug_info['contadores'] = $debug_contadores;
-            $debug_info['vendas_por_consultor_sample'] = array_slice($vendas_por_consultor_original, 0, 5, true);
+            $debug_info['vendas_por_consultor_sample'] = array_slice($vendas_removidas_detalhes, 0, 5, true);
 
-            // Agora atribui aos consultores no array processado
+            // Agora recalcula pontos, SAPs e vendas APENAS com ativas
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
                 $nome = $consultor['consultor'];
-                $pontos_antes = $pontos_originais[$nome] ?? $consultor['pontos'];
 
-                $consultor['pontos_perdidos'] = $pontos_antes - $consultor['pontos'];
-                $consultor['pontos_originais'] = $pontos_antes;
-                $consultor['vendas_canceladas'] = $vendas_por_consultor_original[$nome]['canceladas'] ?? 0;
-                $consultor['vendas_sem_pagamento'] = $vendas_por_consultor_original[$nome]['sem_pagamento'] ?? 0;
+                // Salva valores originais (com TODAS as vendas)
+                $consultor['pontos_originais'] = $consultor['pontos'];
+                $consultor['quantidade_original'] = $consultor['quantidade'];
+
+                // Recalcula com apenas vendas ativas
+                if (isset($vendas_ativas_por_consultor[$nome]) && count($vendas_ativas_por_consultor[$nome]) > 0) {
+                    // Prepara array de vendas para calcular pontos
+                    $vendas_para_pontos = [];
+                    foreach ($vendas_ativas_por_consultor[$nome] as $venda) {
+                        $vendas_para_pontos[] = [
+                            'num_vagas' => $venda['num_vagas'],
+                            'e_vista' => $venda['e_vista'],
+                            'data_venda' => $venda['data_para_pontuacao'],
+                            'id_venda' => $venda['id'],
+                            'valor_total' => $venda['valor_total'],
+                            'valor_pago' => $venda['valor_pago']
+                        ];
+                    }
+
+                    // Calcula pontos apenas com vendas ativas
+                    $calc_ativas = calcularPontosComRanges($vendas_para_pontos, $nome);
+
+                    // Atualiza com valores das ativas
+                    $consultor['pontos'] = $calc_ativas['pontos_total'];
+                    $consultor['quantidade'] = count($vendas_ativas_por_consultor[$nome]);
+                    $consultor['vendas_ativas'] = count($vendas_ativas_por_consultor[$nome]);
+
+                    // Recalcula SAPs e DIPs com pontos das ativas
+                    $pontos_por_sap = $_SESSION['config_premiacoes']['pontos_por_sap'] ?? 21;
+                    $consultor['saps'] = floor($consultor['pontos'] / $pontos_por_sap);
+
+                    // DIPs (baseado em quantidade de vendas ativas)
+                    $vendas_para_dip = $_SESSION['config_premiacoes']['vendas_para_dip'] ?? 200;
+                    $vendas_acima_2vagas_para_dip = $_SESSION['config_premiacoes']['vendas_acima_2vagas_para_dip'] ?? 200;
+                    $consultor['dips'] = 0;
+                    if ($consultor['quantidade'] >= $vendas_para_dip) {
+                        $consultor['dips'] = 1;
+                        $consultor['criterio_dip'] = 'vendas_total';
+                    } elseif ($consultor['vendas_acima_2vagas'] >= $vendas_acima_2vagas_para_dip) {
+                        $consultor['dips'] = 1;
+                        $consultor['criterio_dip'] = 'vendas_acima_2vagas';
+                    }
+                } else {
+                    // Consultor não tem vendas ativas
+                    $consultor['pontos'] = 0;
+                    $consultor['quantidade'] = 0;
+                    $consultor['saps'] = 0;
+                    $consultor['dips'] = 0;
+                    $consultor['vendas_ativas'] = 0;
+                }
+
+                // Calcula pontos perdidos
+                $consultor['pontos_perdidos'] = $consultor['pontos_originais'] - $consultor['pontos'];
+
+                // Adiciona contagem de canceladas e sem pagamento
+                $consultor['vendas_canceladas'] = $vendas_removidas_detalhes[$nome]['canceladas'] ?? 0;
+                $consultor['vendas_sem_pagamento'] = $vendas_removidas_detalhes[$nome]['sem_pagamento'] ?? 0;
             }
             unset($consultor); // Limpa referência
         } else {
