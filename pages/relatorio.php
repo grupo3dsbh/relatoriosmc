@@ -1755,7 +1755,7 @@ jQuery(document).ready(function($) {
                 }
 
                 // Escreve o HTML na nova janela
-                printWindow.document.write(`
+                const htmlContent = `
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -1794,24 +1794,26 @@ jQuery(document).ready(function($) {
                     </head>
                     <body>
                         ${conteudo}
-                        <script>
-                            // Aguarda o carregamento do CSS antes de imprimir
-                            window.onload = function() {
-                                // Aguarda um pouco mais para garantir que o CSS foi aplicado
-                                setTimeout(function() {
-                                    window.print();
-                                    // Fecha a janela após a impressão
-                                    setTimeout(function() {
-                                        window.close();
-                                    }, 1000);
-                                }, 800);
-                            };
-                        </script>
                     </body>
                     </html>
-                `);
+                `;
 
+                printWindow.document.write(htmlContent);
                 printWindow.document.close();
+
+                // Adiciona o script de impressão depois que o documento está fechado
+                const script = printWindow.document.createElement('script');
+                script.textContent = `
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                            setTimeout(function() {
+                                window.close();
+                            }, 1000);
+                        }, 800);
+                    };
+                `;
+                printWindow.document.body.appendChild(script);
             }, 500);
         });
 
