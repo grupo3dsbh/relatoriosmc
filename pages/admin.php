@@ -95,6 +95,19 @@ if (isset($_POST['alterar_senha_consultores'])) {
     $mensagem_sucesso = "Senha de consultores alterada com sucesso!";
 }
 
+// Processa alteração de senha mestre
+if (isset($_POST['alterar_senha_mestre'])) {
+    $nova_senha_mestre = trim($_POST['nova_senha_mestre']);
+
+    if (!empty($nova_senha_mestre)) {
+        $_SESSION['config_sistema']['acesso']['senha_mestre'] = $nova_senha_mestre;
+        salvarConfiguracoes($_SESSION['config_sistema']);
+        $mensagem_sucesso = "Senha mestre alterada com sucesso!";
+    } else {
+        $erro_upload = "A senha mestre não pode estar vazia!";
+    }
+}
+
 // Processa upload de CSV de vendas
 if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
     if ($_FILES['csv_vendas']['error'] === UPLOAD_ERR_OK) {
@@ -1074,12 +1087,43 @@ if (!verificarAdmin()):
                             <label>
                                 <i class="fas fa-edit"></i> Nova Senha
                             </label>
-                            <input type="text" class="form-control" name="nova_senha" 
+                            <input type="text" class="form-control" name="nova_senha"
                                    placeholder="Digite a nova senha" required>
                         </div>
                         <div class="col-md-2">
                             <label>&nbsp;</label>
                             <button type="submit" name="alterar_senha_consultores" class="btn btn-warning btn-block">
+                                <i class="fas fa-save"></i> Alterar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+
+                <form method="post">
+                    <div class="form-row">
+                        <div class="col-md-6">
+                            <label>
+                                <i class="fas fa-user-shield"></i> Senha Mestre Atual (Admin)
+                            </label>
+                            <input type="text" class="form-control"
+                                   value="<?= htmlspecialchars($_SESSION['config_sistema']['acesso']['senha_mestre'] ?? 'Não definida') ?>"
+                                   disabled>
+                            <small class="form-text text-muted">
+                                Esta senha permite acesso a qualquer relatório sem validação de PIN/CPF
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <label>
+                                <i class="fas fa-edit"></i> Nova Senha Mestre
+                            </label>
+                            <input type="text" class="form-control" name="nova_senha_mestre"
+                                   placeholder="Digite a nova senha mestre" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label>&nbsp;</label>
+                            <button type="submit" name="alterar_senha_mestre" class="btn btn-danger btn-block">
                                 <i class="fas fa-save"></i> Alterar
                             </button>
                         </div>
