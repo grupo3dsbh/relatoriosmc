@@ -10,8 +10,20 @@ $mensagem_erro = null;
 // ===== CARREGA CONFIGURAÇÕES DO ARQUIVO =====
 $config = carregarConfiguracoes();
 
+// ===== DEBUG TEMPORÁRIO =====
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log("POST recebido em configuracoes.php");
+    error_log("POST keys: " . implode(', ', array_keys($_POST)));
+    if (isset($_POST['salvar_configuracoes'])) {
+        error_log("salvar_configuracoes detectado!");
+    }
+}
+
 // ===== PROCESSAR SALVAMENTO =====
 if (isset($_POST['salvar_configuracoes'])) {
+    error_log("Iniciando salvamento de configurações...");
+    error_log("periodo_data_inicial: " . ($_POST['periodo_data_inicial'] ?? 'não definido'));
+    error_log("periodo_data_final: " . ($_POST['periodo_data_final'] ?? 'não definido'));
 
     // Atualiza pontos padrão
     $config['pontos_padrao'] = [
@@ -78,13 +90,16 @@ if (isset($_POST['salvar_configuracoes'])) {
     
     // Salva configurações
     $resultado = salvarConfiguracoes($config);
-    
+    error_log("Resultado do salvamento: " . json_encode($resultado));
+
     if ($resultado['sucesso']) {
         $mensagem_sucesso = $resultado['mensagem'];
+        error_log("SUCESSO: " . $mensagem_sucesso);
         // Recarrega configurações
         $config = carregarConfiguracoes();
     } else {
         $mensagem_erro = $resultado['mensagem'];
+        error_log("ERRO: " . $mensagem_erro);
     }
 }
 
@@ -202,7 +217,20 @@ if (isset($_POST['resetar_config'])) {
 
 <div class="row">
     <div class="col-md-12">
-        
+
+        <?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
+            <div class="alert alert-warning alert-dismissible fade show">
+                <strong>🔍 DEBUG:</strong> POST recebido!
+                <?php if (isset($_POST['salvar_configuracoes'])): ?>
+                    <br>✅ <code>salvar_configuracoes</code> detectado - processando...
+                <?php else: ?>
+                    <br>❌ <code>salvar_configuracoes</code> NÃO encontrado
+                    <br>Keys recebidas: <code><?= implode(', ', array_keys($_POST)) ?></code>
+                <?php endif; ?>
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+            </div>
+        <?php endif; ?>
+
         <?php if ($mensagem_sucesso): ?>
             <div class="alert alert-success alert-dismissible fade show">
                 <i class="fas fa-check-circle"></i> <?= $mensagem_sucesso ?>
