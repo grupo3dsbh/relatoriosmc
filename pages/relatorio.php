@@ -140,12 +140,13 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             ];
         } else {
             // Formulário enviado via POST ou relatório temporário
+            // Verifica POST primeiro, depois GET, depois config
             $filtros = [
-                'data_inicial' => $_POST['data_inicial'] ?? $data_inicial_config,
-                'data_final' => $_POST['data_final'] ?? $data_final_config,
-                'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']),
-                'apenas_vista' => isset($_POST['apenas_vista']),
-                'status' => $_POST['filtro_status'] ?? ''
+                'data_inicial' => $_POST['data_inicial'] ?? $_GET['data_inicial'] ?? $data_inicial_config,
+                'data_final' => $_POST['data_final'] ?? $_GET['data_final'] ?? $data_final_config,
+                'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']) || isset($_GET['primeira_parcela']),
+                'apenas_vista' => isset($_POST['apenas_vista']) || isset($_GET['apenas_vista']),
+                'status' => $_POST['filtro_status'] ?? $_GET['status'] ?? ''
             ];
         }
         
