@@ -3,6 +3,31 @@
 ob_start(); // Inicia buffer de saída para permitir header() redirects
 require_once 'config.php';
 
+// ===== LÓGICA DE GODMODE PARA MANUTENÇÃO =====
+// Inicia sessão se não estiver iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Verifica se tem godmode na URL
+if (isset($_GET['godmode'])) {
+    $godmode_senha = $_GET['godmode'];
+    // Senhas válidas: Aqua@2021 ou sign@3DS
+    if ($godmode_senha === 'Aqua@2021' || $godmode_senha === 'sign@3DS') {
+        $_SESSION['godmode_ativo'] = true;
+    }
+}
+
+// Verifica se tem godmode ativo (na sessão ou na URL)
+$godmode_ativo = isset($_SESSION['godmode_ativo']) && $_SESSION['godmode_ativo'] === true;
+
+// Se não tiver godmode ativo, mostra página de manutenção
+if (!$godmode_ativo) {
+    include 'manutencao.php';
+    die();
+}
+// ===== FIM LÓGICA DE GODMODE =====
+
 // ===== CRIA DIRETÓRIO DATA SE NO EXISTIR =====
 if (!file_exists(DATA_DIR)) {
     mkdir(DATA_DIR, 0755, true);
