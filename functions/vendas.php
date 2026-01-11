@@ -13,32 +13,37 @@ function extrairNumeroVagas($produto) {
 
 /**
  * Processa CSV de vendas detalhadas
- * Estrutura do CSV (25 campos, índices 0-24):
- * 0: ID (SFA-XXXX)
+ * Estrutura do CSV (30 campos, índices 0-29):
+ * 0: NumeroTitulo (ID - SFA-XXXX)
  * 1: NomeProdutoOriginal
  * 2: NomeProdutoAtual
  * 3: AlterouVagas
  * 4: Categoria
- * 5: DataCadastro
- * 6: DataVenda
- * 7: OrigemVenda
- * 8: ResidentialPhone
- * 9: StatusTitulo
- * 10: Promotor
- * 11: Gerente
- * 12: NomeTitular
- * 13: DocumentoTitular
- * 14: QuantidadeParcelasVenda
- * 15: Parcelas (lista)
- * 16: ValoresPagos
- * 17: FormaPagamento (ex: "Loja Cartão de Crédito")
- * 18: ParcelasPagas
- * 19: TipoPagamento (ex: "Recorrente")
+ * 5: StatusTitulo
+ * 6: DataCadastro
+ * 7: DataPrimeiraVenda
+ * 8: DataUltimaVenda
+ * 9: NomeTitular
+ * 10: DocumentoTitular
+ * 11: TelefoneResidencial
+ * 12: OrigemVenda
+ * 13: Promotor
+ * 14: Gerente
+ * 15: NumeroCartao
+ * 16: Bandeira
+ * 17: TipoPagamentoCartao
+ * 18: QuantidadeParcelasVenda
+ * 19: QtdParcelasPagas
  * 20: ValorParcela
- * 21: ValorTotalPlano
- * 22: TotalPago
- * 23: SaldoRestante
- * 24: ParcelasRestantes
+ * 21: TotalPago
+ * 22: SaldoRestante
+ * 23: ParcelasRestantes
+ * 24: FormaPagamento
+ * 25: TipoPagamento
+ * 26: PeriodoTitulo
+ * 27: DiasDesdeVenda
+ * 28: ListaParcelasPagas
+ * 29: ListaValoresPagos
  */
  
  /**
@@ -188,47 +193,90 @@ function processarVendasCSV($arquivo, $filtros = []) {
                 continue;
             }
             
-            // LOG: Colunas insuficientes
+            // LOG: Colunas insuficientes (aceita 25 ou 30 campos para compatibilidade)
             if (count($dados) < 25) {
                 $log_ignorados[] = [
                     'linha' => $linha_num,
-                    'motivo' => 'Colunas insuficientes (' . count($dados) . '/25)',
+                    'motivo' => 'Colunas insuficientes (' . count($dados) . '/mínimo 25)',
                     'id' => $dados[0] ?? 'N/A'
                 ];
                 continue;
             }
-            
+
             // ===== REMOVE BOM DA PRIMEIRA COLUNA (SE EXISTIR) =====
             $dados[0] = removerBOM(trim($dados[0]));
-            
-            // Mapeia dados
-            $venda = [
-                'id' => trim($dados[0]),
-                'produto_original' => trim($dados[1] ?? ''),
-                'produto_atual' => trim($dados[2] ?? ''),
-                'alterou_vagas' => trim($dados[3] ?? ''),
-                'categoria' => trim($dados[4] ?? ''),
-                'data_cadastro' => trim($dados[5] ?? ''),
-                'data_venda' => trim($dados[6] ?? ''),
-                'origem_venda' => trim($dados[7] ?? ''),
-                'telefone' => trim($dados[8] ?? ''),
-                'status' => trim($dados[9] ?? ''),
-                'consultor' => trim($dados[10] ?? ''),
-                'gerente' => trim($dados[11] ?? ''),
-                'titular' => trim($dados[12] ?? ''),
-                'cpf' => trim($dados[13] ?? ''),
-                'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
-                'parcelas' => trim($dados[15] ?? ''),
-                'valores_pagos' => trim($dados[16] ?? ''),
-                'forma_pagamento' => trim($dados[17] ?? ''),  // FormaPagamento (ex: "Loja Cartão de Crédito")
-                'parcelas_pagas' => intval($dados[18] ?? 0),  // ParcelasPagas (número)
-                'tipo_pagamento' => trim($dados[19] ?? ''),   // TipoPagamento (ex: "Recorrente")
-                'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
-                'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),      // ValorTotalPlano
-                'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),       // TotalPago
-                'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),   // SaldoRestante
-                'parcelas_restantes' => intval($dados[24] ?? 0)                         // ParcelasRestantes
-            ];
+
+            // Detecta formato do CSV (25 campos antigo ou 30 campos novo)
+            $formato_novo = count($dados) >= 30;
+
+            if ($formato_novo) {
+                // Formato NOVO com 30 campos
+                $venda = [
+                    'id' => trim($dados[0]),
+                    'produto_original' => trim($dados[1] ?? ''),
+                    'produto_atual' => trim($dados[2] ?? ''),
+                    'alterou_vagas' => trim($dados[3] ?? ''),
+                    'categoria' => trim($dados[4] ?? ''),
+                    'status' => trim($dados[5] ?? ''),
+                    'data_cadastro' => trim($dados[6] ?? ''),
+                    'data_primeira_venda' => trim($dados[7] ?? ''),
+                    'data_venda' => trim($dados[8] ?? ''),  // DataUltimaVenda
+                    'titular' => trim($dados[9] ?? ''),
+                    'cpf' => trim($dados[10] ?? ''),
+                    'telefone' => trim($dados[11] ?? ''),
+                    'origem_venda' => trim($dados[12] ?? ''),
+                    'consultor' => trim($dados[13] ?? ''),
+                    'gerente' => trim($dados[14] ?? ''),
+                    'numero_cartao' => trim($dados[15] ?? ''),
+                    'bandeira' => trim($dados[16] ?? ''),
+                    'tipo_pagamento_cartao' => trim($dados[17] ?? ''),
+                    'quantidade_parcelas_venda' => intval($dados[18] ?? 0),
+                    'parcelas_pagas' => intval($dados[19] ?? 0),
+                    'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                    'valor_pago' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
+                    'valor_restante' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
+                    'parcelas_restantes' => intval($dados[23] ?? 0),
+                    'forma_pagamento' => trim($dados[24] ?? ''),
+                    'tipo_pagamento' => trim($dados[25] ?? ''),
+                    'periodo_titulo' => trim($dados[26] ?? ''),
+                    'dias_desde_venda' => trim($dados[27] ?? ''),
+                    'parcelas' => trim($dados[28] ?? ''),  // ListaParcelasPagas
+                    'valores_pagos' => trim($dados[29] ?? ''),  // ListaValoresPagos
+                    'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)) + floatval(str_replace(',', '.', $dados[22] ?? 0))  // TotalPago + SaldoRestante
+                ];
+            } else {
+                // Formato ANTIGO com 25 campos (retrocompatibilidade)
+                $venda = [
+                    'id' => trim($dados[0]),
+                    'produto_original' => trim($dados[1] ?? ''),
+                    'produto_atual' => trim($dados[2] ?? ''),
+                    'alterou_vagas' => trim($dados[3] ?? ''),
+                    'categoria' => trim($dados[4] ?? ''),
+                    'data_cadastro' => trim($dados[5] ?? ''),
+                    'data_venda' => trim($dados[6] ?? ''),
+                    'origem_venda' => trim($dados[7] ?? ''),
+                    'telefone' => trim($dados[8] ?? ''),
+                    'status' => trim($dados[9] ?? ''),
+                    'consultor' => trim($dados[10] ?? ''),
+                    'gerente' => trim($dados[11] ?? ''),
+                    'titular' => trim($dados[12] ?? ''),
+                    'cpf' => trim($dados[13] ?? ''),
+                    'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
+                    'parcelas' => trim($dados[15] ?? ''),
+                    'valores_pagos' => trim($dados[16] ?? ''),
+                    'forma_pagamento' => trim($dados[17] ?? ''),
+                    'parcelas_pagas' => intval($dados[18] ?? 0),
+                    'tipo_pagamento' => trim($dados[19] ?? ''),
+                    'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                    'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
+                    'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
+                    'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),
+                    'parcelas_restantes' => intval($dados[24] ?? 0),
+                    'numero_cartao' => '',  // Não disponível no formato antigo
+                    'bandeira' => '',  // Não disponível no formato antigo
+                    'tipo_pagamento_cartao' => ''  // Não disponível no formato antigo
+                ];
+            }
             
             // Debug da primeira venda
             if ($linhas_lidas == 1) {
@@ -364,16 +412,104 @@ function processarVendasCSV($arquivo, $filtros = []) {
         }
         
         fclose($handle);
-        
-         "<!-- PROCESSAMENTO: " . $linhas_lidas . " linhas lidas, " . 
-             count($vendas) . " vendas processadas, " . 
+
+         "<!-- PROCESSAMENTO: " . $linhas_lidas . " linhas lidas, " .
+             count($vendas) . " vendas processadas, " .
              count($log_ignorados) . " ignoradas -->";
     }
-    
+
+    // === FILTRO DE CARTÕES DUPLICADOS ===
+    $vendas_ignoradas_cartao = [];
+    if (!empty($filtros['ignorar_cartao_duplicado'])) {
+        $cartoes_duplicados = detectarCartoesDuplicados($vendas);
+
+        if ($cartoes_duplicados['total'] > 0) {
+            $vendas_filtradas = [];
+
+            foreach ($vendas as $venda) {
+                $numero_cartao = trim($venda['numero_cartao'] ?? '');
+                $e_duplicado = false;
+
+                // Verifica se o cartão está na lista de duplicados
+                if (!empty($numero_cartao) && in_array($numero_cartao, $cartoes_duplicados['cartoes'])) {
+                    $e_duplicado = true;
+                    $vendas_ignoradas_cartao[] = [
+                        'id' => $venda['id'],
+                        'titular' => $venda['titular'],
+                        'consultor' => $venda['consultor'],
+                        'produto' => $venda['produto_atual'],
+                        'valor_total' => $venda['valor_total'],
+                        'numero_cartao' => $numero_cartao,
+                        'bandeira' => $venda['bandeira'] ?? '',
+                        'data_venda' => $venda['data_venda'],
+                        'motivo' => 'Cartão duplicado'
+                    ];
+
+                    $log_ignorados[] = [
+                        'linha' => '-',
+                        'motivo' => 'FILTRADO PÓS-PROCESSAMENTO: Cartão duplicado (' . substr($numero_cartao, -4) . ')',
+                        'id' => $venda['id']
+                    ];
+                } else {
+                    $vendas_filtradas[] = $venda;
+                }
+            }
+
+            $vendas = $vendas_filtradas;
+
+            // Reprocessa por_consultor com vendas filtradas
+            $por_consultor = [];
+            foreach ($vendas as $venda) {
+                $consultor_nome = $venda['consultor'];
+
+                if (!isset($por_consultor[$consultor_nome])) {
+                    $por_consultor[$consultor_nome] = [
+                        'consultor' => $consultor_nome,
+                        'venda' => 0,
+                        'devido' => 0,
+                        'pago' => 0,
+                        'quantidade' => 0,
+                        'vendas_ativas' => 0,
+                        'contagem_vagas' => [],
+                        'vendas_detalhes' => [],
+                        'vendas_ids' => [],
+                        'vendas_acima_2vagas' => 0
+                    ];
+                }
+
+                $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
+                $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
+                $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
+                $por_consultor[$consultor_nome]['quantidade']++;
+                $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
+
+                if ($venda['status'] === 'Ativo') {
+                    $por_consultor[$consultor_nome]['vendas_ativas']++;
+                }
+
+                if ($venda['num_vagas'] > 2) {
+                    $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
+                }
+
+                $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
+                    'num_vagas' => $venda['num_vagas'],
+                    'e_vista' => $venda['e_vista'],
+                    'data_venda' => $venda['data_para_pontuacao'],
+                    'data_cadastro_original' => $venda['data_cadastro'],
+                    'data_venda_original' => $venda['data_venda'],
+                    'id_venda' => $venda['id'],
+                    'valor_total' => $venda['valor_total'],
+                    'valor_pago' => $venda['valor_pago']
+                ];
+            }
+        }
+    }
+
     return [
         'vendas' => $vendas,
         'por_consultor' => array_values($por_consultor),
-        'log_ignorados' => $log_ignorados
+        'log_ignorados' => $log_ignorados,
+        'vendas_ignoradas_cartao' => $vendas_ignoradas_cartao
     ];
 }
 /**
@@ -416,6 +552,52 @@ function detectarDuplicados($vendas) {
     return [
         'total' => count($duplicados),
         'cpfs' => array_keys($duplicados),
+        'detalhes' => $duplicados
+    ];
+}
+
+/**
+ * Detecta vendas com cart\u00f5es duplicados (mesmo n\u00famero de cart\u00e3o)
+ */
+function detectarCartoesDuplicados($vendas) {
+    $cartoes = [];
+    $duplicados = [];
+
+    foreach ($vendas as $index => $venda) {
+        $numero_cartao = trim($venda['numero_cartao'] ?? '');
+
+        // Ignora se n\u00e3o tiver n\u00famero de cart\u00e3o
+        if (empty($numero_cartao) || $numero_cartao === 'NULL' || strlen($numero_cartao) < 4) {
+            continue;
+        }
+
+        if (!isset($cartoes[$numero_cartao])) {
+            $cartoes[$numero_cartao] = [];
+        }
+
+        $cartoes[$numero_cartao][] = [
+            'index' => $index,
+            'id' => $venda['id'],
+            'titular' => $venda['titular'],
+            'consultor' => $venda['consultor'],
+            'data_venda' => $venda['data_venda'],
+            'produto' => $venda['produto_atual'],
+            'valor_total' => $venda['valor_total'],
+            'status' => $venda['status'],
+            'bandeira' => $venda['bandeira'] ?? 'N/A'
+        ];
+    }
+
+    // Identifica duplicados
+    foreach ($cartoes as $cartao => $registros) {
+        if (count($registros) > 1) {
+            $duplicados[$cartao] = $registros;
+        }
+    }
+
+    return [
+        'total' => count($duplicados),
+        'cartoes' => array_keys($duplicados),
         'detalhes' => $duplicados
     ];
 }
@@ -1239,11 +1421,12 @@ function processarVendasComRanges($arquivo, $filtros = []) {
     
     // Adiciona premiações
     adicionarPremiacoes($por_consultor);
-    
+
     return [
         'vendas' => $resultado['vendas'],
         'por_consultor' => $por_consultor,
-        'duplicados' => $duplicados
+        'duplicados' => $duplicados,
+        'vendas_ignoradas_cartao' => $resultado['vendas_ignoradas_cartao'] ?? []
     ];
 }
 

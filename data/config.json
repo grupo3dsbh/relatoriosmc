@@ -56,7 +56,8 @@
         "data_final": "2025-11-30",
         "filtro_status": "Ativo",
         "apenas_primeira_parcela": false,
-        "apenas_vista": false
+        "apenas_vista": false,
+        "ignorar_cartao_duplicado": false
     },
     "ultima_atualizacao": "2025-12-02 00:00:00"
 }

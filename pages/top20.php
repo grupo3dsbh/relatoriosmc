@@ -50,6 +50,7 @@ if (!empty($arquivos_vendas)) {
         'data_final' => $periodo_config['data_final'],
         'primeira_parcela_paga' => false, // NÃO filtrar - processar todas
         'apenas_vista' => false, // NÃO filtrar - processar todas
+        'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? false,
         'status' => '' // NÃO filtrar - processar todas
     ];
 
@@ -68,8 +69,21 @@ if (!empty($arquivos_vendas)) {
             $vendas_removidas_por_consultor[$consultor['consultor']] = [
                 'canceladas' => 0,
                 'sem_pagamento' => 0,
+                'cartao_duplicado' => 0,
                 'pontos_perdidos' => 0
             ];
+        }
+
+        // Processa vendas ignoradas por cartão duplicado
+        $vendas_cartao_por_consultor = [];
+        if (!empty($vendas_todas['vendas_ignoradas_cartao'])) {
+            foreach ($vendas_todas['vendas_ignoradas_cartao'] as $venda_ignorada) {
+                $nome = $venda_ignorada['consultor'];
+                if (!isset($vendas_cartao_por_consultor[$nome])) {
+                    $vendas_cartao_por_consultor[$nome] = 0;
+                }
+                $vendas_cartao_por_consultor[$nome]++;
+            }
         }
 
         $vendas_processadas = $vendas_processadas_original;
@@ -210,14 +224,17 @@ if (!empty($arquivos_vendas)) {
                 // Adiciona contagem de canceladas e sem pagamento
                 $consultor['vendas_canceladas'] = $vendas_removidas_detalhes[$nome]['canceladas'] ?? 0;
                 $consultor['vendas_sem_pagamento'] = $vendas_removidas_detalhes[$nome]['sem_pagamento'] ?? 0;
+                $consultor['vendas_cartao_duplicado'] = $vendas_cartao_por_consultor[$nome] ?? 0;
             }
             unset($consultor); // Limpa referência
         } else {
             // Não é relatório final, pontos perdidos = 0
             foreach ($vendas_processadas['por_consultor'] as &$consultor) {
+                $nome = $consultor['consultor'];
                 $consultor['pontos_perdidos'] = 0;
                 $consultor['vendas_canceladas'] = 0;
                 $consultor['vendas_sem_pagamento'] = 0;
+                $consultor['vendas_cartao_duplicado'] = $vendas_cartao_por_consultor[$nome] ?? 0;
                 $consultor['pontos_originais'] = $consultor['pontos'];
             }
         }
@@ -505,6 +522,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                 }
                                 if ($consultor['vendas_sem_pagamento'] > 0) {
                                     $detalhes[] = $consultor['vendas_sem_pagamento'] . ' ⚠️';
+                                }
+                                if (isset($consultor['vendas_cartao_duplicado']) && $consultor['vendas_cartao_duplicado'] > 0) {
+                                    $detalhes[] = $consultor['vendas_cartao_duplicado'] . ' 💳';
                                 }
                                 if (!empty($detalhes)) {
                                     echo ' | ' . implode(' | ', $detalhes);
