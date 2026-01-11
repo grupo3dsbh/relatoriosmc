@@ -50,7 +50,7 @@ if (!empty($arquivos_vendas)) {
         'data_final' => $periodo_config['data_final'],
         'primeira_parcela_paga' => false, // NÃO filtrar - processar todas
         'apenas_vista' => false, // NÃO filtrar - processar todas
-        'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? false,
+        'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? true, // PADRÃO: TRUE
         'status' => '' // NÃO filtrar - processar todas
     ];
 
@@ -574,6 +574,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             <strong><i class="fas fa-info-circle"></i> Legenda:</strong>
             <span class="ml-2">❌ = Vendas canceladas</span>
             <span class="ml-3">⚠️ = Vendas sem pagamento da 1ª parcela</span>
+            <span class="ml-3">💳 = Vendas com cartão duplicado (mesmo número usado em múltiplas cotas)</span>
         </small>
     </div>
     <?php endif; ?>

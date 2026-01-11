@@ -141,12 +141,26 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         } else {
             // Formulário enviado via POST ou relatório temporário
             // Verifica POST primeiro, depois GET, depois config
+
+            // IGNORAR_CARTAO_DUPLICADO: Por padrão TRUE, só pode desativar com godmode
+            $ignorar_cartao = true; // PADRÃO: ATIVO
+            if (isset($_POST['processar_relatorio'])) {
+                // Se o formulário foi submetido, verifica se o checkbox foi marcado
+                // Checkbox só é desmarcável no godmode
+                if (isset($_SESSION['godmode_ativo']) && $_SESSION['godmode_ativo'] === true) {
+                    $ignorar_cartao = isset($_POST['ignorar_cartao_duplicado']);
+                }
+            } elseif (isset($_GET['ignorar_cartao_duplicado'])) {
+                // Via GET (apenas godmode pode passar false)
+                $ignorar_cartao = $_GET['ignorar_cartao_duplicado'] !== 'false';
+            }
+
             $filtros = [
                 'data_inicial' => $_POST['data_inicial'] ?? $_GET['data_inicial'] ?? $data_inicial_config,
                 'data_final' => $_POST['data_final'] ?? $_GET['data_final'] ?? $data_final_config,
                 'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']) || isset($_GET['primeira_parcela']),
                 'apenas_vista' => isset($_POST['apenas_vista']) || isset($_GET['apenas_vista']),
-                'ignorar_cartao_duplicado' => isset($_POST['ignorar_cartao_duplicado']) || isset($_GET['ignorar_cartao_duplicado']),
+                'ignorar_cartao_duplicado' => $ignorar_cartao,
                 'status' => $_POST['filtro_status'] ?? $_GET['status'] ?? ''
             ];
         }
@@ -572,11 +586,14 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                             <div class="form-check mt-4 pt-2">
                                                 <input type="checkbox" class="form-check-input"
                                                        name="ignorar_cartao_duplicado" id="ignorar_cartao_duplicado"
-                                                       <?= isset($_POST['ignorar_cartao_duplicado']) ? 'checked' : '' ?>>
+                                                       checked>
                                                 <label class="form-check-label" for="ignorar_cartao_duplicado">
                                                     <i class="fas fa-credit-card"></i> Ignorar Cartões Duplicados
                                                     <span class="badge badge-warning ml-1" title="Apenas visível no godmode">GODMODE</span>
                                                 </label>
+                                                <small class="form-text text-muted">
+                                                    <i class="fas fa-shield-alt"></i> Ativo por padrão para evitar fraudes
+                                                </small>
                                             </div>
                                         </div>
                                         <?php endif; ?>
