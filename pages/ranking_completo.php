@@ -20,14 +20,17 @@ if (!empty($arquivos_vendas)) {
     // Pega o arquivo mais recente
     $arquivo_selecionado = $arquivos_vendas[0]['caminho'];
 
+    // Processa filtros da URL (tem prioridade sobre config)
+    $filtros_url = processarFiltrosURL();
+
     // Aplica filtros do admin
     $filtros = [
         'data_inicial' => $periodo_config['data_inicial'],
         'data_final' => $periodo_config['data_final'],
         'primeira_parcela_paga' => $periodo_config['apenas_primeira_parcela'] ?? false,
         'apenas_vista' => $periodo_config['apenas_vista'] ?? false,
-        'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? true,
-        'ignorar_vendas_pix' => $periodo_config['ignorar_vendas_pix'] ?? false,
+        'ignorar_cartao_duplicado' => $filtros_url['ignorar_cartao_duplicado'] ?: ($periodo_config['ignorar_cartao_duplicado'] ?? true),
+        'ignorar_vendas_pix' => $filtros_url['ignorar_vendas_pix'] ?: ($periodo_config['ignorar_vendas_pix'] ?? false),
         'status' => $periodo_config['filtro_status'] ?? 'Ativo'
     ];
 

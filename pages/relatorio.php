@@ -142,6 +142,9 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             // Formulário enviado via POST ou relatório temporário
             // Verifica POST primeiro, depois GET, depois config
 
+            // Processa filtros da URL (tem prioridade)
+            $filtros_url = processarFiltrosURL();
+
             // IGNORAR_CARTAO_DUPLICADO: Por padrão TRUE, só pode desativar com godmode
             $ignorar_cartao = true; // PADRÃO: ATIVO
             if (isset($_POST['processar_relatorio'])) {
@@ -155,13 +158,23 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 $ignorar_cartao = $_GET['ignorar_cartao_duplicado'] !== 'false';
             }
 
+            // Aplica filtros da URL se existirem (tem prioridade)
+            if ($filtros_url['ignorar_cartao_duplicado']) {
+                $ignorar_cartao = true;
+            }
+
+            $ignorar_pix = isset($_POST['ignorar_vendas_pix']) || isset($_GET['ignorar_vendas_pix']);
+            if ($filtros_url['ignorar_vendas_pix']) {
+                $ignorar_pix = true;
+            }
+
             $filtros = [
                 'data_inicial' => $_POST['data_inicial'] ?? $_GET['data_inicial'] ?? $data_inicial_config,
                 'data_final' => $_POST['data_final'] ?? $_GET['data_final'] ?? $data_final_config,
                 'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']) || isset($_GET['primeira_parcela']),
                 'apenas_vista' => isset($_POST['apenas_vista']) || isset($_GET['apenas_vista']),
                 'ignorar_cartao_duplicado' => $ignorar_cartao,
-                'ignorar_vendas_pix' => isset($_POST['ignorar_vendas_pix']) || isset($_GET['ignorar_vendas_pix']),
+                'ignorar_vendas_pix' => $ignorar_pix,
                 'status' => $_POST['filtro_status'] ?? $_GET['status'] ?? ''
             ];
         }

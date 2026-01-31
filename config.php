@@ -373,6 +373,40 @@ function logout() {
     unset($_SESSION['consultores_autenticado']);
 }
 
+/**
+ * Processa filtros da URL via parâmetro 'include'
+ * Uso: ?include=pix ou ?include=pix,cartoes_duplicados
+ *
+ * @return array Filtros a serem aplicados
+ */
+function processarFiltrosURL() {
+    $filtros = [
+        'ignorar_vendas_pix' => false,
+        'ignorar_cartao_duplicado' => false
+    ];
+
+    if (isset($_GET['include'])) {
+        $include = $_GET['include'];
+
+        // Remove espaços e converte para array
+        $opcoes = array_map('trim', explode(',', $include));
+
+        foreach ($opcoes as $opcao) {
+            $opcao_lower = strtolower($opcao);
+
+            if ($opcao_lower === 'pix') {
+                $filtros['ignorar_vendas_pix'] = true;
+            }
+
+            if ($opcao_lower === 'cartoes_duplicados' || $opcao_lower === 'cartao_duplicado') {
+                $filtros['ignorar_cartao_duplicado'] = true;
+            }
+        }
+    }
+
+    return $filtros;
+}
+
 // Função para salvar arquivo CSV
 function salvarCSV($arquivo_temporario, $tipo = 'vendas', $substituir = false, $arquivo_alvo = null) {
     $diretorio = $tipo === 'vendas' ? VENDAS_DIR : PROMOTORES_DIR;

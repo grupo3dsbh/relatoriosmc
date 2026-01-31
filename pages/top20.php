@@ -44,14 +44,17 @@ if (!empty($arquivos_vendas)) {
         $arquivo_selecionado = $arquivos_vendas[0]['caminho'];
     }
 
+    // Processa filtros da URL (tem prioridade sobre config)
+    $filtros_url = processarFiltrosURL();
+
     // Aplica filtros do admin
     $filtros = [
         'data_inicial' => $periodo_config['data_inicial'],
         'data_final' => $periodo_config['data_final'],
         'primeira_parcela_paga' => false, // NÃO filtrar - processar todas
         'apenas_vista' => false, // NÃO filtrar - processar todas
-        'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? true, // PADRÃO: TRUE
-        'ignorar_vendas_pix' => $periodo_config['ignorar_vendas_pix'] ?? false, // Pega do config
+        'ignorar_cartao_duplicado' => $filtros_url['ignorar_cartao_duplicado'] ?: ($periodo_config['ignorar_cartao_duplicado'] ?? true),
+        'ignorar_vendas_pix' => $filtros_url['ignorar_vendas_pix'] ?: ($periodo_config['ignorar_vendas_pix'] ?? false),
         'status' => '' // NÃO filtrar - processar todas
     ];
 
