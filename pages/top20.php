@@ -53,8 +53,8 @@ if (!empty($arquivos_vendas)) {
         'data_final' => $periodo_config['data_final'],
         'primeira_parcela_paga' => false, // NÃO filtrar - processar todas
         'apenas_vista' => false, // NÃO filtrar - processar todas
-        'ignorar_cartao_duplicado' => $filtros_url['ignorar_cartao_duplicado'] ?: ($periodo_config['ignorar_cartao_duplicado'] ?? true),
-        'ignorar_vendas_pix' => $filtros_url['ignorar_vendas_pix'] ?: ($periodo_config['ignorar_vendas_pix'] ?? false),
+        'ignorar_cartao_duplicado' => $filtros_url['ignorar_cartao_duplicado'],
+        'ignorar_vendas_pix' => $filtros_url['ignorar_vendas_pix'],
         'status' => '' // NÃO filtrar - processar todas
     ];
 

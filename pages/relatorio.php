@@ -158,14 +158,14 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 $ignorar_cartao = $_GET['ignorar_cartao_duplicado'] !== 'false';
             }
 
-            // Aplica filtros da URL se existirem (tem prioridade)
-            if ($filtros_url['ignorar_cartao_duplicado']) {
-                $ignorar_cartao = true;
-            }
-
-            $ignorar_pix = isset($_POST['ignorar_vendas_pix']) || isset($_GET['ignorar_vendas_pix']);
-            if ($filtros_url['ignorar_vendas_pix']) {
-                $ignorar_pix = true;
+            // Aplica filtros da URL se existirem (tem prioridade máxima)
+            if (isset($_GET['include'])) {
+                // URL ?include parameter tem prioridade absoluta
+                $ignorar_cartao = $filtros_url['ignorar_cartao_duplicado'];
+                $ignorar_pix = $filtros_url['ignorar_vendas_pix'];
+            } else {
+                // Sem URL parameter, processa filtro PIX de POST/GET
+                $ignorar_pix = isset($_POST['ignorar_vendas_pix']) || isset($_GET['ignorar_vendas_pix']);
             }
 
             $filtros = [
