@@ -51,6 +51,7 @@ if (!empty($arquivos_vendas)) {
         'primeira_parcela_paga' => false, // NÃO filtrar - processar todas
         'apenas_vista' => false, // NÃO filtrar - processar todas
         'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? true, // PADRÃO: TRUE
+        'ignorar_vendas_pix' => $periodo_config['ignorar_vendas_pix'] ?? false, // Pega do config
         'status' => '' // NÃO filtrar - processar todas
     ];
 

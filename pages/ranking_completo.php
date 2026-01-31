@@ -26,6 +26,8 @@ if (!empty($arquivos_vendas)) {
         'data_final' => $periodo_config['data_final'],
         'primeira_parcela_paga' => $periodo_config['apenas_primeira_parcela'] ?? false,
         'apenas_vista' => $periodo_config['apenas_vista'] ?? false,
+        'ignorar_cartao_duplicado' => $periodo_config['ignorar_cartao_duplicado'] ?? true,
+        'ignorar_vendas_pix' => $periodo_config['ignorar_vendas_pix'] ?? false,
         'status' => $periodo_config['filtro_status'] ?? 'Ativo'
     ];
 
