@@ -505,11 +505,96 @@ function processarVendasCSV($arquivo, $filtros = []) {
         }
     }
 
+    // === FILTRO DE VENDAS PIX ===
+    $vendas_ignoradas_pix = [];
+    if (!empty($filtros['ignorar_vendas_pix'])) {
+        $vendas_filtradas = [];
+
+        foreach ($vendas as $venda) {
+            $forma_pagamento = strtoupper(trim($venda['forma_pagamento'] ?? ''));
+            $tipo_pagamento = strtoupper(trim($venda['tipo_pagamento'] ?? ''));
+
+            // Verifica se é PIX
+            $e_pix = (stripos($forma_pagamento, 'PIX') !== false) ||
+                     (stripos($tipo_pagamento, 'PIX') !== false);
+
+            if ($e_pix) {
+                $vendas_ignoradas_pix[] = [
+                    'id' => $venda['id'],
+                    'titular' => $venda['titular'],
+                    'consultor' => $venda['consultor'],
+                    'produto' => $venda['produto_atual'],
+                    'valor_total' => $venda['valor_total'],
+                    'forma_pagamento' => $venda['forma_pagamento'],
+                    'data_venda' => $venda['data_venda'],
+                    'motivo' => 'Pagamento via PIX'
+                ];
+
+                $log_ignorados[] = [
+                    'linha' => '-',
+                    'motivo' => 'FILTRADO PÓS-PROCESSAMENTO: Venda PIX',
+                    'id' => $venda['id']
+                ];
+            } else {
+                $vendas_filtradas[] = $venda;
+            }
+        }
+
+        $vendas = $vendas_filtradas;
+
+        // Reprocessa por_consultor com vendas filtradas
+        $por_consultor = [];
+        foreach ($vendas as $venda) {
+            $consultor_nome = $venda['consultor'];
+
+            if (!isset($por_consultor[$consultor_nome])) {
+                $por_consultor[$consultor_nome] = [
+                    'consultor' => $consultor_nome,
+                    'venda' => 0,
+                    'devido' => 0,
+                    'pago' => 0,
+                    'quantidade' => 0,
+                    'vendas_ativas' => 0,
+                    'contagem_vagas' => [],
+                    'vendas_detalhes' => [],
+                    'vendas_ids' => [],
+                    'vendas_acima_2vagas' => 0
+                ];
+            }
+
+            $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
+            $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
+            $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
+            $por_consultor[$consultor_nome]['quantidade']++;
+            $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
+
+            if ($venda['status'] === 'Ativo') {
+                $por_consultor[$consultor_nome]['vendas_ativas']++;
+            }
+
+            if ($venda['num_vagas'] > 2) {
+                $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
+            }
+
+            $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
+                'num_vagas' => $venda['num_vagas'],
+                'e_vista' => $venda['e_vista'],
+                'data_venda' => $venda['data_para_pontuacao'],
+                'data_cadastro_original' => $venda['data_cadastro'],
+                'data_venda_original' => $venda['data_venda'],
+                'id_venda' => $venda['id'],
+                'valor_total' => $venda['valor_total'],
+                'valor_pago' => $venda['valor_pago']
+            ];
+        }
+    }
+
     return [
         'vendas' => $vendas,
         'por_consultor' => array_values($por_consultor),
         'log_ignorados' => $log_ignorados,
-        'vendas_ignoradas_cartao' => $vendas_ignoradas_cartao
+        'vendas_ignoradas_cartao' => $vendas_ignoradas_cartao,
+        'vendas_ignoradas_pix' => $vendas_ignoradas_pix
     ];
 }
 /**
@@ -1426,7 +1511,8 @@ function processarVendasComRanges($arquivo, $filtros = []) {
         'vendas' => $resultado['vendas'],
         'por_consultor' => $por_consultor,
         'duplicados' => $duplicados,
-        'vendas_ignoradas_cartao' => $resultado['vendas_ignoradas_cartao'] ?? []
+        'vendas_ignoradas_cartao' => $resultado['vendas_ignoradas_cartao'] ?? [],
+        'vendas_ignoradas_pix' => $resultado['vendas_ignoradas_pix'] ?? []
     ];
 }
 

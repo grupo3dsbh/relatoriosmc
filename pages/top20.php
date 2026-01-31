@@ -70,6 +70,7 @@ if (!empty($arquivos_vendas)) {
                 'canceladas' => 0,
                 'sem_pagamento' => 0,
                 'cartao_duplicado' => 0,
+                'vendas_pix' => 0,
                 'pontos_perdidos' => 0
             ];
         }
@@ -83,6 +84,18 @@ if (!empty($arquivos_vendas)) {
                     $vendas_cartao_por_consultor[$nome] = 0;
                 }
                 $vendas_cartao_por_consultor[$nome]++;
+            }
+        }
+
+        // Processa vendas ignoradas por PIX
+        $vendas_pix_por_consultor = [];
+        if (!empty($vendas_todas['vendas_ignoradas_pix'])) {
+            foreach ($vendas_todas['vendas_ignoradas_pix'] as $venda_ignorada) {
+                $nome = $venda_ignorada['consultor'];
+                if (!isset($vendas_pix_por_consultor[$nome])) {
+                    $vendas_pix_por_consultor[$nome] = 0;
+                }
+                $vendas_pix_por_consultor[$nome]++;
             }
         }
 
@@ -225,6 +238,7 @@ if (!empty($arquivos_vendas)) {
                 $consultor['vendas_canceladas'] = $vendas_removidas_detalhes[$nome]['canceladas'] ?? 0;
                 $consultor['vendas_sem_pagamento'] = $vendas_removidas_detalhes[$nome]['sem_pagamento'] ?? 0;
                 $consultor['vendas_cartao_duplicado'] = $vendas_cartao_por_consultor[$nome] ?? 0;
+                $consultor['vendas_pix'] = $vendas_pix_por_consultor[$nome] ?? 0;
             }
             unset($consultor); // Limpa referência
         } else {
@@ -235,6 +249,7 @@ if (!empty($arquivos_vendas)) {
                 $consultor['vendas_canceladas'] = 0;
                 $consultor['vendas_sem_pagamento'] = 0;
                 $consultor['vendas_cartao_duplicado'] = $vendas_cartao_por_consultor[$nome] ?? 0;
+                $consultor['vendas_pix'] = $vendas_pix_por_consultor[$nome] ?? 0;
                 $consultor['pontos_originais'] = $consultor['pontos'];
             }
         }
@@ -526,6 +541,10 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                 if (isset($consultor['vendas_cartao_duplicado']) && $consultor['vendas_cartao_duplicado'] > 0) {
                                     $detalhes[] = $consultor['vendas_cartao_duplicado'] . ' 💳';
                                 }
+                                // Exibe vendas PIX apenas no godmode
+                                if (isGodMode() && isset($consultor['vendas_pix']) && $consultor['vendas_pix'] > 0) {
+                                    $detalhes[] = $consultor['vendas_pix'] . ' 📱';
+                                }
                                 if (!empty($detalhes)) {
                                     echo ' | ' . implode(' | ', $detalhes);
                                 }
@@ -575,6 +594,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             <span class="ml-2">❌ = Vendas canceladas</span>
             <span class="ml-3">⚠️ = Vendas sem pagamento da 1ª parcela</span>
             <span class="ml-3">💳 = Vendas com cartão duplicado (mesmo número usado em múltiplas cotas)</span>
+            <?php if (isGodMode()): ?>
+                <span class="ml-3">📱 = Vendas pagas via PIX (removidas do ranking)</span>
+            <?php endif; ?>
         </small>
     </div>
     <?php endif; ?>

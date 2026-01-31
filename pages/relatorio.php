@@ -161,6 +161,7 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']) || isset($_GET['primeira_parcela']),
                 'apenas_vista' => isset($_POST['apenas_vista']) || isset($_GET['apenas_vista']),
                 'ignorar_cartao_duplicado' => $ignorar_cartao,
+                'ignorar_vendas_pix' => isset($_POST['ignorar_vendas_pix']) || isset($_GET['ignorar_vendas_pix']),
                 'status' => $_POST['filtro_status'] ?? $_GET['status'] ?? ''
             ];
         }
@@ -593,6 +594,21 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                 </label>
                                                 <small class="form-text text-muted">
                                                     <i class="fas fa-shield-alt"></i> Ativo por padrão para evitar fraudes
+                                                </small>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <div class="form-check mt-4 pt-2">
+                                                <input type="checkbox" class="form-check-input"
+                                                       name="ignorar_vendas_pix" id="ignorar_vendas_pix"
+                                                       <?= isset($_POST['ignorar_vendas_pix']) ? 'checked' : '' ?>>
+                                                <label class="form-check-label" for="ignorar_vendas_pix">
+                                                    <i class="fas fa-mobile-alt"></i> Ignorar Vendas PIX
+                                                    <span class="badge badge-warning ml-1" title="Apenas visível no godmode">GODMODE</span>
+                                                </label>
+                                                <small class="form-text text-muted">
+                                                    <i class="fas fa-filter"></i> Remove vendas pagas via PIX do ranking
                                                 </small>
                                             </div>
                                         </div>
