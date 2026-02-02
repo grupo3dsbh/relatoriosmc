@@ -1459,6 +1459,116 @@ function identificarRange($data_venda) {
 }
 
 /**
+ * Processa múltiplos arquivos CSV e consolida os dados (GODMODE)
+ *
+ * @param array $arquivos Lista de caminhos dos arquivos CSV
+ * @param array $filtros Filtros a aplicar
+ * @return array Resultado consolidado com todas as vendas unificadas
+ */
+function processarMultiplosArquivosCSV($arquivos, $filtros = []) {
+    $vendas_consolidadas = [];
+    $nomes_arquivos = [];
+
+    // Processa cada arquivo
+    foreach ($arquivos as $arquivo) {
+        if (!file_exists($arquivo)) {
+            continue;
+        }
+
+        // Processa o arquivo individual
+        $resultado = processarVendasComRanges($arquivo, $filtros);
+
+        // Adiciona nome do arquivo à lista
+        $nomes_arquivos[] = basename($arquivo);
+
+        // Unifica as vendas
+        foreach ($resultado['vendas'] as $venda) {
+            $venda['arquivo_origem'] = basename($arquivo); // Marca de qual arquivo veio
+            $vendas_consolidadas[] = $venda;
+        }
+    }
+
+    // Agora recalcula tudo com as vendas consolidadas
+    // Agrupa por consultor
+    $por_consultor = [];
+
+    foreach ($vendas_consolidadas as $venda) {
+        $nome = $venda['consultor'];
+
+        if (!isset($por_consultor[$nome])) {
+            $por_consultor[$nome] = [
+                'consultor' => $nome,
+                'vendas_detalhes' => [],
+                'quantidade' => 0,
+                'venda' => 0,
+                'pago' => 0,
+                'vendas_vista' => 0,
+                'vendas_acima_2vagas' => 0,
+                'vendas_ativas' => 0
+            ];
+        }
+
+        $por_consultor[$nome]['vendas_detalhes'][] = [
+            'num_vagas' => $venda['num_vagas'],
+            'e_vista' => $venda['e_vista'],
+            'data_venda' => $venda['data_para_pontuacao'],
+            'id_venda' => $venda['id'],
+            'valor_total' => $venda['valor_total'],
+            'valor_pago' => $venda['valor_pago']
+        ];
+
+        $por_consultor[$nome]['quantidade']++;
+        $por_consultor[$nome]['venda'] += $venda['valor_total'];
+        $por_consultor[$nome]['pago'] += $venda['valor_pago'];
+
+        if ($venda['e_vista']) {
+            $por_consultor[$nome]['vendas_vista']++;
+        }
+
+        if ($venda['num_vagas'] > 2) {
+            $por_consultor[$nome]['vendas_acima_2vagas']++;
+        }
+
+        // Conta vendas ativas
+        if (strcasecmp($venda['status'], 'Ativo') === 0) {
+            $por_consultor[$nome]['vendas_ativas']++;
+        }
+    }
+
+    // Calcula pontos para cada consultor
+    foreach ($por_consultor as &$consultor) {
+        $calculo_pontos = calcularPontosComRanges($consultor['vendas_detalhes'], $consultor['consultor']);
+        $consultor['pontos'] = $calculo_pontos['pontos_total'];
+
+        // Calcula SAPs
+        $pontos_por_sap = $_SESSION['config_premiacoes']['pontos_por_sap'] ?? 21;
+        $consultor['saps'] = floor($consultor['pontos'] / $pontos_por_sap);
+
+        // Calcula DIPs
+        $vendas_para_dip = $_SESSION['config_premiacoes']['vendas_para_dip'] ?? 200;
+        $vendas_acima_2vagas_para_dip = $_SESSION['config_premiacoes']['vendas_acima_2vagas_para_dip'] ?? 200;
+        $consultor['dips'] = 0;
+
+        if ($consultor['quantidade'] >= $vendas_para_dip) {
+            $consultor['dips'] = 1;
+            $consultor['criterio_dip'] = 'vendas_total';
+        } elseif ($consultor['vendas_acima_2vagas'] >= $vendas_acima_2vagas_para_dip) {
+            $consultor['dips'] = 1;
+            $consultor['criterio_dip'] = 'vendas_acima_2vagas';
+        }
+    }
+    unset($consultor);
+
+    return [
+        'vendas' => $vendas_consolidadas,
+        'por_consultor' => array_values($por_consultor),
+        'multifile' => true,
+        'arquivos' => $nomes_arquivos,
+        'total_arquivos' => count($arquivos)
+    ];
+}
+
+/**
  * Processa vendas e calcula pontos com ranges (NOVA FUNÃO)
  */
 /**

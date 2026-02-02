@@ -99,10 +99,20 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             $arquivo_selecionado = VENDAS_DIR . '/' . $nome_arquivo;
         }
     } elseif (isset($_POST['arquivo_vendas'])) {
-        $arquivo_selecionado = $_POST['arquivo_vendas'];
+        // Verifica se é array (múltiplos arquivos - godmode)
+        if (is_array($_POST['arquivo_vendas'])) {
+            $arquivos_selecionados = $_POST['arquivo_vendas'];
+            $arquivo_selecionado = $arquivos_selecionados[0]; // Primeiro arquivo para compatibilidade
+        } else {
+            $arquivo_selecionado = $_POST['arquivo_vendas'];
+            $arquivos_selecionados = [$arquivo_selecionado]; // Array com 1 elemento
+        }
     }
 
-    if ($arquivo_selecionado && file_exists($arquivo_selecionado)) {
+    // Suporte para múltiplos arquivos (godmode)
+    $e_multifile = isset($arquivos_selecionados) && count($arquivos_selecionados) > 1;
+
+    if ($arquivo_selecionado && (file_exists($arquivo_selecionado) || $e_multifile)) {
 
         // Busca configurações do período para obter datas
         $periodo_config = $_SESSION['config_sistema']['periodo_relatorio'] ?? [];
@@ -247,7 +257,13 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         // ===== DEBUG DETALHADO - FIM =====
 
         // Processa vendas COM RANGES DE PONTUAÇÃO
-        $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+        if ($e_multifile) {
+            // GODMODE: Múltiplos arquivos
+            $vendas_processadas = processarMultiplosArquivosCSV($arquivos_selecionados, $filtros);
+        } else {
+            // Arquivo único
+            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+        }
 
         // ===== APLICA REGRA DO DIA 08 (remove canceladas e sem 1ª parcela) =====
         $regra_dia08 = aplicarRegraDia08(
@@ -259,7 +275,13 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         // Se aplicou filtro, recalcula pontuação dos consultores
         if ($regra_dia08['aplicar_filtro']) {
             // Reagrupa vendas por consultor
-            $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+            if ($e_multifile) {
+                // GODMODE: Múltiplos arquivos
+                $vendas_processadas = processarMultiplosArquivosCSV($arquivos_selecionados, $filtros);
+            } else {
+                // Arquivo único
+                $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+            }
 
             // Filtra novamente as vendas processadas
             $regra_dia08 = aplicarRegraDia08(
@@ -385,8 +407,14 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             }
         });
         
-        $mensagem_sucesso = "Relatório processado com sucesso! " . 
-                          count($vendas_processadas['vendas']) . " vendas encontradas.";
+        if ($e_multifile && isset($vendas_processadas['multifile'])) {
+            $mensagem_sucesso = "Relatório CONSOLIDADO processado com sucesso! " .
+                              count($vendas_processadas['vendas']) . " vendas encontradas de " .
+                              $vendas_processadas['total_arquivos'] . " arquivos.";
+        } else {
+            $mensagem_sucesso = "Relatório processado com sucesso! " .
+                              count($vendas_processadas['vendas']) . " vendas encontradas.";
+        }
     } else {
         $mensagem_erro = "Arquivo não encontrado!";
     }
@@ -417,6 +445,17 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                 <?php if ($mensagem_sucesso): ?>
                     <div class="alert alert-success alert-dismissible fade show">
                         <i class="fas fa-check-circle"></i> <?= $mensagem_sucesso ?>
+
+                        <?php if (isset($vendas_processadas['multifile']) && $vendas_processadas['multifile']): ?>
+                            <hr>
+                            <strong><i class="fas fa-layer-group"></i> Arquivos Consolidados:</strong>
+                            <ul class="mb-0 mt-2">
+                                <?php foreach ($vendas_processadas['arquivos'] as $nome_arquivo): ?>
+                                    <li><?= htmlspecialchars(gerarNomeAmigavel($nome_arquivo)) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                     </div>
                 <?php endif; ?>
@@ -495,18 +534,39 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                     <div class="form-group">
                                         <label>
                                             <i class="fas fa-file-csv"></i> Arquivo de Vendas
+                                            <?php if (isGodMode()): ?>
+                                                <span class="badge badge-warning ml-2">GODMODE: Múltiplos Arquivos</span>
+                                                <small class="d-block text-muted mt-1">
+                                                    <i class="fas fa-info-circle"></i> Segure CTRL (Windows/Linux) ou CMD (Mac) para selecionar múltiplos arquivos para relatório consolidado
+                                                </small>
+                                            <?php endif; ?>
                                         </label>
-                                        <select class="form-control" name="arquivo_vendas" required>
-                                            <option value="">-- Selecione o arquivo --</option>
-                                            <?php foreach ($arquivos_vendas as $arquivo):
-                                                $nome_amigavel_arquivo = gerarNomeAmigavel($arquivo['nome']);
-                                            ?>
-                                                <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
-                                                        <?= $arquivo_selecionado === $arquivo['caminho'] ? 'selected' : '' ?>>
-                                                    <?= htmlspecialchars($nome_amigavel_arquivo) ?> (<?= $arquivo['data'] ?>)
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                        <?php if (isGodMode()): ?>
+                                            <!-- GODMODE: Seleção múltipla -->
+                                            <select class="form-control" name="arquivo_vendas[]" multiple size="6" required
+                                                    style="height: auto; min-height: 150px;">
+                                                <?php foreach ($arquivos_vendas as $arquivo):
+                                                    $nome_amigavel_arquivo = gerarNomeAmigavel($arquivo['nome']);
+                                                ?>
+                                                    <option value="<?= htmlspecialchars($arquivo['caminho']) ?>">
+                                                        <?= htmlspecialchars($nome_amigavel_arquivo) ?> (<?= $arquivo['data'] ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php else: ?>
+                                            <!-- Normal: Seleção única -->
+                                            <select class="form-control" name="arquivo_vendas" required>
+                                                <option value="">-- Selecione o arquivo --</option>
+                                                <?php foreach ($arquivos_vendas as $arquivo):
+                                                    $nome_amigavel_arquivo = gerarNomeAmigavel($arquivo['nome']);
+                                                ?>
+                                                    <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
+                                                            <?= $arquivo_selecionado === $arquivo['caminho'] ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($nome_amigavel_arquivo) ?> (<?= $arquivo['data'] ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <!-- Filtros de Data -->
