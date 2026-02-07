@@ -191,21 +191,89 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
         });
     }
 
-// Filtro Forma Pagamento (MULTISELECT)
-    if (!empty($filtros['forma_pagamento'])) {
+    // LÓGICA ESPECIAL: Se forma_pagamento E apenas_cartoes_duplicados estão ativos, usa OR
+    $tem_forma_pgto = !empty($filtros['forma_pagamento']);
+    $tem_cartoes_dup = $filtros['apenas_cartoes_duplicados'];
+
+    if ($tem_forma_pgto && $tem_cartoes_dup) {
+        // Lógica OR: vendas que atendam forma_pagamento OU cartões duplicados
         $formas_selecionadas = is_array($filtros['forma_pagamento'])
             ? $filtros['forma_pagamento']
             : [$filtros['forma_pagamento']];
 
-        $resultado = array_filter($resultado, function($v) use ($formas_selecionadas) {
-            $forma_venda = strtoupper(trim($v['forma_pagamento'] ?? ''));
-            foreach ($formas_selecionadas as $forma) {
-                if (stripos($forma_venda, $forma) !== false) {
-                    return true;
+        // Identifica cartões duplicados
+        $por_cartao = [];
+        foreach ($resultado as $v) {
+            $numero_cartao = trim($v['numero_cartao'] ?? '');
+            if (!empty($numero_cartao) && $numero_cartao !== 'NULL' && strlen($numero_cartao) >= 4) {
+                $por_cartao[$numero_cartao][] = $v;
+            }
+        }
+        $cartoes_duplicados = [];
+        foreach ($por_cartao as $cartao => $vendas_cartao) {
+            if (count($vendas_cartao) > 1) {
+                foreach ($vendas_cartao as $venda) {
+                    $cartoes_duplicados[$venda['id']] = true;
                 }
             }
-            return false;
+        }
+
+        // Aplica filtro OR
+        $resultado = array_filter($resultado, function($v) use ($formas_selecionadas, $cartoes_duplicados) {
+            // Verifica se atende forma de pagamento
+            $forma_venda = strtoupper(trim($v['forma_pagamento'] ?? ''));
+            $atende_forma = false;
+            foreach ($formas_selecionadas as $forma) {
+                if (stripos($forma_venda, $forma) !== false) {
+                    $atende_forma = true;
+                    break;
+                }
+            }
+
+            // Verifica se é cartão duplicado
+            $e_cartao_duplicado = isset($cartoes_duplicados[$v['id']]);
+
+            // OR: retorna true se atender qualquer um dos critérios
+            return $atende_forma || $e_cartao_duplicado;
         });
+    } else {
+        // Lógica normal (AND): aplica filtros separadamente
+
+        // Filtro Forma Pagamento (MULTISELECT)
+        if ($tem_forma_pgto) {
+            $formas_selecionadas = is_array($filtros['forma_pagamento'])
+                ? $filtros['forma_pagamento']
+                : [$filtros['forma_pagamento']];
+
+            $resultado = array_filter($resultado, function($v) use ($formas_selecionadas) {
+                $forma_venda = strtoupper(trim($v['forma_pagamento'] ?? ''));
+                foreach ($formas_selecionadas as $forma) {
+                    if (stripos($forma_venda, $forma) !== false) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        }
+
+        // Filtro Cartões Duplicados
+        if ($tem_cartoes_dup) {
+            $por_cartao = [];
+            foreach ($resultado as $v) {
+                $numero_cartao = trim($v['numero_cartao'] ?? '');
+                if (!empty($numero_cartao) && $numero_cartao !== 'NULL' && strlen($numero_cartao) >= 4) {
+                    $por_cartao[$numero_cartao][] = $v;
+                }
+            }
+
+            $duplicadas_cartao = [];
+            foreach ($por_cartao as $cartao => $vendas_cartao) {
+                if (count($vendas_cartao) > 1) {
+                    $duplicadas_cartao = array_merge($duplicadas_cartao, $vendas_cartao);
+                }
+            }
+            $resultado = $duplicadas_cartao;
+        }
     }
 
     // Filtro Consultor
@@ -246,25 +314,6 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
             }
         }
         $resultado = $duplicadas;
-    }
-
-    // Filtro Cartões Duplicados
-    if ($filtros['apenas_cartoes_duplicados']) {
-        $por_cartao = [];
-        foreach ($resultado as $v) {
-            $numero_cartao = trim($v['numero_cartao'] ?? '');
-            if (!empty($numero_cartao) && $numero_cartao !== 'NULL' && strlen($numero_cartao) >= 4) {
-                $por_cartao[$numero_cartao][] = $v;
-            }
-        }
-
-        $duplicadas_cartao = [];
-        foreach ($por_cartao as $cartao => $vendas_cartao) {
-            if (count($vendas_cartao) > 1) {
-                $duplicadas_cartao = array_merge($duplicadas_cartao, $vendas_cartao);
-            }
-        }
-        $resultado = $duplicadas_cartao;
     }
 
     return array_values($resultado);
@@ -402,6 +451,81 @@ function exportarVendas($vendas, $formato) {
             }
 
             echo '</tbody></table></body></html>';
+            break;
+
+        case 'pdf':
+            // PDF usando HTML otimizado para impressão
+            header('Content-Type: text/html; charset=utf-8');
+
+            echo '<!DOCTYPE html>';
+            echo '<html><head>';
+            echo '<meta charset="UTF-8">';
+            echo '<title>Relatório de Vendas - PDF</title>';
+            echo '<style>';
+            echo 'body { font-family: Arial, sans-serif; font-size: 10px; margin: 20px; }';
+            echo 'h1 { font-size: 16px; text-align: center; margin-bottom: 20px; }';
+            echo 'table { width: 100%; border-collapse: collapse; margin-top: 10px; }';
+            echo 'th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }';
+            echo 'th { background-color: #333; color: white; font-weight: bold; }';
+            echo 'tr:nth-child(even) { background-color: #f9f9f9; }';
+            echo '.text-right { text-align: right; }';
+            echo '.text-center { text-align: center; }';
+            echo '.info { margin-bottom: 15px; font-size: 11px; }';
+            echo '@media print { ';
+            echo '  body { margin: 10px; }';
+            echo '  .no-print { display: none; }';
+            echo '}';
+            echo '</style>';
+            echo '</head><body>';
+
+            echo '<h1>📊 Relatório de Vendas - Aquabeat</h1>';
+            echo '<div class="info">';
+            echo '<strong>Data de Geração:</strong> ' . date('d/m/Y H:i:s') . '<br>';
+            echo '<strong>Total de Vendas:</strong> ' . count($vendas);
+            echo '</div>';
+
+            echo '<table>';
+            echo '<thead><tr>';
+            echo '<th>ID</th><th>Data</th><th>Titular</th><th>CPF</th>';
+            echo '<th>Produto Original</th><th>Produto Atual</th>';
+            echo '<th>Consultor</th><th>Status</th><th>Forma Pgto</th>';
+            echo '<th>Tipo Pgto</th><th class="text-right">Valor Pago</th><th class="text-center">1ª Parcela</th>';
+            echo '</tr></thead><tbody>';
+
+            foreach ($vendas as $v) {
+                $tipo_pgto = $v['tipo_pagamento'] ?? 'Parcelado';
+
+                echo '<tr>';
+                echo '<td><small>' . htmlspecialchars($v['id']) . '</small></td>';
+                echo '<td><small>' . date('d/m/Y', strtotime($v['data_cadastro'])) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['titular']) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['cpf']) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['produto_original']) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['produto_atual']) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['consultor']) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['status']) . '</small></td>';
+                echo '<td><small>' . htmlspecialchars($v['forma_pagamento'] ?? '-') . '</small></td>';
+                echo '<td class="text-center"><small>' . $tipo_pgto . '</small></td>';
+                echo '<td class="text-right"><small>R$ ' . number_format($v['valor_pago'], 2, ',', '.') . '</small></td>';
+                echo '<td class="text-center"><small>' . (($v['primeira_parcela_paga'] ?? false) ? '✓ Sim' : '✗ Não') . '</small></td>';
+                echo '</tr>';
+            }
+
+            echo '</tbody></table>';
+
+            echo '<div class="no-print" style="margin-top: 30px; text-align: center;">';
+            echo '<button onclick="window.print()" style="padding: 10px 30px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">';
+            echo '🖨️ Imprimir / Salvar como PDF';
+            echo '</button>';
+            echo '<p style="color: #666; margin-top: 10px;"><small>Use CTRL+P ou CMD+P para imprimir ou salvar como PDF</small></p>';
+            echo '</div>';
+
+            echo '<script>';
+            echo '// Auto-abre diálogo de impressão após 500ms';
+            echo 'setTimeout(function() { window.print(); }, 500);';
+            echo '</script>';
+
+            echo '</body></html>';
             break;
     }
 }
@@ -568,6 +692,10 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                     <a href="?page=gestao_vendas&exportar=json&<?= http_build_query(array_filter($filtros)) ?>"
                        class="btn btn-secondary">
                         <i class="fas fa-file-code"></i> JSON
+                    </a>
+                    <a href="?page=gestao_vendas&exportar=pdf&<?= http_build_query(array_filter($filtros)) ?>"
+                       class="btn btn-danger" target="_blank">
+                        <i class="fas fa-file-pdf"></i> PDF
                     </a>
                 </div>
             </div>
