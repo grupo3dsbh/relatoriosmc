@@ -607,25 +607,34 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
     return strtotime($b['data_cadastro']) - strtotime($a['data_cadastro']);
 });
 
-// Gera query string para exportação (preserva arrays)
-$query_exportacao = http_build_query([
-    'filtro_csv' => $filtros['csv_selecionado'],
-    'filtro_cpf' => $filtros['cpf'],
-    'filtro_titular' => $filtros['titular'],
-    'filtro_titulo_id' => $filtros['titulo_id'],
-    'filtro_status' => $filtros['status'],
-    'data_inicio' => $filtros['data_inicio'],
-    'data_fim' => $filtros['data_fim'],
-    'filtro_primeira_parcela' => $filtros['primeira_parcela'],
-    'filtro_produto_alterado' => $filtros['produto_alterado'] ? '1' : '',
-    'filtro_venda_a_vista' => $filtros['venda_a_vista'] ? '1' : '',
-    'filtro_forma_pagamento' => $filtros['forma_pagamento'], // Array preservado
-    'filtro_consultor' => $filtros['consultor'],
-    'valor_pago_min' => $filtros['valor_pago_min'],
-    'valor_pago_max' => $filtros['valor_pago_max'],
-    'apenas_duplicadas' => $filtros['apenas_duplicadas'] ? '1' : '',
-    'apenas_cartoes_duplicados' => $filtros['apenas_cartoes_duplicados'] ? '1' : ''
-]);
+// Gera query string para exportação (preserva arrays e remove vazios)
+$params_export = [];
+
+// Campos simples
+if (!empty($filtros['csv_selecionado'])) $params_export['filtro_csv'] = $filtros['csv_selecionado'];
+if (!empty($filtros['cpf'])) $params_export['filtro_cpf'] = $filtros['cpf'];
+if (!empty($filtros['titular'])) $params_export['filtro_titular'] = $filtros['titular'];
+if (!empty($filtros['titulo_id'])) $params_export['filtro_titulo_id'] = $filtros['titulo_id'];
+if (!empty($filtros['status'])) $params_export['filtro_status'] = $filtros['status'];
+if (!empty($filtros['data_inicio'])) $params_export['data_inicio'] = $filtros['data_inicio'];
+if (!empty($filtros['data_fim'])) $params_export['data_fim'] = $filtros['data_fim'];
+if (!empty($filtros['primeira_parcela'])) $params_export['filtro_primeira_parcela'] = $filtros['primeira_parcela'];
+if (!empty($filtros['consultor'])) $params_export['filtro_consultor'] = $filtros['consultor'];
+if (!empty($filtros['valor_pago_min'])) $params_export['valor_pago_min'] = $filtros['valor_pago_min'];
+if (!empty($filtros['valor_pago_max'])) $params_export['valor_pago_max'] = $filtros['valor_pago_max'];
+
+// Checkboxes
+if ($filtros['produto_alterado']) $params_export['filtro_produto_alterado'] = '1';
+if ($filtros['venda_a_vista']) $params_export['filtro_venda_a_vista'] = '1';
+if ($filtros['apenas_duplicadas']) $params_export['apenas_duplicadas'] = '1';
+if ($filtros['apenas_cartoes_duplicados']) $params_export['apenas_cartoes_duplicados'] = '1';
+
+// Array de forma de pagamento (multiselect)
+if (!empty($filtros['forma_pagamento']) && is_array($filtros['forma_pagamento'])) {
+    $params_export['filtro_forma_pagamento'] = $filtros['forma_pagamento'];
+}
+
+$query_exportacao = http_build_query($params_export);
 
 ?>
 
@@ -1041,53 +1050,40 @@ $query_exportacao = http_build_query([
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.full.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 $(document).ready(function() {
-    console.log('Inicializando Select2...');
+    console.log('=== INIT Select2 ===');
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('Select2 loaded:', typeof $.fn.select2 !== 'undefined');
 
-    // Verifica se os elementos existem
-    console.log('Consultor elements:', $('.select2-consultor').length);
-    console.log('Forma Pgto elements:', $('.select2-forma-pgto').length);
+    // Inicializa Select2 com configurações simples
+    $('#select-consultor').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Selecione um consultor',
+        allowClear: true
+    });
 
-    // Inicializa Select2 PRIMEIRO (antes do DataTable)
-    if ($('.select2-consultor').length > 0) {
-        $('.select2-consultor').select2({
-            theme: 'bootstrap4',
-            placeholder: 'Selecione um consultor',
-            allowClear: true,
-            width: '100%',
-            dropdownAutoWidth: true
-        });
-        console.log('Select2 Consultor inicializado');
-    }
+    $('#select-forma-pgto').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Selecione formas de pagamento',
+        allowClear: true,
+        closeOnSelect: false
+    });
 
-    if ($('.select2-forma-pgto').length > 0) {
-        $('.select2-forma-pgto').select2({
-            theme: 'bootstrap4',
-            placeholder: 'Selecione uma ou mais formas de pagamento',
-            allowClear: true,
-            width: '100%',
-            closeOnSelect: false,
-            dropdownAutoWidth: true
-        });
-        console.log('Select2 Forma Pgto inicializado');
-    }
+    console.log('Select2 inicializado!');
 
-    // Inicializa DataTable DEPOIS
-    if ($('#tabelaGestaoVendas').length > 0) {
-        $('#tabelaGestaoVendas').DataTable({
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
-            },
-            order: [[1, 'desc']],
-            pageLength: 50
-        });
-        console.log('DataTable inicializado');
-    }
+    // Inicializa DataTable
+    $('#tabelaGestaoVendas').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
+        },
+        order: [[1, 'desc']],
+        pageLength: 50
+    });
 });
 </script>
 
