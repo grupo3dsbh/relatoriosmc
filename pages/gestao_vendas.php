@@ -607,6 +607,26 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
     return strtotime($b['data_cadastro']) - strtotime($a['data_cadastro']);
 });
 
+// Gera query string para exportação (preserva arrays)
+$query_exportacao = http_build_query([
+    'filtro_csv' => $filtros['csv_selecionado'],
+    'filtro_cpf' => $filtros['cpf'],
+    'filtro_titular' => $filtros['titular'],
+    'filtro_titulo_id' => $filtros['titulo_id'],
+    'filtro_status' => $filtros['status'],
+    'data_inicio' => $filtros['data_inicio'],
+    'data_fim' => $filtros['data_fim'],
+    'filtro_primeira_parcela' => $filtros['primeira_parcela'],
+    'filtro_produto_alterado' => $filtros['produto_alterado'] ? '1' : '',
+    'filtro_venda_a_vista' => $filtros['venda_a_vista'] ? '1' : '',
+    'filtro_forma_pagamento' => $filtros['forma_pagamento'], // Array preservado
+    'filtro_consultor' => $filtros['consultor'],
+    'valor_pago_min' => $filtros['valor_pago_min'],
+    'valor_pago_max' => $filtros['valor_pago_max'],
+    'apenas_duplicadas' => $filtros['apenas_duplicadas'] ? '1' : '',
+    'apenas_cartoes_duplicados' => $filtros['apenas_cartoes_duplicados'] ? '1' : ''
+]);
+
 ?>
 
 <!DOCTYPE html>
@@ -681,19 +701,19 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
             <!-- Botões de Exportação -->
             <div class="mb-3 text-right">
                 <div class="btn-group">
-                    <a href="?page=gestao_vendas&exportar=csv&<?= http_build_query(array_filter($filtros)) ?>"
+                    <a href="?page=gestao_vendas&exportar=csv&<?= $query_exportacao ?>"
                        class="btn btn-success">
                         <i class="fas fa-file-csv"></i> CSV
                     </a>
-                    <a href="?page=gestao_vendas&exportar=excel&<?= http_build_query(array_filter($filtros)) ?>"
+                    <a href="?page=gestao_vendas&exportar=excel&<?= $query_exportacao ?>"
                        class="btn btn-primary">
                         <i class="fas fa-file-excel"></i> Excel
                     </a>
-                    <a href="?page=gestao_vendas&exportar=json&<?= http_build_query(array_filter($filtros)) ?>"
+                    <a href="?page=gestao_vendas&exportar=json&<?= $query_exportacao ?>"
                        class="btn btn-secondary">
                         <i class="fas fa-file-code"></i> JSON
                     </a>
-                    <a href="?page=gestao_vendas&exportar=pdf&<?= http_build_query(array_filter($filtros)) ?>"
+                    <a href="?page=gestao_vendas&exportar=pdf&<?= $query_exportacao ?>"
                        class="btn btn-danger" target="_blank">
                         <i class="fas fa-file-pdf"></i> PDF
                     </a>
@@ -785,7 +805,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label><i class="fas fa-user-tie"></i> Consultor</label>
-                                    <select class="form-control form-control-sm select2-consultor" name="filtro_consultor">
+                                    <select class="form-control select2-consultor" name="filtro_consultor" id="select-consultor">
                                         <option value="">Todos os Consultores</option>
                                         <?php foreach ($consultores_unicos as $consultor): ?>
                                             <option value="<?= htmlspecialchars($consultor) ?>"
@@ -800,7 +820,7 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label><i class="fas fa-credit-card"></i> Forma Pgto (múltipla)</label>
-                                    <select class="form-control form-control-sm select2-forma-pgto" name="filtro_forma_pagamento[]" multiple>
+                                    <select class="form-control select2-forma-pgto" name="filtro_forma_pagamento[]" multiple id="select-forma-pgto">
                                         <?php foreach ($formas_pagamento_unicas as $forma): ?>
                                             <option value="<?= htmlspecialchars($forma) ?>"
                                                     <?= is_array($filtros['forma_pagamento']) && in_array($forma, $filtros['forma_pagamento']) ? 'selected' : '' ?>>
@@ -1027,30 +1047,47 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
 
 <script>
 $(document).ready(function() {
-    // Inicializa DataTable
-    $('#tabelaGestaoVendas').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
-        },
-        order: [[1, 'desc']],
-        pageLength: 50
-    });
+    console.log('Inicializando Select2...');
 
-    // Inicializa Select2
-    $('.select2-consultor').select2({
-        theme: 'bootstrap4',
-        placeholder: 'Selecione um consultor',
-        allowClear: true,
-        width: '100%'
-    });
+    // Verifica se os elementos existem
+    console.log('Consultor elements:', $('.select2-consultor').length);
+    console.log('Forma Pgto elements:', $('.select2-forma-pgto').length);
 
-    $('.select2-forma-pgto').select2({
-        theme: 'bootstrap4',
-        placeholder: 'Selecione uma ou mais formas de pagamento',
-        allowClear: true,
-        width: '100%',
-        closeOnSelect: false
-    });
+    // Inicializa Select2 PRIMEIRO (antes do DataTable)
+    if ($('.select2-consultor').length > 0) {
+        $('.select2-consultor').select2({
+            theme: 'bootstrap4',
+            placeholder: 'Selecione um consultor',
+            allowClear: true,
+            width: '100%',
+            dropdownAutoWidth: true
+        });
+        console.log('Select2 Consultor inicializado');
+    }
+
+    if ($('.select2-forma-pgto').length > 0) {
+        $('.select2-forma-pgto').select2({
+            theme: 'bootstrap4',
+            placeholder: 'Selecione uma ou mais formas de pagamento',
+            allowClear: true,
+            width: '100%',
+            closeOnSelect: false,
+            dropdownAutoWidth: true
+        });
+        console.log('Select2 Forma Pgto inicializado');
+    }
+
+    // Inicializa DataTable DEPOIS
+    if ($('#tabelaGestaoVendas').length > 0) {
+        $('#tabelaGestaoVendas').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
+            },
+            order: [[1, 'desc']],
+            pageLength: 50
+        });
+        console.log('DataTable inicializado');
+    }
 });
 </script>
 
