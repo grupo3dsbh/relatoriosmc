@@ -23,10 +23,12 @@ if (isset($_GET['exportar'])) {
         'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
         'produto_alterado' => isset($_GET['filtro_produto_alterado']),
         'venda_a_vista' => isset($_GET['filtro_venda_a_vista']),
-        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
+        'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? [],
+        'consultor' => $_GET['filtro_consultor'] ?? '',
         'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
         'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
         'apenas_duplicadas' => isset($_GET['apenas_duplicadas']),
+        'apenas_cartoes_duplicados' => isset($_GET['apenas_cartoes_duplicados']),
         'csv_selecionado' => $_GET['filtro_csv'] ?? ''
     ];
 
@@ -189,10 +191,27 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
         });
     }
 
-    // Filtro Forma Pagamento
+// Filtro Forma Pagamento (MULTISELECT)
     if (!empty($filtros['forma_pagamento'])) {
+        $formas_selecionadas = is_array($filtros['forma_pagamento'])
+            ? $filtros['forma_pagamento']
+            : [$filtros['forma_pagamento']];
+
+        $resultado = array_filter($resultado, function($v) use ($formas_selecionadas) {
+            $forma_venda = strtoupper(trim($v['forma_pagamento'] ?? ''));
+            foreach ($formas_selecionadas as $forma) {
+                if (stripos($forma_venda, $forma) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    // Filtro Consultor
+    if (!empty($filtros['consultor'])) {
         $resultado = array_filter($resultado, function($v) use ($filtros) {
-            return stripos($v['forma_pagamento'] ?? '', $filtros['forma_pagamento']) !== false;
+            return stripos($v['consultor'] ?? '', $filtros['consultor']) !== false;
         });
     }
 
@@ -210,7 +229,7 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
         });
     }
 
-    // Filtro Apenas Duplicadas
+    // Filtro Apenas Duplicadas (por CPF)
     if ($filtros['apenas_duplicadas']) {
         $por_cpf = [];
         foreach ($resultado as $v) {
@@ -227,6 +246,25 @@ function aplicarFiltrosAvancados($vendas, $filtros) {
             }
         }
         $resultado = $duplicadas;
+    }
+
+    // Filtro Cartões Duplicados
+    if ($filtros['apenas_cartoes_duplicados']) {
+        $por_cartao = [];
+        foreach ($resultado as $v) {
+            $numero_cartao = trim($v['numero_cartao'] ?? '');
+            if (!empty($numero_cartao) && $numero_cartao !== 'NULL' && strlen($numero_cartao) >= 4) {
+                $por_cartao[$numero_cartao][] = $v;
+            }
+        }
+
+        $duplicadas_cartao = [];
+        foreach ($por_cartao as $cartao => $vendas_cartao) {
+            if (count($vendas_cartao) > 1) {
+                $duplicadas_cartao = array_merge($duplicadas_cartao, $vendas_cartao);
+            }
+        }
+        $resultado = $duplicadas_cartao;
     }
 
     return array_values($resultado);
@@ -392,6 +430,23 @@ if (!empty($csv_selecionado)) {
 
 $total_sem_filtro = count($todas_vendas);
 
+// Coleta consultores e formas de pagamento únicas para os filtros
+$consultores_unicos = [];
+$formas_pagamento_unicas = [];
+foreach ($todas_vendas as $venda) {
+    $consultor = trim($venda['consultor'] ?? '');
+    if (!empty($consultor) && !in_array($consultor, $consultores_unicos)) {
+        $consultores_unicos[] = $consultor;
+    }
+
+    $forma_pgto = strtoupper(trim($venda['forma_pagamento'] ?? ''));
+    if (!empty($forma_pgto) && !in_array($forma_pgto, $formas_pagamento_unicas)) {
+        $formas_pagamento_unicas[] = $forma_pgto;
+    }
+}
+sort($consultores_unicos);
+sort($formas_pagamento_unicas);
+
 // Aplica filtros
 $filtros = [
     'cpf' => $_GET['filtro_cpf'] ?? '',
@@ -403,10 +458,12 @@ $filtros = [
     'primeira_parcela' => $_GET['filtro_primeira_parcela'] ?? '',
     'produto_alterado' => isset($_GET['filtro_produto_alterado']),
     'venda_a_vista' => isset($_GET['filtro_venda_a_vista']),
-    'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? '',
+    'forma_pagamento' => $_GET['filtro_forma_pagamento'] ?? [],
+    'consultor' => $_GET['filtro_consultor'] ?? '',
     'valor_pago_min' => $_GET['valor_pago_min'] ?? '',
     'valor_pago_max' => $_GET['valor_pago_max'] ?? '',
     'apenas_duplicadas' => isset($_GET['apenas_duplicadas']),
+    'apenas_cartoes_duplicados' => isset($_GET['apenas_cartoes_duplicados']),
     'csv_selecionado' => $csv_selecionado
 ];
 
@@ -436,6 +493,8 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap4.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap4-theme@1.5.4/dist/select2-bootstrap4.min.css">
 </head>
 <body>
 
@@ -595,12 +654,32 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                 </div>
                             </div>
 
-                            <div class="col-md-2">
+                            <div class="col-md-3">
                                 <div class="form-group">
-                                    <label><i class="fas fa-credit-card"></i> Forma Pgto</label>
-                                    <input type="text" class="form-control form-control-sm" name="filtro_forma_pagamento"
-                                           placeholder="PIX, Boleto, etc"
-                                           value="<?= htmlspecialchars($filtros['forma_pagamento']) ?>">
+                                    <label><i class="fas fa-user-tie"></i> Consultor</label>
+                                    <select class="form-control form-control-sm select2-consultor" name="filtro_consultor">
+                                        <option value="">Todos os Consultores</option>
+                                        <?php foreach ($consultores_unicos as $consultor): ?>
+                                            <option value="<?= htmlspecialchars($consultor) ?>"
+                                                    <?= $filtros['consultor'] === $consultor ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($consultor) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label><i class="fas fa-credit-card"></i> Forma Pgto (múltipla)</label>
+                                    <select class="form-control form-control-sm select2-forma-pgto" name="filtro_forma_pagamento[]" multiple>
+                                        <?php foreach ($formas_pagamento_unicas as $forma): ?>
+                                            <option value="<?= htmlspecialchars($forma) ?>"
+                                                    <?= is_array($filtros['forma_pagamento']) && in_array($forma, $filtros['forma_pagamento']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($forma) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                             </div>
 
@@ -660,7 +739,15 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
                                                    id="apenas_duplicadas" name="apenas_duplicadas"
                                                    <?= $filtros['apenas_duplicadas'] ? 'checked' : '' ?>>
                                             <label class="custom-control-label" for="apenas_duplicadas">
-                                                <small>Apenas Duplicadas</small>
+                                                <small>Apenas CPF Duplicado</small>
+                                            </label>
+                                        </div>
+                                        <div class="custom-control custom-checkbox custom-control-inline">
+                                            <input type="checkbox" class="custom-control-input"
+                                                   id="apenas_cartoes_duplicados" name="apenas_cartoes_duplicados"
+                                                   <?= $filtros['apenas_cartoes_duplicados'] ? 'checked' : '' ?>>
+                                            <label class="custom-control-label" for="apenas_cartoes_duplicados">
+                                                <small>💳 Apenas Cartões Duplicados</small>
                                             </label>
                                         </div>
                                     </div>
@@ -808,15 +895,33 @@ usort($vendas_filtradas, function($a, $b) use ($duplicidades) {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 $(document).ready(function() {
+    // Inicializa DataTable
     $('#tabelaGestaoVendas').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/pt-BR.json'
         },
         order: [[1, 'desc']],
         pageLength: 50
+    });
+
+    // Inicializa Select2
+    $('.select2-consultor').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Selecione um consultor',
+        allowClear: true,
+        width: '100%'
+    });
+
+    $('.select2-forma-pgto').select2({
+        theme: 'bootstrap4',
+        placeholder: 'Selecione uma ou mais formas de pagamento',
+        allowClear: true,
+        width: '100%',
+        closeOnSelect: false
     });
 });
 </script>
