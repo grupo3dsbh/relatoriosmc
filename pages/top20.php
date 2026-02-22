@@ -346,6 +346,10 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             border-left: 4px solid #ffc107 !important;
         }
 
+        .cotas-desc-highlight {
+            border-left: 4px solid #dc3545 !important;
+        }
+
         #searchInput {
             font-size: 1.1em;
             padding: 12px;
@@ -561,7 +565,10 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
         </thead>
         <tbody>
             <?php foreach ($vendas_processadas['por_consultor'] as $index => $consultor): ?>
-            <tr data-consultor="<?= strtolower(htmlspecialchars($consultor['consultor'])) ?>">
+            <tr data-consultor="<?= strtolower(htmlspecialchars($consultor['consultor'])) ?>"
+                data-cotas-desc="<?= (isGodMode() && isset($consultor['cotas_desconsideradas']) && $consultor['cotas_desconsideradas']['quantidade'] > 0) ? 'sim' : 'nao' ?>"
+                data-cotas-desc-qtd="<?= isset($consultor['cotas_desconsideradas']) ? $consultor['cotas_desconsideradas']['quantidade'] : 0 ?>"
+                data-cotas-desc-pts="<?= isset($consultor['cotas_desconsideradas']) ? $consultor['cotas_desconsideradas']['pontos'] : 0 ?>">
                 <td class="text-center">
                     <strong><?= $index + 1 ?>º</strong>
                     <?php if ($index < 3): ?>
@@ -679,7 +686,7 @@ $(document).ready(function() {
         const searchTerm = $searchInput.val().toLowerCase().trim();
 
         // Remove destaques anteriores
-        $tableRows.removeClass('search-highlight');
+        $tableRows.removeClass('search-highlight cotas-desc-highlight');
 
         if (searchTerm === '') {
             // Mostra todas as linhas
@@ -698,6 +705,12 @@ $(document).ready(function() {
             if (consultorName.indexOf(searchTerm) !== -1) {
                 $row.show();
                 $row.addClass('search-highlight');
+
+                // Adiciona destaque extra se tiver cotas desconsideradas
+                if ($row.attr('data-cotas-desc') === 'sim') {
+                    $row.addClass('cotas-desc-highlight');
+                }
+
                 foundCount++;
 
                 if (!firstMatch) {
@@ -710,12 +723,25 @@ $(document).ready(function() {
 
         // Atualiza mensagem de resultado
         if (foundCount > 0) {
-            $searchResult.html(
-                `<div class="alert alert-success mb-0">
+            let resultHtml = `<div class="alert alert-success mb-0">
                     <i class="fas fa-check-circle"></i>
-                    <strong>${foundCount}</strong> consultor(es) encontrado(s)
-                </div>`
-            );
+                    <strong>${foundCount}</strong> consultor(es) encontrado(s)`;
+
+            // Se estiver em godmode, mostra informações sobre cotas desconsideradas
+            if (firstMatch) {
+                const temCotasDesc = firstMatch.attr('data-cotas-desc') === 'sim';
+                const qtdCotasDesc = parseInt(firstMatch.attr('data-cotas-desc-qtd') || 0);
+                const ptsCotasDesc = parseInt(firstMatch.attr('data-cotas-desc-pts') || 0);
+
+                if (temCotasDesc && qtdCotasDesc > 0) {
+                    resultHtml += `<br><i class="fas fa-exclamation-triangle text-warning"></i> <strong>ATENÇÃO:</strong> Este consultor tem <strong>${qtdCotasDesc}</strong> cota(s) desconsiderada(s) (<strong>-${ptsCotasDesc} pts</strong>)`;
+                } else if ($('tr[data-cotas-desc="sim"]').length > 0) {
+                    resultHtml += `<br><i class="fas fa-check text-success"></i> Este consultor não tem cotas desconsideradas`;
+                }
+            }
+
+            resultHtml += `</div>`;
+            $searchResult.html(resultHtml);
 
             // Scroll até o primeiro resultado
             if (firstMatch) {
