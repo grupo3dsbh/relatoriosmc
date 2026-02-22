@@ -1579,14 +1579,20 @@ function processarVendasComRanges($arquivo, $filtros = []) {
     $resultado = processarVendasCSV($arquivo, $filtros);
 
     // ===== PROCESSA COTAS DESCONSIDERADAS =====
-    $cotas_desconsideradas = carregarCotasDesconsideradas();
+    $cotas_desconsideradas_dados = carregarCotasDesconsideradas();
     $vendas_desconsideradas = [];
     $vendas_desconsideradas_por_consultor = [];
 
-    if (!empty($cotas_desconsideradas)) {
+    // Extrai apenas os IDs das cotas desconsideradas
+    $cotas_desconsideradas_ids = [];
+    foreach ($cotas_desconsideradas_dados as $item) {
+        $cotas_desconsideradas_ids[] = $item['cota'];
+    }
+
+    if (!empty($cotas_desconsideradas_ids)) {
         // Separa vendas desconsideradas
         foreach ($resultado['vendas'] as $key => $venda) {
-            if (in_array($venda['id'], $cotas_desconsideradas)) {
+            if (in_array($venda['id'], $cotas_desconsideradas_ids)) {
                 $vendas_desconsideradas[] = $venda;
 
                 // Agrupa por consultor
@@ -1617,7 +1623,7 @@ function processarVendasComRanges($arquivo, $filtros = []) {
 
             // Remove vendas desconsideradas novamente
             foreach ($resultado['vendas'] as $key => $venda) {
-                if (in_array($venda['id'], $cotas_desconsideradas)) {
+                if (in_array($venda['id'], $cotas_desconsideradas_ids)) {
                     unset($resultado['vendas'][$key]);
                 }
             }

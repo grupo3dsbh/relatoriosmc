@@ -340,6 +340,30 @@ if (isset($_POST['alternar_status_mensagem'])) {
     }
 }
 
+// Processar adição de cotas desconsideradas
+if (isset($_POST['adicionar_cotas_desconsideradas'])) {
+    $cotas_input = $_POST['cotas_desconsiderar'] ?? '';
+    if (!empty($cotas_input)) {
+        adicionarCotasDesconsideradas($cotas_input);
+        $mensagem_sucesso = "Cotas adicionadas à lista de desconsideradas com sucesso!";
+    }
+}
+
+// Processar remoção de cota desconsiderada
+if (isset($_POST['remover_cota_desconsiderada'])) {
+    $cota_remover = $_POST['cota_id'] ?? '';
+    if (!empty($cota_remover)) {
+        removerCotaDesconsiderada($cota_remover);
+        $mensagem_sucesso = "Cota removida da lista de desconsideradas!";
+    }
+}
+
+// Processar limpeza de todas as cotas desconsideradas
+if (isset($_POST['limpar_todas_cotas'])) {
+    limparTodasCotasDesconsideradas();
+    $mensagem_sucesso = "Todas as cotas foram removidas da lista de desconsideradas!";
+}
+
 // Se não estiver autenticado, mostra tela de login
 if (!verificarAdmin()):
 ?>
@@ -1560,6 +1584,175 @@ if (!verificarAdmin()):
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gerenciamento de Cotas Desconsideradas -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-ban"></i> Cotas Desconsideradas do Ranking/Top 20
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Gerencie as cotas que devem ser desconsideradas no cálculo do ranking e Top 20.<br>
+                    <strong>Importante:</strong> Vendas dessas cotas não serão contabilizadas nos pontos dos consultores.
+                </p>
+
+                <!-- Formulário para adicionar cotas -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-10">
+                            <div class="form-group mb-0">
+                                <label><strong>Adicionar Cotas (separadas por vírgula)</strong></label>
+                                <input type="text" class="form-control" name="cotas_desconsiderar"
+                                       placeholder="Ex: 12345, 67890, 11111"
+                                       pattern="[\d\s,]+"
+                                       title="Apenas números separados por vírgula">
+                                <small class="form-text text-muted">
+                                    Digite os números das cotas separados por vírgula
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="adicionar_cotas_desconsideradas" class="btn btn-danger btn-block">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <?php
+                $cotas_desconsideradas = carregarCotasDesconsideradas();
+                if (empty($cotas_desconsideradas)):
+                ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nenhuma cota desconsiderada ainda.
+                    </div>
+                <?php else: ?>
+                    <!-- Campo de pesquisa -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                </div>
+                                <input type="text" class="form-control" id="pesquisar_cota"
+                                       placeholder="Pesquisar cota...">
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-right">
+                            <strong>Total: </strong>
+                            <span class="badge badge-danger" id="total_cotas"><?= count($cotas_desconsideradas) ?></span>
+                            <span class="ml-2">
+                                <strong>Visíveis: </strong>
+                                <span class="badge badge-info" id="cotas_visiveis"><?= count($cotas_desconsideradas) ?></span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Botão limpar todas -->
+                    <div class="mb-3">
+                        <form method="post" style="display: inline;">
+                            <button type="submit" name="limpar_todas_cotas"
+                                    class="btn btn-warning btn-sm"
+                                    onclick="return confirm('⚠️ Tem certeza que deseja remover TODAS as cotas da lista de desconsideradas?\n\nIsso irá reativar todas as cotas no ranking.')">
+                                <i class="fas fa-eraser"></i> Limpar Todas
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Tabela de cotas -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="20%">Cota</th>
+                                    <th width="30%">Data de Exclusão</th>
+                                    <th width="20%">Status</th>
+                                    <th width="30%" class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela_cotas">
+                                <?php foreach ($cotas_desconsideradas as $item): ?>
+                                <tr class="linha_cota" data-cota="<?= htmlspecialchars($item['cota']) ?>">
+                                    <td>
+                                        <i class="fas fa-ban text-danger"></i>
+                                        <strong><?= htmlspecialchars($item['cota']) ?></strong>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock"></i>
+                                            <?= date('d/m/Y H:i', strtotime($item['data_exclusao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-danger">Desconsiderada</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="cota_id" value="<?= htmlspecialchars($item['cota']) ?>">
+                                            <button type="submit" name="remover_cota_desconsiderada"
+                                                    class="btn btn-success btn-sm"
+                                                    title="Reativar esta cota no ranking"
+                                                    onclick="return confirm('Reativar cota <?= htmlspecialchars($item['cota']) ?>?\n\nEla voltará a ser contabilizada no ranking.')">
+                                                <i class="fas fa-check"></i> Reativar
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Mensagem quando não encontrar resultados na pesquisa -->
+                    <div id="sem_resultados" style="display: none;">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-search"></i> Nenhuma cota encontrada com esse termo de pesquisa.
+                        </div>
+                    </div>
+
+                    <!-- JavaScript para pesquisa em tempo real -->
+                    <script>
+                    document.getElementById('pesquisar_cota').addEventListener('keyup', function() {
+                        let termo = this.value.toLowerCase().trim();
+                        let linhas = document.querySelectorAll('.linha_cota');
+                        let visiveis = 0;
+
+                        linhas.forEach(function(linha) {
+                            let cota = linha.getAttribute('data-cota').toLowerCase();
+
+                            if (cota.includes(termo)) {
+                                linha.style.display = '';
+                                visiveis++;
+                            } else {
+                                linha.style.display = 'none';
+                            }
+                        });
+
+                        // Atualiza contador
+                        document.getElementById('cotas_visiveis').textContent = visiveis;
+
+                        // Mostra mensagem se não houver resultados
+                        if (visiveis === 0) {
+                            document.getElementById('sem_resultados').style.display = 'block';
+                        } else {
+                            document.getElementById('sem_resultados').style.display = 'none';
+                        }
+                    });
+                    </script>
+
+                <?php endif; ?>
             </div>
         </div>
     </div>

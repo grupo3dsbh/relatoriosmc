@@ -324,4 +324,116 @@ function salvarCotasDesconsideradas($lista_cotas) {
 
     return salvarConfiguracoes($config);
 }
+
+/**
+ * Adiciona novas cotas à lista de desconsideradas
+ */
+function adicionarCotasDesconsideradas($novas_cotas) {
+    $config = carregarConfiguracoes();
+
+    if (!isset($config['cotas_desconsideradas'])) {
+        $config['cotas_desconsideradas'] = [
+            'ativo' => true,
+            'lista' => []
+        ];
+    }
+
+    // Processa novas cotas (pode ser array ou string separada por vírgula)
+    if (is_string($novas_cotas)) {
+        $novas_cotas = array_map('trim', explode(',', $novas_cotas));
+    }
+
+    $timestamp = date('Y-m-d H:i:s');
+
+    foreach ($novas_cotas as $cota) {
+        $cota = trim($cota);
+        if (empty($cota)) continue;
+
+        // Evita duplicatas
+        $ja_existe = false;
+        foreach ($config['cotas_desconsideradas']['lista'] as $item) {
+            if ($item['cota'] === $cota) {
+                $ja_existe = true;
+                break;
+            }
+        }
+
+        if (!$ja_existe) {
+            $config['cotas_desconsideradas']['lista'][] = [
+                'cota' => $cota,
+                'data_exclusao' => $timestamp
+            ];
+        }
+    }
+
+    return salvarConfiguracoes($config);
+}
+
+/**
+ * Remove uma cota específica da lista de desconsideradas
+ */
+function removerCotaDesconsiderada($cota_remover) {
+    $config = carregarConfiguracoes();
+
+    if (isset($config['cotas_desconsideradas']['lista'])) {
+        $config['cotas_desconsideradas']['lista'] = array_filter(
+            $config['cotas_desconsideradas']['lista'],
+            function($item) use ($cota_remover) {
+                return $item['cota'] !== $cota_remover;
+            }
+        );
+
+        // Reindexar array
+        $config['cotas_desconsideradas']['lista'] = array_values($config['cotas_desconsideradas']['lista']);
+    }
+
+    return salvarConfiguracoes($config);
+}
+
+/**
+ * Verifica se uma cota está desconsiderada
+ */
+function isCotaDesconsiderada($cota) {
+    $config = carregarConfiguracoes();
+
+    if (!isset($config['cotas_desconsideradas']['ativo']) || !$config['cotas_desconsideradas']['ativo']) {
+        return false;
+    }
+
+    if (isset($config['cotas_desconsideradas']['lista'])) {
+        foreach ($config['cotas_desconsideradas']['lista'] as $item) {
+            if ($item['cota'] === $cota) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Retorna o total de cotas desconsideradas
+ */
+function getTotalCotasDesconsideradas() {
+    $config = carregarConfiguracoes();
+
+    if (isset($config['cotas_desconsideradas']['lista'])) {
+        return count($config['cotas_desconsideradas']['lista']);
+    }
+
+    return 0;
+}
+
+/**
+ * Limpa todas as cotas desconsideradas
+ */
+function limparTodasCotasDesconsideradas() {
+    $config = carregarConfiguracoes();
+
+    if (isset($config['cotas_desconsideradas'])) {
+        $config['cotas_desconsideradas']['lista'] = [];
+    }
+
+    return salvarConfiguracoes($config);
+}
 ?>
