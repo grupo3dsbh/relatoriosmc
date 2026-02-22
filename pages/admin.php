@@ -95,12 +95,28 @@ if (isset($_POST['alterar_senha_consultores'])) {
     $mensagem_sucesso = "Senha de consultores alterada com sucesso!";
 }
 
+// Processa alteração de senha mestre
+if (isset($_POST['alterar_senha_mestre'])) {
+    $nova_senha_mestre = trim($_POST['nova_senha_mestre']);
+
+    if (!empty($nova_senha_mestre)) {
+        $_SESSION['config_sistema']['acesso']['senha_mestre'] = $nova_senha_mestre;
+        salvarConfiguracoes($_SESSION['config_sistema']);
+        $mensagem_sucesso = "Senha mestre alterada com sucesso!";
+    } else {
+        $erro_upload = "A senha mestre não pode estar vazia!";
+    }
+}
+
 // Processa upload de CSV de vendas
 if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
     if ($_FILES['csv_vendas']['error'] === UPLOAD_ERR_OK) {
-        $resultado = salvarCSV($_FILES['csv_vendas']['tmp_name'], 'vendas');
+        $substituir = isset($_POST['substituir_vendas']) && $_POST['substituir_vendas'] == '1';
+        $arquivo_alvo = $substituir && !empty($_POST['arquivo_substituir_vendas']) ? $_POST['arquivo_substituir_vendas'] : null;
+        $resultado = salvarCSV($_FILES['csv_vendas']['tmp_name'], 'vendas', $substituir, $arquivo_alvo);
         if ($resultado['sucesso']) {
-            $mensagem_sucesso = "CSV de vendas enviado com sucesso! Arquivo: {$resultado['nome']}";
+            $acao = $resultado['substituiu'] ? 'substituído' : 'criado';
+            $mensagem_sucesso = "CSV de vendas {$acao} com sucesso! Arquivo: {$resultado['nome']}";
         } else {
             $erro_upload = $resultado['erro'];
         }
@@ -110,13 +126,102 @@ if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
 // Processa upload de CSV de promotores
 if (isset($_POST['upload_promotores']) && isset($_FILES['csv_promotores'])) {
     if ($_FILES['csv_promotores']['error'] === UPLOAD_ERR_OK) {
-        $resultado = salvarCSV($_FILES['csv_promotores']['tmp_name'], 'promotores');
+        $substituir = isset($_POST['substituir_promotores']) && $_POST['substituir_promotores'] == '1';
+        $arquivo_alvo = $substituir && !empty($_POST['arquivo_substituir_promotores']) ? $_POST['arquivo_substituir_promotores'] : null;
+        $resultado = salvarCSV($_FILES['csv_promotores']['tmp_name'], 'promotores', $substituir, $arquivo_alvo);
         if ($resultado['sucesso']) {
             require_once 'functions/promotores.php';
             $_SESSION['promotores'] = processarPromotoresCSV($resultado['caminho']);
-            $mensagem_sucesso = "CSV de promotores enviado com sucesso! {$_SESSION['promotores']['total']} promotores carregados.";
-        } else {
+            $acao = $resultado['substituiu'] ? 'substituído' : 'criado';
+            $mensagem_sucesso = "CSV de promotores {$acao} com sucesso! {$_SESSION['promotores']['total']} promotores carregados.";
+        } else{
             $erro_upload = $resultado['erro'];
+        }
+    }
+}
+
+// Processa gerenciamento de apelidos de consultores
+if (isset($_POST['adicionar_apelido'])) {
+    $nome_original = trim($_POST['nome_original'] ?? '');
+    $apelido = trim($_POST['apelido'] ?? '');
+
+    if (!empty($nome_original) && !empty($apelido)) {
+        adicionarApelidoConsultor($nome_original, $apelido);
+        $mensagem_sucesso = "Apelido adicionado com sucesso!";
+    } else {
+        $mensagem_erro = "Nome original e apelido são obrigatórios!";
+    }
+}
+
+if (isset($_POST['remover_apelido'])) {
+    $nome_original = $_POST['nome_original'] ?? '';
+    if (!empty($nome_original)) {
+        removerApelidoConsultor($nome_original);
+        $mensagem_sucesso = "Apelido removido com sucesso!";
+    }
+}
+
+// Processa gerenciamento de cotas desconsideradas
+if (isset($_POST['adicionar_cotas_desconsideradas'])) {
+    $cotas_input = trim($_POST['cotas_lista'] ?? '');
+
+    if (!empty($cotas_input)) {
+        $resultado = adicionarCotasDesconsideradas($cotas_input);
+        if ($resultado['sucesso']) {
+            $mensagem_sucesso = "Cotas adicionadas à lista de exclusão com sucesso!";
+        } else {
+            $mensagem_erro = $resultado['mensagem'];
+        }
+    } else {
+        $mensagem_erro = "Por favor, informe ao menos uma cota!";
+    }
+}
+
+if (isset($_POST['remover_cota_desconsiderada'])) {
+    $cota = $_POST['cota'] ?? '';
+    if (!empty($cota)) {
+        $resultado = removerCotaDesconsiderada($cota);
+        if ($resultado['sucesso']) {
+            $mensagem_sucesso = "Cota removida da lista de exclusão!";
+        } else {
+            $mensagem_erro = $resultado['mensagem'];
+        }
+    }
+}
+
+if (isset($_POST['limpar_cotas_desconsideradas'])) {
+    $resultado = salvarCotasDesconsideradas([]);
+    if ($resultado['sucesso']) {
+        $mensagem_sucesso = "Todas as cotas foram removidas da lista de exclusão!";
+    }
+}
+
+// Processa gerenciamento de nomes amigáveis de CSVs
+if (isset($_POST['definir_nome_amigavel'])) {
+    $nome_arquivo = trim($_POST['nome_arquivo_csv'] ?? '');
+    $nome_amigavel = trim($_POST['nome_amigavel_csv'] ?? '');
+
+    if (!empty($nome_arquivo) && !empty($nome_amigavel)) {
+        // Valida que nome amigável não contém caracteres especiais
+        if (preg_match('/^[a-z0-9\-]+$/', $nome_amigavel)) {
+            definirNomeAmigavel($nome_arquivo, $nome_amigavel);
+            $mensagem_sucesso = "Nome amigável definido com sucesso!";
+        } else {
+            $mensagem_erro = "Nome amigável deve conter apenas letras minúsculas, números e hífens!";
+        }
+    } else {
+        $mensagem_erro = "Nome do arquivo e nome amigável são obrigatórios!";
+    }
+}
+
+if (isset($_POST['remover_nome_amigavel'])) {
+    $nome_arquivo = $_POST['nome_arquivo_remover'] ?? '';
+    if (!empty($nome_arquivo)) {
+        $mapeamento = carregarMapeamentoNomes();
+        if (isset($mapeamento[$nome_arquivo])) {
+            unset($mapeamento[$nome_arquivo]);
+            salvarMapeamentoNomes($mapeamento);
+            $mensagem_sucesso = "Nome amigável removido com sucesso!";
         }
     }
 }
@@ -128,53 +233,6 @@ if (isset($_POST['excluir_arquivo'])) {
         $mensagem_sucesso = "Arquivo excluído com sucesso!";
     } else {
         $erro_upload = "Erro ao excluir arquivo!";
-    }
-}
-
-// Processa salvamento de metadados CSV
-if (isset($_POST['salvar_metadados_csv'])) {
-    $tipo = $_POST['tipo_arquivo'];
-    $nome_arquivo = $_POST['nome_arquivo'];
-    $nome_amigavel = $_POST['nome_amigavel'];
-    $mes_referencia = $_POST['mes_referencia'] ?? '';
-
-    if (salvarMetadadosCSV($tipo, $nome_arquivo, $nome_amigavel, $mes_referencia)) {
-        $mensagem_sucesso = "Metadados salvos com sucesso!";
-    } else {
-        $erro_upload = "Erro ao salvar metadados!";
-    }
-}
-
-// Processa importação de CSV para banco de dados
-if (isset($_POST['importar_para_banco'])) {
-    require_once BASE_DIR . '/database/config.php';
-    require_once BASE_DIR . '/database/import_csv.php';
-
-    $tipo = $_POST['tipo_importacao'];
-    $caminho = $_POST['arquivo_path'];
-    $mes_referencia = $_POST['mes_ref'] ?? null;
-    $nome_amigavel = $_POST['nome_amig'] ?? null;
-    $reimportar = isset($_POST['reimportar']);
-
-    ob_start();
-
-    if ($tipo === 'vendas') {
-        // Se reimportar, limpa o mês primeiro
-        if ($reimportar && $mes_referencia) {
-            limparVendasMes($mes_referencia);
-        }
-
-        $resultado = importarVendasParaBanco($caminho, $mes_referencia, $nome_amigavel);
-    } else {
-        $resultado = importarPromotoresParaBanco($caminho, $nome_amigavel);
-    }
-
-    $output_importacao = ob_get_clean();
-
-    if ($resultado && $resultado['sucesso']) {
-        $mensagem_sucesso = "Importação concluída! {$resultado['sucesso_count']} registros importados.";
-    } else {
-        $erro_upload = "Erro na importação: " . ($resultado['erro'] ?? 'Desconhecido');
     }
 }
 
@@ -272,6 +330,51 @@ if (isset($_POST['salvar_config_premiacoes'])) {
     $mensagem_sucesso = "Configurações de premiação atualizadas com sucesso!";
 }
 
+// Processar configurações do Top20 / Período de Relatório
+if (isset($_POST['salvar_config_top20'])) {
+    $_SESSION['config_sistema']['periodo_relatorio'] = [
+        'arquivo_csv' => $_POST['periodo_arquivo_csv'] ?? '',
+        'data_inicial' => $_POST['periodo_data_inicial'],
+        'data_final' => $_POST['periodo_data_final'],
+        'apenas_primeira_parcela' => isset($_POST['periodo_apenas_primeira_parcela']),
+        'apenas_vista' => isset($_POST['periodo_apenas_vista']),
+        'filtro_status' => $_POST['periodo_filtro_status'] ?? 'Ativo'
+    ];
+
+    salvarConfiguracoes($_SESSION['config_sistema']);
+
+    $mensagem_sucesso = "Configurações do Top20 / Período de Relatório atualizadas com sucesso!";
+}
+
+// Processar gerenciamento de mensagens de parabéns
+if (isset($_POST['adicionar_mensagem_parabens'])) {
+    $titulo = trim($_POST['titulo_mensagem'] ?? '');
+    $mensagem = trim($_POST['texto_mensagem'] ?? '');
+
+    if (!empty($titulo) && !empty($mensagem)) {
+        adicionarMensagemParabens($titulo, $mensagem);
+        $mensagem_sucesso = "Mensagem de parabéns adicionada com sucesso!";
+    } else {
+        $mensagem_erro = "Título e mensagem são obrigatórios!";
+    }
+}
+
+if (isset($_POST['remover_mensagem_parabens'])) {
+    $id = $_POST['mensagem_id'] ?? '';
+    if (!empty($id)) {
+        removerMensagemParabens($id);
+        $mensagem_sucesso = "Mensagem removida com sucesso!";
+    }
+}
+
+if (isset($_POST['alternar_status_mensagem'])) {
+    $id = $_POST['mensagem_id'] ?? '';
+    if (!empty($id)) {
+        alternarStatusMensagem($id);
+        $mensagem_sucesso = "Status da mensagem alterado com sucesso!";
+    }
+}
+
 // Se não estiver autenticado, mostra tela de login
 if (!verificarAdmin()):
 ?>
@@ -328,14 +431,9 @@ if (!verificarAdmin()):
                 <i class="fas fa-check-circle"></i>
                 <strong>Bem-vindo ao Painel Administrativo!</strong> Você está autenticado como administrador.
             </div>
-            <div>
-                <a href="?page=dashboard_db" class="btn btn-info btn-sm mr-2">
-                    <i class="fas fa-database"></i> Dashboard BD
-                </a>
-                <a href="?page=configuracoes" class="btn btn-primary btn-sm">
-                    <i class="fas fa-cog"></i> Configurações Detalhadas
-                </a>
-            </div>
+            <a href="?page=configuracoes" class="btn btn-primary btn-sm">
+                <i class="fas fa-cog"></i> Configurações Detalhadas
+            </a>
         </div>
     </div>
 </div>
@@ -759,6 +857,249 @@ if (!verificarAdmin()):
     </div>
 </div>
 
+<!-- Configurações do Top20 / Período de Relatório -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-alt"></i> Configurações do Top20 / Período de Relatório
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure o período padrão e filtros que serão aplicados automaticamente no Top20.
+                    Essas configurações também são usadas como padrão nos relatórios.
+                </p>
+
+                <form method="post">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-group">
+                                <label><strong><i class="fas fa-file-csv"></i> Arquivo CSV de Vendas para o Top20</strong></label>
+                                <select class="form-control" name="periodo_arquivo_csv">
+                                    <option value="">Usar o mais recente (padrão)</option>
+                                    <?php
+                                    $arquivos_disponiveis = listarCSVs('vendas');
+                                    $arquivo_selecionado_config = $_SESSION['config_sistema']['periodo_relatorio']['arquivo_csv'] ?? '';
+                                    foreach ($arquivos_disponiveis as $arq):
+                                    ?>
+                                        <option value="<?= htmlspecialchars($arq['nome']) ?>"
+                                                <?= $arquivo_selecionado_config === $arq['nome'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($arq['nome']) ?> (<?= htmlspecialchars($arq['data']) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Escolha qual arquivo CSV usar no Top20 e relatórios. Se não selecionar, usará o mais recente.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Data Inicial do Período</strong></label>
+                                <input type="date" class="form-control" name="periodo_data_inicial"
+                                       value="<?= $_SESSION['config_sistema']['periodo_relatorio']['data_inicial'] ?? date('Y-m-01') ?>"
+                                       required>
+                                <small class="text-muted">Data de início para contagem de vendas</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Data Final do Período</strong></label>
+                                <input type="date" class="form-control" name="periodo_data_final"
+                                       value="<?= $_SESSION['config_sistema']['periodo_relatorio']['data_final'] ?? date('Y-m-t') ?>"
+                                       required>
+                                <small class="text-muted">Data final para contagem de vendas</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label><strong>Filtro de Status</strong></label>
+                                <select class="form-control" name="periodo_filtro_status">
+                                    <?php
+                                    $status_atual = $_SESSION['config_sistema']['periodo_relatorio']['filtro_status'] ?? 'Ativo';
+                                    ?>
+                                    <option value="Ativo" <?= $status_atual === 'Ativo' ? 'selected' : '' ?>>Apenas Ativo</option>
+                                    <option value="" <?= $status_atual === '' ? 'selected' : '' ?>>Todos os Status</option>
+                                    <option value="Cancelado" <?= $status_atual === 'Cancelado' ? 'selected' : '' ?>>Apenas Cancelado</option>
+                                </select>
+                                <small class="text-muted">Filtrar vendas por status</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <div class="custom-control custom-checkbox mt-4">
+                                    <input type="checkbox" class="custom-control-input"
+                                           id="periodo_apenas_primeira_parcela"
+                                           name="periodo_apenas_primeira_parcela"
+                                           <?= ($_SESSION['config_sistema']['periodo_relatorio']['apenas_primeira_parcela'] ?? false) ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="periodo_apenas_primeira_parcela">
+                                        <strong>Apenas com 1ª Parcela Paga</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block">Considerar apenas vendas que já receberam a primeira parcela</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <div class="custom-control custom-checkbox mt-4">
+                                    <input type="checkbox" class="custom-control-input"
+                                           id="periodo_apenas_vista"
+                                           name="periodo_apenas_vista"
+                                           <?= ($_SESSION['config_sistema']['periodo_relatorio']['apenas_vista'] ?? false) ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="periodo_apenas_vista">
+                                        <strong>Apenas Vendas à Vista</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block">Considerar apenas vendas à vista</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="alert alert-warning mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Importante:</strong> Após o dia 08 do mês seguinte ao período, o sistema
+                        automaticamente remove vendas canceladas e sem primeira parcela paga do ranking,
+                        independentemente dos filtros configurados aqui (Regra do Dia 08).
+                    </div>
+
+                    <hr>
+
+                    <button type="submit" name="salvar_config_top20" class="btn btn-info btn-block">
+                        <i class="fas fa-save"></i> Salvar Configurações do Top20
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mensagens de Parabéns para Relatórios Finais -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-trophy"></i> Mensagens de Parabéns (Relatórios Finais)
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure mensagens que serão exibidas aleatoriamente nos relatórios FINAIS (após dia 08).
+                    As mensagens ativas são selecionadas randomicamente ao carregar a página.
+                </p>
+
+                <!-- Formulário para adicionar mensagem -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label><strong>Título da Mensagem</strong></label>
+                                <input type="text" class="form-control" name="titulo_mensagem"
+                                       placeholder="Ex: Parabéns aos Campeões!" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><strong>Mensagem</strong></label>
+                                <textarea class="form-control" name="texto_mensagem" rows="2"
+                                          placeholder="Digite a mensagem de parabéns..." required></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="adicionar_mensagem_parabens" class="btn btn-success btn-block">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Lista de mensagens -->
+                <?php
+                $mensagens_parabens = carregarMensagensParabens();
+                ?>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th width="25%">Título</th>
+                                <th width="45%">Mensagem</th>
+                                <th width="10%" class="text-center">Status</th>
+                                <th width="12%">Data Criação</th>
+                                <th width="8%" class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($mensagens_parabens)): ?>
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    <i class="fas fa-info-circle"></i> Nenhuma mensagem cadastrada ainda.
+                                </td>
+                            </tr>
+                            <?php else: ?>
+                                <?php foreach ($mensagens_parabens as $msg): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($msg['titulo']) ?></strong></td>
+                                    <td><?= htmlspecialchars($msg['mensagem']) ?></td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="mensagem_id" value="<?= htmlspecialchars($msg['id']) ?>">
+                                            <button type="submit" name="alternar_status_mensagem"
+                                                    class="btn btn-sm btn-<?= $msg['ativo'] ? 'success' : 'secondary' ?>"
+                                                    title="Clique para <?= $msg['ativo'] ? 'desativar' : 'ativar' ?>">
+                                                <?= $msg['ativo'] ? 'Ativa' : 'Inativa' ?>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <?= date('d/m/Y', strtotime($msg['data_criacao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="mensagem_id" value="<?= htmlspecialchars($msg['id']) ?>">
+                                            <button type="submit" name="remover_mensagem_parabens"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Remover esta mensagem?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-info mb-0 mt-3">
+                    <i class="fas fa-lightbulb"></i>
+                    <strong>Dica:</strong> Mantenha pelo menos 3 mensagens ativas para maior variedade.
+                    As mensagens inativas não serão exibidas, mas ficam salvas para reativação futura.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Configurações de Senha -->
 <div class="row mb-4">
     <div class="col-md-12">
@@ -781,12 +1122,43 @@ if (!verificarAdmin()):
                             <label>
                                 <i class="fas fa-edit"></i> Nova Senha
                             </label>
-                            <input type="text" class="form-control" name="nova_senha" 
+                            <input type="text" class="form-control" name="nova_senha"
                                    placeholder="Digite a nova senha" required>
                         </div>
                         <div class="col-md-2">
                             <label>&nbsp;</label>
                             <button type="submit" name="alterar_senha_consultores" class="btn btn-warning btn-block">
+                                <i class="fas fa-save"></i> Alterar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+
+                <form method="post">
+                    <div class="form-row">
+                        <div class="col-md-6">
+                            <label>
+                                <i class="fas fa-user-shield"></i> Senha Mestre Atual (Admin)
+                            </label>
+                            <input type="text" class="form-control"
+                                   value="<?= htmlspecialchars($_SESSION['config_sistema']['acesso']['senha_mestre'] ?? 'Não definida') ?>"
+                                   disabled>
+                            <small class="form-text text-muted">
+                                Esta senha permite acesso a qualquer relatório sem validação de PIN/CPF
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <label>
+                                <i class="fas fa-edit"></i> Nova Senha Mestre
+                            </label>
+                            <input type="text" class="form-control" name="nova_senha_mestre"
+                                   placeholder="Digite a nova senha mestre" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label>&nbsp;</label>
+                            <button type="submit" name="alterar_senha_mestre" class="btn btn-danger btn-block">
                                 <i class="fas fa-save"></i> Alterar
                             </button>
                         </div>
@@ -808,17 +1180,63 @@ if (!verificarAdmin()):
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
+                    <?php
+                    $arquivos_vendas_existentes = listarCSVs('vendas');
+                    if (!empty($arquivos_vendas_existentes)):
+                    ?>
+                    <div class="alert alert-info">
+                        <small>
+                            <strong><i class="fas fa-info-circle"></i> Arquivos CSV de Vendas Existentes:</strong><br>
+                            <?php foreach ($arquivos_vendas_existentes as $idx => $arq): ?>
+                                <?= $idx + 1 ?>. <strong><?= htmlspecialchars($arq['nome']) ?></strong>
+                                (<?= htmlspecialchars($arq['data']) ?>)<br>
+                            <?php endforeach; ?>
+                        </small>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="form-group">
                         <label>
                             <i class="fas fa-file-csv"></i> Arquivo CSV
                         </label>
-                        <input type="file" class="form-control-file" name="csv_vendas" 
+                        <input type="file" class="form-control-file" name="csv_vendas"
                                accept=".csv" required>
                         <small class="form-text text-muted">
                             Formato esperado: Exportaço de vendas do sistema
                         </small>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input"
+                                   id="substituir_vendas" name="substituir_vendas" value="1"
+                                   onchange="toggleArquivoSubstituir('vendas')">
+                            <label class="custom-control-label" for="substituir_vendas">
+                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Se desmarcado, será criado um novo arquivo com timestamp
+                        </small>
+                    </div>
+
+                    <!-- Dropdown de arquivos (oculto por padrão) -->
+                    <div class="form-group" id="select_arquivo_vendas" style="display: none;">
+                        <label><strong>Escolha qual arquivo substituir:</strong></label>
+                        <select class="form-control" name="arquivo_substituir_vendas">
+                            <option value="">Selecione o arquivo...</option>
+                            <?php
+                            $arquivos_vendas_list = listarCSVs('vendas');
+                            foreach ($arquivos_vendas_list as $arq):
+                            ?>
+                                <option value="<?= htmlspecialchars($arq['nome']) ?>">
+                                    <?= htmlspecialchars($arq['nome']) ?>
+                                    (<?= htmlspecialchars($arq['data']) ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
                     <button type="submit" name="upload_vendas" class="btn btn-primary btn-block">
                         <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Vendas
                     </button>
@@ -836,21 +1254,523 @@ if (!verificarAdmin()):
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
+                    <?php
+                    $arquivos_promotores_existentes = listarCSVs('promotores');
+                    if (!empty($arquivos_promotores_existentes)):
+                    ?>
+                    <div class="alert alert-info">
+                        <small>
+                            <strong><i class="fas fa-info-circle"></i> Arquivos CSV de Promotores Existentes:</strong><br>
+                            <?php foreach ($arquivos_promotores_existentes as $idx => $arq): ?>
+                                <?= $idx + 1 ?>. <strong><?= htmlspecialchars($arq['nome']) ?></strong>
+                                (<?= htmlspecialchars($arq['data']) ?>)<br>
+                            <?php endforeach; ?>
+                        </small>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="form-group">
                         <label>
                             <i class="fas fa-file-csv"></i> Arquivo CSV
                         </label>
-                        <input type="file" class="form-control-file" name="csv_promotores" 
+                        <input type="file" class="form-control-file" name="csv_promotores"
                                accept=".csv" required>
                         <small class="form-text text-muted">
                             Lista de promotores/consultores
                         </small>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input"
+                                   id="substituir_promotores" name="substituir_promotores" value="1"
+                                   onchange="toggleArquivoSubstituir('promotores')">
+                            <label class="custom-control-label" for="substituir_promotores">
+                                <i class="fas fa-sync-alt"></i> Substituir arquivo existente
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Se desmarcado, será criado um novo arquivo com timestamp
+                        </small>
+                    </div>
+
+                    <!-- Dropdown de arquivos (oculto por padrão) -->
+                    <div class="form-group" id="select_arquivo_promotores" style="display: none;">
+                        <label><strong>Escolha qual arquivo substituir:</strong></label>
+                        <select class="form-control" name="arquivo_substituir_promotores">
+                            <option value="">Selecione o arquivo...</option>
+                            <?php
+                            $arquivos_promotores_list = listarCSVs('promotores');
+                            foreach ($arquivos_promotores_list as $arq):
+                            ?>
+                                <option value="<?= htmlspecialchars($arq['nome']) ?>">
+                                    <?= htmlspecialchars($arq['nome']) ?>
+                                    (<?= htmlspecialchars($arq['data']) ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
                     <button type="submit" name="upload_promotores" class="btn btn-info btn-block">
                         <i class="fas fa-cloud-upload-alt"></i> Enviar CSV de Promotores
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gerenciamento de Apelidos de Consultores -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-user-tag"></i> Apelidos de Consultores
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure apelidos para consultores que querem aparecer com outro nome no ranking.
+                    O nome original ficará visível apenas para você ao passar o mouse.
+                </p>
+
+                <!-- Formulário para adicionar apelido -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Nome Original do Consultor</strong></label>
+                                <input type="text" class="form-control" name="nome_original"
+                                       placeholder="Ex: João Silva" required
+                                       list="consultores-list">
+                                <datalist id="consultores-list">
+                                    <?php
+                                    // Lista consultores existentes (dos arquivos CSV)
+                                    $arquivos_vendas = listarCSVs('vendas');
+                                    $consultores_unicos = [];
+
+                                    foreach ($arquivos_vendas as $arquivo) {
+                                        $vendas_data = processarVendasCSV($arquivo['caminho']);
+                                        foreach ($vendas_data['por_consultor'] as $cons) {
+                                            $consultores_unicos[$cons['consultor']] = true;
+                                        }
+                                    }
+
+                                    foreach (array_keys($consultores_unicos) as $consultor):
+                                    ?>
+                                        <option value="<?= htmlspecialchars($consultor) ?>">
+                                    <?php endforeach; ?>
+                                </datalist>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Apelido (Nome para Exibir)</strong></label>
+                                <input type="text" class="form-control" name="apelido"
+                                       placeholder="Ex: J. Silva" required>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="adicionar_apelido" class="btn btn-warning btn-block">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Lista de apelidos existentes -->
+                <?php
+                $apelidos = carregarApelidosConsultores();
+                if (empty($apelidos)):
+                ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nenhum apelido configurado ainda.
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="35%">Nome Original</th>
+                                    <th width="35%">Apelido (Exibição)</th>
+                                    <th width="20%">Data Alteração</th>
+                                    <th width="10%" class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($apelidos as $nome_orig => $dados): ?>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-user text-muted"></i>
+                                        <strong><?= htmlspecialchars($nome_orig) ?></strong>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-tag text-warning"></i>
+                                        <?= htmlspecialchars($dados['apelido']) ?>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <?= date('d/m/Y H:i', strtotime($dados['data_alteracao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="nome_original" value="<?= htmlspecialchars($nome_orig) ?>">
+                                            <button type="submit" name="remover_apelido"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Remover apelido de <?= htmlspecialchars($nome_orig) ?>?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gerenciamento de Nomes Amigáveis de Relatórios -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-link"></i> Nomes Amigáveis de Relatórios (URLs)
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure nomes amigáveis para os arquivos CSV de vendas, facilitando o compartilhamento de links.<br>
+                    <strong>Exemplo:</strong> <code>vendas-novembro25</code> em vez de <code>2025-12-01_034017_vendas.csv</code>
+                </p>
+
+                <!-- Formulário para definir nome amigável -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Arquivo CSV</strong></label>
+                                <select class="form-control" name="nome_arquivo_csv" required>
+                                    <option value="">Selecione um arquivo...</option>
+                                    <?php
+                                    $arquivos_vendas = listarCSVs('vendas');
+                                    foreach ($arquivos_vendas as $arquivo):
+                                        $nome_arquivo = $arquivo['nome'];
+                                        $nome_amigavel_atual = gerarNomeAmigavel($nome_arquivo);
+                                    ?>
+                                        <option value="<?= htmlspecialchars($nome_arquivo) ?>">
+                                            <?= htmlspecialchars($nome_arquivo) ?>
+                                            (atual: <?= htmlspecialchars($nome_amigavel_atual) ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="form-group">
+                                <label><strong>Nome Amigável (para URL)</strong></label>
+                                <input type="text" class="form-control" name="nome_amigavel_csv"
+                                       placeholder="Ex: vendas-novembro25" required
+                                       pattern="[a-z0-9\-]+"
+                                       title="Apenas letras minúsculas, números e hífens">
+                                <small class="form-text text-muted">
+                                    Apenas letras minúsculas, números e hífens (-)
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="definir_nome_amigavel" class="btn btn-primary btn-block">
+                                <i class="fas fa-save"></i> Definir
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Lista de nomes amigáveis personalizados -->
+                <?php
+                $mapeamento_nomes = carregarMapeamentoNomes();
+                if (empty($mapeamento_nomes)):
+                ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nenhum nome amigável personalizado configurado.
+                        Os nomes são gerados automaticamente a partir da data do arquivo.
+                    </div>
+                <?php else: ?>
+                    <h6 class="mb-3"><strong>Nomes Personalizados:</strong></h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th width="40%">Arquivo CSV</th>
+                                    <th width="30%">Nome Amigável</th>
+                                    <th width="20%">Data Definição</th>
+                                    <th width="10%" class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($mapeamento_nomes as $nome_arquivo => $dados): ?>
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-file-csv text-muted"></i>
+                                        <code><?= htmlspecialchars($nome_arquivo) ?></code>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-link text-primary"></i>
+                                        <strong><?= htmlspecialchars($dados['nome_amigavel']) ?></strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            <i class="fas fa-external-link-alt"></i>
+                                            <code>?page=relatorio&arquivo=<?= htmlspecialchars($dados['nome_amigavel']) ?></code>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <?= date('d/m/Y H:i', strtotime($dados['data_definicao'])) ?>
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="nome_arquivo_remover" value="<?= htmlspecialchars($nome_arquivo) ?>">
+                                            <button type="submit" name="remover_nome_amigavel"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Remover nome amigável?\nO arquivo voltará a usar o nome automático.')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Tabela de nomes automáticos (referência) -->
+                <hr class="my-4">
+                <h6 class="mb-3"><strong>Todos os Arquivos e Seus Nomes Amigáveis:</strong></h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="thead-light">
+                            <tr>
+                                <th width="50%">Arquivo CSV</th>
+                                <th width="30%">Nome Amigável Atual</th>
+                                <th width="20%">Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $arquivos_vendas = listarCSVs('vendas');
+                            foreach ($arquivos_vendas as $arquivo):
+                                $nome_arquivo = $arquivo['nome'];
+                                $nome_amigavel = gerarNomeAmigavel($nome_arquivo);
+                                $e_personalizado = isset($mapeamento_nomes[$nome_arquivo]);
+                            ?>
+                            <tr class="<?= $e_personalizado ? 'table-primary' : '' ?>">
+                                <td>
+                                    <i class="fas fa-file-csv text-muted"></i>
+                                    <code><?= htmlspecialchars($nome_arquivo) ?></code>
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($nome_amigavel) ?></strong>
+                                </td>
+                                <td>
+                                    <?php if ($e_personalizado): ?>
+                                        <span class="badge badge-primary">Personalizado</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-secondary">Automático</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gerenciamento de Cotas Desconsideradas -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-ban"></i> Cotas Desconsideradas do Ranking/Top 20
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Configure cotas que devem ser <strong>excluídas</strong> dos cálculos de ranking e Top 20.
+                    As vendas dessas cotas não serão contabilizadas para os consultores.
+                </p>
+
+                <!-- Formulário para adicionar cotas -->
+                <form method="post" class="mb-4">
+                    <div class="row">
+                        <div class="col-md-10">
+                            <div class="form-group">
+                                <label><strong>Cotas para Desconsiderar</strong></label>
+                                <input type="text" class="form-control" name="cotas_lista"
+                                       placeholder="Ex: 12345, 67890, 11111 (separadas por vírgula)" required>
+                                <small class="form-text text-muted">
+                                    <i class="fas fa-lightbulb"></i>
+                                    Você pode informar uma única cota ou várias separadas por vírgula
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="d-block">&nbsp;</label>
+                            <button type="submit" name="adicionar_cotas_desconsideradas" class="btn btn-danger btn-block">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <?php
+                $cotas_desconsideradas = carregarCotasDesconsideradas();
+                $total_cotas = count($cotas_desconsideradas);
+                ?>
+
+                <!-- Estatísticas -->
+                <div class="alert alert-<?= $total_cotas > 0 ? 'warning' : 'info' ?> mb-3">
+                    <i class="fas fa-chart-bar"></i>
+                    <strong><?= $total_cotas ?></strong> cota(s) desconsiderada(s) atualmente.
+                    <?php if ($total_cotas > 0): ?>
+                        <form method="post" style="display: inline; float: right;">
+                            <button type="submit" name="limpar_cotas_desconsideradas"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Deseja remover TODAS as cotas da lista de exclusão?')">
+                                <i class="fas fa-broom"></i> Limpar Todas
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Campo de pesquisa -->
+                <?php if ($total_cotas > 0): ?>
+                <div class="form-group mb-3">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                <i class="fas fa-search"></i>
+                            </span>
+                        </div>
+                        <input type="text" class="form-control" id="pesquisa-cotas"
+                               placeholder="Digite para buscar uma cota específica...">
+                    </div>
+                    <small class="form-text text-muted" id="contador-cotas">
+                        Mostrando <strong id="total-visiveis"><?= $total_cotas ?></strong> de <strong><?= $total_cotas ?></strong> cotas
+                    </small>
+                </div>
+
+                <!-- Lista de cotas desconsideradas -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th width="20%">Cota</th>
+                                <th width="30%">Data de Exclusão</th>
+                                <th width="40%">Status</th>
+                                <th width="10%" class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-cotas-desconsideradas">
+                            <?php foreach ($cotas_desconsideradas as $cota => $dados): ?>
+                            <tr class="linha-cota" data-cota="<?= htmlspecialchars($cota) ?>">
+                                <td>
+                                    <i class="fas fa-hashtag text-danger"></i>
+                                    <strong class="cota-numero"><?= htmlspecialchars($cota) ?></strong>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i>
+                                        <?= date('d/m/Y H:i', strtotime($dados['data_exclusao'])) ?>
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge badge-danger">
+                                        <i class="fas fa-ban"></i> Desconsiderada
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <form method="post" style="display: inline;">
+                                        <input type="hidden" name="cota" value="<?= htmlspecialchars($cota) ?>">
+                                        <button type="submit" name="remover_cota_desconsiderada"
+                                                class="btn btn-success btn-sm"
+                                                title="Reativar cota (remover da exclusão)"
+                                                onclick="return confirm('Remover a cota <?= htmlspecialchars($cota) ?> da lista de exclusão?\nEla voltará a ser contabilizada no ranking.')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Script para filtro de pesquisa -->
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const inputPesquisa = document.getElementById('pesquisa-cotas');
+                    const linhasCotas = document.querySelectorAll('.linha-cota');
+                    const totalVisiveis = document.getElementById('total-visiveis');
+
+                    if (inputPesquisa) {
+                        inputPesquisa.addEventListener('input', function() {
+                            const termoPesquisa = this.value.toLowerCase().trim();
+                            let contadorVisiveis = 0;
+
+                            linhasCotas.forEach(function(linha) {
+                                const numeroCota = linha.getAttribute('data-cota').toLowerCase();
+
+                                if (numeroCota.includes(termoPesquisa)) {
+                                    linha.style.display = '';
+                                    contadorVisiveis++;
+                                } else {
+                                    linha.style.display = 'none';
+                                }
+                            });
+
+                            totalVisiveis.textContent = contadorVisiveis;
+
+                            // Feedback visual
+                            if (contadorVisiveis === 0 && termoPesquisa !== '') {
+                                if (!document.getElementById('sem-resultados-cotas')) {
+                                    const msgSemResultados = document.createElement('tr');
+                                    msgSemResultados.id = 'sem-resultados-cotas';
+                                    msgSemResultados.innerHTML = '<td colspan="4" class="text-center text-muted"><i class="fas fa-search"></i> Nenhuma cota encontrada para "' + termoPesquisa + '"</td>';
+                                    document.getElementById('tabela-cotas-desconsideradas').appendChild(msgSemResultados);
+                                }
+                            } else {
+                                const msgExistente = document.getElementById('sem-resultados-cotas');
+                                if (msgExistente) {
+                                    msgExistente.remove();
+                                }
+                            }
+                        });
+                    }
+                });
+                </script>
+
+                <?php else: ?>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Nenhuma cota desconsiderada. Todas as vendas estão sendo contabilizadas!
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -987,160 +1907,44 @@ if (!verificarAdmin()):
     </div>
 </div>
 
-<!-- Seção de Banco de Dados -->
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-database"></i> Gerenciamento de Banco de Dados
-                </h5>
-            </div>
-            <div class="card-body">
-                <?php if (isset($output_importacao)): ?>
-                    <div class="alert alert-info">
-                        <strong>Log da Importação:</strong>
-                        <div style="max-height: 300px; overflow-y: auto; font-size: 12px;">
-                            <?= $output_importacao ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
+<script>
+// Função para mostrar/ocultar dropdown de arquivos quando checkbox for marcado
+function toggleArquivoSubstituir(tipo) {
+    console.log('toggleArquivoSubstituir chamado para:', tipo);
 
-                <div class="row mb-3">
-                    <div class="col-md-12">
-                        <a href="database/migrations.php" target="_blank" class="btn btn-info">
-                            <i class="fas fa-cogs"></i> Gerenciar Tabelas
-                        </a>
-                        <a href="database/migrations.php?action=verificar" target="_blank" class="btn btn-secondary">
-                            <i class="fas fa-check-circle"></i> Verificar Integridade
-                        </a>
-                        <a href="database/migrations.php?action=exportar" target="_blank" class="btn btn-success">
-                            <i class="fas fa-download"></i> Exportar Dados (JSON)
-                        </a>
-                    </div>
-                </div>
+    const checkbox = document.getElementById('substituir_' + tipo);
+    const selectDiv = document.getElementById('select_arquivo_' + tipo);
 
-                <hr>
+    if (!checkbox) {
+        console.error('Checkbox não encontrado:', 'substituir_' + tipo);
+        return;
+    }
 
-                <h6><i class="fas fa-upload"></i> Importar CSVs para Banco de Dados</h6>
-                <p class="text-muted">Selecione arquivos CSV já enviados para importar no banco de dados MySQL.</p>
+    if (!selectDiv) {
+        console.error('Div de seleção não encontrada:', 'select_arquivo_' + tipo);
+        return;
+    }
 
-                <!-- Importar Vendas -->
-                <div class="card mb-3">
-                    <div class="card-header bg-light">
-                        <strong>Importar Vendas</strong>
-                    </div>
-                    <div class="card-body">
-                        <?php $arquivos_vendas_db = listarCSVs('vendas'); ?>
-                        <?php if (empty($arquivos_vendas_db)): ?>
-                            <p class="text-muted">Nenhum arquivo de vendas disponível.</p>
-                        <?php else: ?>
-                            <form method="post">
-                                <input type="hidden" name="tipo_importacao" value="vendas">
+    const select = selectDiv.querySelector('select');
 
-                                <div class="form-group">
-                                    <label>Arquivo CSV</label>
-                                    <select name="arquivo_path" class="form-control" required onchange="preencherMetadadosVendas(this)">
-                                        <option value="">-- Selecione --</option>
-                                        <?php foreach ($arquivos_vendas_db as $arq): ?>
-                                            <option value="<?= htmlspecialchars($arq['caminho']) ?>"
-                                                    data-nome="<?= htmlspecialchars($arq['nome_amigavel'] ?? '') ?>"
-                                                    data-mes="<?= htmlspecialchars($arq['mes_referencia'] ?? '') ?>">
-                                                <?= $arq['nome_amigavel'] ?? $arq['nome'] ?>
-                                                <?= $arq['mes_referencia'] ? "({$arq['mes_referencia']})" : '' ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
+    if (!select) {
+        console.error('Select não encontrado dentro de:', 'select_arquivo_' + tipo);
+        return;
+    }
 
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>Mês de Referência *</label>
-                                            <input type="month" name="mes_ref" id="mes_ref_vendas" class="form-control" required>
-                                            <small class="text-muted">Mês das vendas (para filtros e relatórios)</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>Nome Amigável</label>
-                                            <input type="text" name="nome_amig" id="nome_amig_vendas" class="form-control"
-                                                   placeholder="Ex: Vendas Novembro 2025">
-                                        </div>
-                                    </div>
-                                </div>
+    console.log('Checkbox checked:', checkbox.checked);
 
-                                <div class="form-check mb-3">
-                                    <input type="checkbox" class="form-check-input" name="reimportar" id="reimportar_vendas">
-                                    <label class="form-check-label" for="reimportar_vendas">
-                                        <strong class="text-warning">Reimportar</strong>
-                                        (remove vendas existentes do mesmo mês antes de importar)
-                                    </label>
-                                </div>
-
-                                <button type="submit" name="importar_para_banco" class="btn btn-primary">
-                                    <i class="fas fa-database"></i> Importar para Banco
-                                </button>
-                            </form>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- Importar Promotores -->
-                <div class="card">
-                    <div class="card-header bg-light">
-                        <strong>Importar Promotores</strong>
-                    </div>
-                    <div class="card-body">
-                        <?php $arquivos_promotores_db = listarCSVs('promotores'); ?>
-                        <?php if (empty($arquivos_promotores_db)): ?>
-                            <p class="text-muted">Nenhum arquivo de promotores disponível.</p>
-                        <?php else: ?>
-                            <form method="post">
-                                <input type="hidden" name="tipo_importacao" value="promotores">
-
-                                <div class="form-group">
-                                    <label>Arquivo CSV</label>
-                                    <select name="arquivo_path" class="form-control" required onchange="preencherMetadadosPromotores(this)">
-                                        <option value="">-- Selecione --</option>
-                                        <?php foreach ($arquivos_promotores_db as $arq): ?>
-                                            <option value="<?= htmlspecialchars($arq['caminho']) ?>"
-                                                    data-nome="<?= htmlspecialchars($arq['nome_amigavel'] ?? '') ?>">
-                                                <?= $arq['nome_amigavel'] ?? $arq['nome'] ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>Nome Amigável</label>
-                                    <input type="text" name="nome_amig" id="nome_amig_promotores" class="form-control"
-                                           placeholder="Ex: Promotores Novembro 2025">
-                                </div>
-
-                                <button type="submit" name="importar_para_banco" class="btn btn-primary">
-                                    <i class="fas fa-database"></i> Importar para Banco
-                                </button>
-                            </form>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <script>
-                function preencherMetadadosVendas(select) {
-                    const option = select.options[select.selectedIndex];
-                    document.getElementById('nome_amig_vendas').value = option.dataset.nome || '';
-                    document.getElementById('mes_ref_vendas').value = option.dataset.mes || '';
-                }
-
-                function preencherMetadadosPromotores(select) {
-                    const option = select.options[select.selectedIndex];
-                    document.getElementById('nome_amig_promotores').value = option.dataset.nome || '';
-                }
-                </script>
-            </div>
-        </div>
-    </div>
-</div>
+    if (checkbox.checked) {
+        selectDiv.style.display = 'block';
+        select.required = true;
+        console.log('Dropdown mostrado para:', tipo);
+    } else {
+        selectDiv.style.display = 'none';
+        select.required = false;
+        select.value = '';
+        console.log('Dropdown ocultado para:', tipo);
+    }
+}
+</script>
 
 <?php endif; ?>

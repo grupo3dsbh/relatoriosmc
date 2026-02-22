@@ -2,17 +2,6 @@
 // functions/vendas.php - Funções para processar vendas
 
 /**
- * Retorna a lista de cotas desconsideradas configurada no sistema
- * @return array Lista de IDs de cotas (ex: ['SFA-10001', 'SFA-9999'])
- */
-function obterCotasDesconsideradas() {
-    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
-    $lista = $config['cotas_desconsideradas'] ?? [];
-    // Normaliza para maiúsculas e remove espaços
-    return array_map('strtoupper', array_map('trim', $lista));
-}
-
-/**
  * Extrai número de vagas do nome do produto
  */
 function extrairNumeroVagas($produto) {
@@ -24,32 +13,37 @@ function extrairNumeroVagas($produto) {
 
 /**
  * Processa CSV de vendas detalhadas
- * Estrutura do CSV (25 campos, índices 0-24):
- * 0: ID (SFA-XXXX)
+ * Estrutura do CSV (30 campos, índices 0-29):
+ * 0: NumeroTitulo (ID - SFA-XXXX)
  * 1: NomeProdutoOriginal
  * 2: NomeProdutoAtual
  * 3: AlterouVagas
  * 4: Categoria
- * 5: DataCadastro
- * 6: DataVenda
- * 7: OrigemVenda
- * 8: ResidentialPhone
- * 9: StatusTitulo
- * 10: Promotor
- * 11: Gerente
- * 12: NomeTitular
- * 13: DocumentoTitular
- * 14: QuantidadeParcelasVenda
- * 15: Parcelas (lista)
- * 16: ValoresPagos
- * 17: FormaPagamento (ex: "Loja Cartão de Crédito")
- * 18: ParcelasPagas
- * 19: TipoPagamento (ex: "Recorrente")
+ * 5: StatusTitulo
+ * 6: DataCadastro
+ * 7: DataPrimeiraVenda
+ * 8: DataUltimaVenda
+ * 9: NomeTitular
+ * 10: DocumentoTitular
+ * 11: TelefoneResidencial
+ * 12: OrigemVenda
+ * 13: Promotor
+ * 14: Gerente
+ * 15: NumeroCartao
+ * 16: Bandeira
+ * 17: TipoPagamentoCartao
+ * 18: QuantidadeParcelasVenda
+ * 19: QtdParcelasPagas
  * 20: ValorParcela
- * 21: ValorTotalPlano
- * 22: TotalPago
- * 23: SaldoRestante
- * 24: ParcelasRestantes
+ * 21: TotalPago
+ * 22: SaldoRestante
+ * 23: ParcelasRestantes
+ * 24: FormaPagamento
+ * 25: TipoPagamento
+ * 26: PeriodoTitulo
+ * 27: DiasDesdeVenda
+ * 28: ListaParcelasPagas
+ * 29: ListaValoresPagos
  */
  
  /**
@@ -145,9 +139,6 @@ function processarVendasCSV($arquivo, $filtros = []) {
     $vendas = [];
     $por_consultor = [];
     $log_ignorados = [];
-    $vendas_desconsideradas = [];
-    $por_consultor_desconsideradas = [];
-    $cotas_desconsideradas = obterCotasDesconsideradas();
     
     if (($handle = fopen($arquivo, "r")) !== false) {
         // ===== REMOVE BOM UTF-8 DO INÍCIO DO ARQUIVO =====
@@ -202,47 +193,90 @@ function processarVendasCSV($arquivo, $filtros = []) {
                 continue;
             }
             
-            // LOG: Colunas insuficientes
+            // LOG: Colunas insuficientes (aceita 25 ou 30 campos para compatibilidade)
             if (count($dados) < 25) {
                 $log_ignorados[] = [
                     'linha' => $linha_num,
-                    'motivo' => 'Colunas insuficientes (' . count($dados) . '/25)',
+                    'motivo' => 'Colunas insuficientes (' . count($dados) . '/mínimo 25)',
                     'id' => $dados[0] ?? 'N/A'
                 ];
                 continue;
             }
-            
+
             // ===== REMOVE BOM DA PRIMEIRA COLUNA (SE EXISTIR) =====
             $dados[0] = removerBOM(trim($dados[0]));
-            
-            // Mapeia dados
-            $venda = [
-                'id' => trim($dados[0]),
-                'produto_original' => trim($dados[1] ?? ''),
-                'produto_atual' => trim($dados[2] ?? ''),
-                'alterou_vagas' => trim($dados[3] ?? ''),
-                'categoria' => trim($dados[4] ?? ''),
-                'data_cadastro' => trim($dados[5] ?? ''),
-                'data_venda' => trim($dados[6] ?? ''),
-                'origem_venda' => trim($dados[7] ?? ''),
-                'telefone' => trim($dados[8] ?? ''),
-                'status' => trim($dados[9] ?? ''),
-                'consultor' => trim($dados[10] ?? ''),
-                'gerente' => trim($dados[11] ?? ''),
-                'titular' => trim($dados[12] ?? ''),
-                'cpf' => trim($dados[13] ?? ''),
-                'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
-                'parcelas' => trim($dados[15] ?? ''),
-                'valores_pagos' => trim($dados[16] ?? ''),
-                'forma_pagamento' => trim($dados[17] ?? ''),  // FormaPagamento (ex: "Loja Cartão de Crédito")
-                'parcelas_pagas' => intval($dados[18] ?? 0),  // ParcelasPagas (número)
-                'tipo_pagamento' => trim($dados[19] ?? ''),   // TipoPagamento (ex: "Recorrente")
-                'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
-                'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),      // ValorTotalPlano
-                'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),       // TotalPago
-                'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),   // SaldoRestante
-                'parcelas_restantes' => intval($dados[24] ?? 0)                         // ParcelasRestantes
-            ];
+
+            // Detecta formato do CSV (25 campos antigo ou 30 campos novo)
+            $formato_novo = count($dados) >= 30;
+
+            if ($formato_novo) {
+                // Formato NOVO com 30 campos
+                $venda = [
+                    'id' => trim($dados[0]),
+                    'produto_original' => trim($dados[1] ?? ''),
+                    'produto_atual' => trim($dados[2] ?? ''),
+                    'alterou_vagas' => trim($dados[3] ?? ''),
+                    'categoria' => trim($dados[4] ?? ''),
+                    'status' => trim($dados[5] ?? ''),
+                    'data_cadastro' => trim($dados[6] ?? ''),
+                    'data_primeira_venda' => trim($dados[7] ?? ''),
+                    'data_venda' => trim($dados[8] ?? ''),  // DataUltimaVenda
+                    'titular' => trim($dados[9] ?? ''),
+                    'cpf' => trim($dados[10] ?? ''),
+                    'telefone' => trim($dados[11] ?? ''),
+                    'origem_venda' => trim($dados[12] ?? ''),
+                    'consultor' => trim($dados[13] ?? ''),
+                    'gerente' => trim($dados[14] ?? ''),
+                    'numero_cartao' => trim($dados[15] ?? ''),
+                    'bandeira' => trim($dados[16] ?? ''),
+                    'tipo_pagamento_cartao' => trim($dados[17] ?? ''),
+                    'quantidade_parcelas_venda' => intval($dados[18] ?? 0),
+                    'parcelas_pagas' => intval($dados[19] ?? 0),
+                    'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                    'valor_pago' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
+                    'valor_restante' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
+                    'parcelas_restantes' => intval($dados[23] ?? 0),
+                    'forma_pagamento' => trim($dados[24] ?? ''),
+                    'tipo_pagamento' => trim($dados[25] ?? ''),
+                    'periodo_titulo' => trim($dados[26] ?? ''),
+                    'dias_desde_venda' => trim($dados[27] ?? ''),
+                    'parcelas' => trim($dados[28] ?? ''),  // ListaParcelasPagas
+                    'valores_pagos' => trim($dados[29] ?? ''),  // ListaValoresPagos
+                    'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)) + floatval(str_replace(',', '.', $dados[22] ?? 0))  // TotalPago + SaldoRestante
+                ];
+            } else {
+                // Formato ANTIGO com 25 campos (retrocompatibilidade)
+                $venda = [
+                    'id' => trim($dados[0]),
+                    'produto_original' => trim($dados[1] ?? ''),
+                    'produto_atual' => trim($dados[2] ?? ''),
+                    'alterou_vagas' => trim($dados[3] ?? ''),
+                    'categoria' => trim($dados[4] ?? ''),
+                    'data_cadastro' => trim($dados[5] ?? ''),
+                    'data_venda' => trim($dados[6] ?? ''),
+                    'origem_venda' => trim($dados[7] ?? ''),
+                    'telefone' => trim($dados[8] ?? ''),
+                    'status' => trim($dados[9] ?? ''),
+                    'consultor' => trim($dados[10] ?? ''),
+                    'gerente' => trim($dados[11] ?? ''),
+                    'titular' => trim($dados[12] ?? ''),
+                    'cpf' => trim($dados[13] ?? ''),
+                    'quantidade_parcelas_venda' => intval($dados[14] ?? 0),
+                    'parcelas' => trim($dados[15] ?? ''),
+                    'valores_pagos' => trim($dados[16] ?? ''),
+                    'forma_pagamento' => trim($dados[17] ?? ''),
+                    'parcelas_pagas' => intval($dados[18] ?? 0),
+                    'tipo_pagamento' => trim($dados[19] ?? ''),
+                    'valor_parcela' => floatval(str_replace(',', '.', $dados[20] ?? 0)),
+                    'valor_total' => floatval(str_replace(',', '.', $dados[21] ?? 0)),
+                    'valor_pago' => floatval(str_replace(',', '.', $dados[22] ?? 0)),
+                    'valor_restante' => floatval(str_replace(',', '.', $dados[23] ?? 0)),
+                    'parcelas_restantes' => intval($dados[24] ?? 0),
+                    'numero_cartao' => '',  // Não disponível no formato antigo
+                    'bandeira' => '',  // Não disponível no formato antigo
+                    'tipo_pagamento_cartao' => ''  // Não disponível no formato antigo
+                ];
+            }
             
             // Debug da primeira venda
             if ($linhas_lidas == 1) {
@@ -282,27 +316,41 @@ function processarVendasCSV($arquivo, $filtros = []) {
             
             // Processa dados adicionais
             $venda['num_vagas'] = extrairNumeroVagas($venda['produto_atual']);
+            $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
+
+            // Se produto foi alterado, extrai vagas originais para comparação de pontos
+            if ($venda['produto_alterado']) {
+                $venda['num_vagas_original'] = extrairNumeroVagas($venda['produto_original']);
+            } else {
+                $venda['num_vagas_original'] = $venda['num_vagas'];
+            }
+
             $venda['e_vista'] = (
                 $venda['tipo_pagamento'] === 'À Vista' ||
                 stripos($venda['tipo_pagamento'], 'vista') !== false ||
                 $venda['quantidade_parcelas_venda'] <= 1
             );
             $venda['primeira_parcela_paga'] = ($venda['parcelas_pagas'] > 0);
-            $venda['produto_alterado'] = ($venda['produto_original'] !== $venda['produto_atual']);
             $venda['cpf_limpo'] = preg_replace('/[^0-9]/', '', $venda['cpf']);
 
-            // IMPORTANTE: SEMPRE usa DataCadastro para filtros e pontuação
+            // CRÍTICO: SEMPRE usa DataCadastro para filtros e pontuação
             // Para vendas alteradas:
-            //   - DataCadastro = data original da venda
-            //   - DataVenda = data da alteração
+            //   - DataCadastro = data original da venda (NUNCA MUDA!)
+            //   - DataVenda = data da alteração (muda quando altera produto)
             // Para vendas normais:
             //   - DataCadastro = DataVenda = data da venda
 
-            // Para FILTROS de período: SEMPRE usa DataCadastro (data original/real da venda)
-            $venda['data_para_filtro'] = $venda['data_cadastro'];
-
-            // Para PONTUAÇÃO/RANGES: SEMPRE usa DataCadastro (data original para aplicar range correto)
-            $venda['data_para_pontuacao'] = $venda['data_cadastro'];
+            // FORÇAR uso de DataCadastro (sem fallback)
+            // Se DataCadastro estiver vazia, isso é um ERRO no CSV que deve ser corrigido
+            if (empty($venda['data_cadastro'])) {
+                error_log("AVISO: DataCadastro vazia para venda {$venda['id']}! Usando DataVenda como fallback EMERGENCIAL.");
+                $venda['data_para_filtro'] = $venda['data_venda'];
+                $venda['data_para_pontuacao'] = $venda['data_venda'];
+            } else {
+                // SEMPRE usa DataCadastro (data original que NUNCA muda)
+                $venda['data_para_filtro'] = $venda['data_cadastro'];
+                $venda['data_para_pontuacao'] = $venda['data_cadastro'];
+            }
 
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
@@ -317,25 +365,13 @@ function processarVendasCSV($arquivo, $filtros = []) {
             }
 
             // Verifica se a cota está na lista de desconsideradas
-            if (!empty($cotas_desconsideradas) && in_array(strtoupper($venda['id']), $cotas_desconsideradas)) {
-                $vendas_desconsideradas[] = $venda;
-                $cn = $venda['consultor'];
-                if (!isset($por_consultor_desconsideradas[$cn])) {
-                    $por_consultor_desconsideradas[$cn] = [
-                        'consultor' => $cn,
-                        'vendas_detalhes' => [],
-                        'ids' => []
-                    ];
-                }
-                $por_consultor_desconsideradas[$cn]['vendas_detalhes'][] = [
-                    'id'         => $venda['id'],
-                    'num_vagas'  => $venda['num_vagas'],
-                    'e_vista'    => $venda['e_vista'],
-                    'data_venda' => $venda['data_para_pontuacao'],
-                    'valor_total'=> $venda['valor_total'],
-                    'valor_pago' => $venda['valor_pago']
+            $cota_numero = str_replace('SFA-', '', $venda['id']);
+            if (isCotaDesconsiderada($cota_numero)) {
+                $log_ignorados[] = [
+                    'linha' => $linha_num,
+                    'motivo' => 'COTA DESCONSIDERADA: Configurada para não contabilizar no ranking',
+                    'id' => $venda['id']
                 ];
-                $por_consultor_desconsideradas[$cn]['ids'][] = $venda['id'];
                 continue;
             }
 
@@ -377,25 +413,199 @@ function processarVendasCSV($arquivo, $filtros = []) {
             $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
                 'num_vagas' => $venda['num_vagas'],
                 'e_vista' => $venda['e_vista'],
-                'data_venda' => $venda['data_para_pontuacao'],  // Usa data original para ranges
+                'data_venda' => $venda['data_para_pontuacao'],  // Usa data original (DataCadastro) para ranges
+                'data_cadastro_original' => $venda['data_cadastro'], // DEBUG: guardar para verificação
+                'data_venda_original' => $venda['data_venda'], // DEBUG: guardar para verificação
+                'id_venda' => $venda['id'], // DEBUG: para rastreamento
                 'valor_total' => $venda['valor_total'],
                 'valor_pago' => $venda['valor_pago']
             ];
         }
         
         fclose($handle);
-        
-         "<!-- PROCESSAMENTO: " . $linhas_lidas . " linhas lidas, " . 
-             count($vendas) . " vendas processadas, " . 
+
+         "<!-- PROCESSAMENTO: " . $linhas_lidas . " linhas lidas, " .
+             count($vendas) . " vendas processadas, " .
              count($log_ignorados) . " ignoradas -->";
     }
-    
+
+    // === FILTRO DE CARTÕES DUPLICADOS ===
+    $vendas_ignoradas_cartao = [];
+    if (!empty($filtros['ignorar_cartao_duplicado'])) {
+        $cartoes_duplicados = detectarCartoesDuplicados($vendas);
+
+        if ($cartoes_duplicados['total'] > 0) {
+            $vendas_filtradas = [];
+
+            foreach ($vendas as $venda) {
+                $numero_cartao = trim($venda['numero_cartao'] ?? '');
+                $e_duplicado = false;
+
+                // Verifica se o cartão está na lista de duplicados
+                if (!empty($numero_cartao) && in_array($numero_cartao, $cartoes_duplicados['cartoes'])) {
+                    $e_duplicado = true;
+                    $vendas_ignoradas_cartao[] = [
+                        'id' => $venda['id'],
+                        'titular' => $venda['titular'],
+                        'consultor' => $venda['consultor'],
+                        'produto' => $venda['produto_atual'],
+                        'valor_total' => $venda['valor_total'],
+                        'numero_cartao' => $numero_cartao,
+                        'bandeira' => $venda['bandeira'] ?? '',
+                        'data_venda' => $venda['data_venda'],
+                        'motivo' => 'Cartão duplicado'
+                    ];
+
+                    $log_ignorados[] = [
+                        'linha' => '-',
+                        'motivo' => 'FILTRADO PÓS-PROCESSAMENTO: Cartão duplicado (' . substr($numero_cartao, -4) . ')',
+                        'id' => $venda['id']
+                    ];
+                } else {
+                    $vendas_filtradas[] = $venda;
+                }
+            }
+
+            $vendas = $vendas_filtradas;
+
+            // Reprocessa por_consultor com vendas filtradas
+            $por_consultor = [];
+            foreach ($vendas as $venda) {
+                $consultor_nome = $venda['consultor'];
+
+                if (!isset($por_consultor[$consultor_nome])) {
+                    $por_consultor[$consultor_nome] = [
+                        'consultor' => $consultor_nome,
+                        'venda' => 0,
+                        'devido' => 0,
+                        'pago' => 0,
+                        'quantidade' => 0,
+                        'vendas_ativas' => 0,
+                        'contagem_vagas' => [],
+                        'vendas_detalhes' => [],
+                        'vendas_ids' => [],
+                        'vendas_acima_2vagas' => 0
+                    ];
+                }
+
+                $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
+                $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
+                $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
+                $por_consultor[$consultor_nome]['quantidade']++;
+                $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
+
+                if ($venda['status'] === 'Ativo') {
+                    $por_consultor[$consultor_nome]['vendas_ativas']++;
+                }
+
+                if ($venda['num_vagas'] > 2) {
+                    $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
+                }
+
+                $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
+                    'num_vagas' => $venda['num_vagas'],
+                    'e_vista' => $venda['e_vista'],
+                    'data_venda' => $venda['data_para_pontuacao'],
+                    'data_cadastro_original' => $venda['data_cadastro'],
+                    'data_venda_original' => $venda['data_venda'],
+                    'id_venda' => $venda['id'],
+                    'valor_total' => $venda['valor_total'],
+                    'valor_pago' => $venda['valor_pago']
+                ];
+            }
+        }
+    }
+
+    // === FILTRO DE VENDAS PIX ===
+    $vendas_ignoradas_pix = [];
+    if (!empty($filtros['ignorar_vendas_pix'])) {
+        $vendas_filtradas = [];
+
+        foreach ($vendas as $venda) {
+            $forma_pagamento = strtoupper(trim($venda['forma_pagamento'] ?? ''));
+            $tipo_pagamento = strtoupper(trim($venda['tipo_pagamento'] ?? ''));
+
+            // Verifica se é PIX
+            $e_pix = (stripos($forma_pagamento, 'PIX') !== false) ||
+                     (stripos($tipo_pagamento, 'PIX') !== false);
+
+            if ($e_pix) {
+                $vendas_ignoradas_pix[] = [
+                    'id' => $venda['id'],
+                    'titular' => $venda['titular'],
+                    'consultor' => $venda['consultor'],
+                    'produto' => $venda['produto_atual'],
+                    'valor_total' => $venda['valor_total'],
+                    'forma_pagamento' => $venda['forma_pagamento'],
+                    'data_venda' => $venda['data_venda'],
+                    'motivo' => 'Pagamento via PIX'
+                ];
+
+                $log_ignorados[] = [
+                    'linha' => '-',
+                    'motivo' => 'FILTRADO PÓS-PROCESSAMENTO: Venda PIX',
+                    'id' => $venda['id']
+                ];
+            } else {
+                $vendas_filtradas[] = $venda;
+            }
+        }
+
+        $vendas = $vendas_filtradas;
+
+        // Reprocessa por_consultor com vendas filtradas
+        $por_consultor = [];
+        foreach ($vendas as $venda) {
+            $consultor_nome = $venda['consultor'];
+
+            if (!isset($por_consultor[$consultor_nome])) {
+                $por_consultor[$consultor_nome] = [
+                    'consultor' => $consultor_nome,
+                    'venda' => 0,
+                    'devido' => 0,
+                    'pago' => 0,
+                    'quantidade' => 0,
+                    'vendas_ativas' => 0,
+                    'contagem_vagas' => [],
+                    'vendas_detalhes' => [],
+                    'vendas_ids' => [],
+                    'vendas_acima_2vagas' => 0
+                ];
+            }
+
+            $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
+            $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
+            $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
+            $por_consultor[$consultor_nome]['quantidade']++;
+            $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
+
+            if ($venda['status'] === 'Ativo') {
+                $por_consultor[$consultor_nome]['vendas_ativas']++;
+            }
+
+            if ($venda['num_vagas'] > 2) {
+                $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
+            }
+
+            $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
+                'num_vagas' => $venda['num_vagas'],
+                'e_vista' => $venda['e_vista'],
+                'data_venda' => $venda['data_para_pontuacao'],
+                'data_cadastro_original' => $venda['data_cadastro'],
+                'data_venda_original' => $venda['data_venda'],
+                'id_venda' => $venda['id'],
+                'valor_total' => $venda['valor_total'],
+                'valor_pago' => $venda['valor_pago']
+            ];
+        }
+    }
+
     return [
-        'vendas'                       => $vendas,
-        'por_consultor'                => array_values($por_consultor),
-        'log_ignorados'                => $log_ignorados,
-        'vendas_desconsideradas'       => $vendas_desconsideradas,
-        'por_consultor_desconsideradas'=> $por_consultor_desconsideradas
+        'vendas' => $vendas,
+        'por_consultor' => array_values($por_consultor),
+        'log_ignorados' => $log_ignorados,
+        'vendas_ignoradas_cartao' => $vendas_ignoradas_cartao,
+        'vendas_ignoradas_pix' => $vendas_ignoradas_pix
     ];
 }
 /**
@@ -438,6 +648,52 @@ function detectarDuplicados($vendas) {
     return [
         'total' => count($duplicados),
         'cpfs' => array_keys($duplicados),
+        'detalhes' => $duplicados
+    ];
+}
+
+/**
+ * Detecta vendas com cart\u00f5es duplicados (mesmo n\u00famero de cart\u00e3o)
+ */
+function detectarCartoesDuplicados($vendas) {
+    $cartoes = [];
+    $duplicados = [];
+
+    foreach ($vendas as $index => $venda) {
+        $numero_cartao = trim($venda['numero_cartao'] ?? '');
+
+        // Ignora se n\u00e3o tiver n\u00famero de cart\u00e3o
+        if (empty($numero_cartao) || $numero_cartao === 'NULL' || strlen($numero_cartao) < 4) {
+            continue;
+        }
+
+        if (!isset($cartoes[$numero_cartao])) {
+            $cartoes[$numero_cartao] = [];
+        }
+
+        $cartoes[$numero_cartao][] = [
+            'index' => $index,
+            'id' => $venda['id'],
+            'titular' => $venda['titular'],
+            'consultor' => $venda['consultor'],
+            'data_venda' => $venda['data_venda'],
+            'produto' => $venda['produto_atual'],
+            'valor_total' => $venda['valor_total'],
+            'status' => $venda['status'],
+            'bandeira' => $venda['bandeira'] ?? 'N/A'
+        ];
+    }
+
+    // Identifica duplicados
+    foreach ($cartoes as $cartao => $registros) {
+        if (count($registros) > 1) {
+            $duplicados[$cartao] = $registros;
+        }
+    }
+
+    return [
+        'total' => count($duplicados),
+        'cartoes' => array_keys($duplicados),
         'detalhes' => $duplicados
     ];
 }
@@ -945,6 +1201,9 @@ function obterConfiguracaoPontosPorData($data_venda) {
         $data_fim->setTime(23, 59, 59); // Fim do dia
 
         if ($data >= $data_inicio && $data <= $data_fim) {
+            // DEBUG: Log do range encontrado
+            error_log("DEBUG obterConfiguracaoPontosPorData: Data " . $data_venda . " está no range: " . ($range['nome'] ?? 'sem nome') . " (" . $range['data_inicio'] . " a " . $range['data_fim'] . ")");
+
             // Verifica se os pontos estão em um objeto "pontos" ou diretamente no range
             if (isset($range['pontos']) && is_array($range['pontos'])) {
                 return $range['pontos'];
@@ -1005,14 +1264,39 @@ function converterPontosPadrao($pontos_padrao) {
 }
 
 /**
- * Calcula pontos com ranges de pontuaão por data (CORRIGIDO)
+ * Calcula pontos com ranges de pontuação por data (CORRIGIDO)
  */
-function calcularPontosComRanges($vendas_detalhes) {
+function calcularPontosComRanges($vendas_detalhes, $nome_consultor = '') {
     $pontos_total = 0;
     $detalhamento_por_range = [];
-    
+    $pontos_por_venda = []; // NOVO: Rastreia pontos por ID de venda
+
+    // DEBUG: Armazena info para exibir na tela com godmode
+    $debug_info = [];
+    $debug_todas_vendas = []; // Para mostrar TODAS as vendas de um consultor
+
     foreach ($vendas_detalhes as $detalhe) {
-        // Obtm configuração de pontos baseada na data da venda
+        // DEBUG: Captura TODAS as vendas se for consultor específico
+        if (isGodMode() && !empty($nome_consultor) && stripos($nome_consultor, 'LUCIANA') !== false) {
+            // Adiciona info básica de CADA venda
+            $debug_todas_vendas[] = [
+                'id' => $detalhe['id_venda'] ?? 'N/A',
+                'vagas' => $detalhe['num_vagas'] ?? 0,
+                'data_usada' => substr($detalhe['data_venda'] ?? '', 0, 10),
+            ];
+        }
+
+        // DEBUG: Captura info detalhada para venda específica SFA-9340
+        if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
+            $debug_info['SFA-9340'] = [
+                'data_venda_usada' => $detalhe['data_venda'] ?? 'NULL',
+                'data_cadastro_original' => $detalhe['data_cadastro_original'] ?? 'NULL',
+                'data_venda_original' => $detalhe['data_venda_original'] ?? 'NULL',
+                'num_vagas' => $detalhe['num_vagas'] ?? 'NULL'
+            ];
+        }
+
+        // Obtém configuração de pontos baseada na data da venda (que deveria ser DataCadastro!)
         $config_pontos_raw = obterConfiguracaoPontosPorData($detalhe['data_venda']);
         
         // Converte para formato compatível se necessário
@@ -1032,13 +1316,34 @@ function calcularPontosComRanges($vendas_detalhes) {
         
         // Obtém pontos para esta categoria
         $pontos = obterPontosPorCategoria($categoria, $config_pontos);
-        
+
         // IMPORTANTE: Adiciona os pontos apenas UMA VEZ
         $pontos_total += $pontos;
-        
+
+        // NOVO: Armazena pontos por ID de venda
+        if (isset($detalhe['id_venda'])) {
+            $pontos_por_venda[$detalhe['id_venda']] = $pontos;
+        }
+
         // Identifica qual range foi usado
         $range_usado = identificarRange($detalhe['data_venda']);
-        
+
+        // DEBUG: Adiciona pontos de TODAS as vendas da LUCIANA
+        if (isGodMode() && !empty($nome_consultor) && stripos($nome_consultor, 'LUCIANA') !== false) {
+            $ultimo_indice = count($debug_todas_vendas) - 1;
+            if ($ultimo_indice >= 0) {
+                $debug_todas_vendas[$ultimo_indice]['range'] = $range_usado;
+                $debug_todas_vendas[$ultimo_indice]['pontos'] = $pontos;
+            }
+        }
+
+        // DEBUG: Adiciona info do range usado para SFA-9340
+        if (isset($detalhe['id_venda']) && $detalhe['id_venda'] === 'SFA-9340') {
+            $debug_info['SFA-9340']['range_usado'] = $range_usado;
+            $debug_info['SFA-9340']['pontos_calculados'] = $pontos;
+            $debug_info['SFA-9340']['categoria'] = $categoria;
+        }
+
         // Agrupa por range
         if (!isset($detalhamento_por_range[$range_usado])) {
             $detalhamento_por_range[$range_usado] = [
@@ -1063,7 +1368,47 @@ function calcularPontosComRanges($vendas_detalhes) {
         $detalhamento_por_range[$range_usado]['categorias'][$categoria]['pontos_total'] += $pontos;
         $detalhamento_por_range[$range_usado]['total_pontos'] += $pontos;
     }
-    
+
+    // DEBUG: Exibe na tela se godmode ativo
+    if (isGodMode()) {
+        // DEBUG da venda SFA-9340
+        if (!empty($debug_info)) {
+            echo '<div class="alert alert-warning mt-3"><strong>🔍 DEBUG PONTUAÇÃO - SFA-9340 (GodMode):</strong><br>';
+            foreach ($debug_info as $id => $info) {
+                echo "<strong>Venda {$id}:</strong><br>";
+                echo "• Data usada para pontuação: <strong>{$info['data_venda_usada']}</strong><br>";
+                echo "• DataCadastro (original): {$info['data_cadastro_original']}<br>";
+                echo "• DataVenda (alteração): {$info['data_venda_original']}<br>";
+                echo "• Número de vagas: {$info['num_vagas']}<br>";
+                echo "• Range aplicado: <strong class='text-danger'>{$info['range_usado']}</strong><br>";
+                echo "• Categoria: {$info['categoria']}<br>";
+                echo "• Pontos calculados: <strong>{$info['pontos_calculados']}</strong><br>";
+            }
+            echo '</div>';
+        }
+
+        // DEBUG de TODAS as vendas da LUCIANA
+        if (!empty($debug_todas_vendas)) {
+            $total_pts = array_sum(array_column($debug_todas_vendas, 'pontos'));
+            echo '<div class="alert alert-info mt-3">';
+            echo '<strong>🔍 DEBUG TODAS AS VENDAS - ' . htmlspecialchars($nome_consultor) . ':</strong><br>';
+            echo '<strong>TOTAL CALCULADO: ' . $total_pts . ' pontos</strong><br><br>';
+            echo '<table class="table table-sm table-bordered mt-2">';
+            echo '<thead><tr><th>ID</th><th>Vagas</th><th>Data Usada</th><th>Range</th><th>Pontos</th></tr></thead><tbody>';
+            foreach ($debug_todas_vendas as $v) {
+                echo '<tr>';
+                echo '<td>' . htmlspecialchars($v['id']) . '</td>';
+                echo '<td>' . $v['vagas'] . '</td>';
+                echo '<td>' . $v['data_usada'] . '</td>';
+                echo '<td>' . htmlspecialchars($v['range']) . '</td>';
+                echo '<td><strong>' . $v['pontos'] . '</strong></td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+            echo '</div>';
+        }
+    }
+
     // Monta detalhamento final
     $detalhamento = [];
     foreach ($detalhamento_por_range as $range_nome => $range_data) {
@@ -1071,11 +1416,12 @@ function calcularPontosComRanges($vendas_detalhes) {
             $detalhamento[] = array_merge($cat_data, ['range' => $range_nome]);
         }
     }
-    
+
     return [
         'pontos_total' => $pontos_total,
         'detalhamento' => $detalhamento,
-        'detalhamento_por_range' => array_values($detalhamento_por_range)
+        'detalhamento_por_range' => array_values($detalhamento_por_range),
+        'pontos_por_venda' => $pontos_por_venda // NOVO: Array de pontos por ID
     ];
 }
 
@@ -1124,6 +1470,116 @@ function identificarRange($data_venda) {
 }
 
 /**
+ * Processa múltiplos arquivos CSV e consolida os dados (GODMODE)
+ *
+ * @param array $arquivos Lista de caminhos dos arquivos CSV
+ * @param array $filtros Filtros a aplicar
+ * @return array Resultado consolidado com todas as vendas unificadas
+ */
+function processarMultiplosArquivosCSV($arquivos, $filtros = []) {
+    $vendas_consolidadas = [];
+    $nomes_arquivos = [];
+
+    // Processa cada arquivo
+    foreach ($arquivos as $arquivo) {
+        if (!file_exists($arquivo)) {
+            continue;
+        }
+
+        // Processa o arquivo individual
+        $resultado = processarVendasComRanges($arquivo, $filtros);
+
+        // Adiciona nome do arquivo à lista
+        $nomes_arquivos[] = basename($arquivo);
+
+        // Unifica as vendas
+        foreach ($resultado['vendas'] as $venda) {
+            $venda['arquivo_origem'] = basename($arquivo); // Marca de qual arquivo veio
+            $vendas_consolidadas[] = $venda;
+        }
+    }
+
+    // Agora recalcula tudo com as vendas consolidadas
+    // Agrupa por consultor
+    $por_consultor = [];
+
+    foreach ($vendas_consolidadas as $venda) {
+        $nome = $venda['consultor'];
+
+        if (!isset($por_consultor[$nome])) {
+            $por_consultor[$nome] = [
+                'consultor' => $nome,
+                'vendas_detalhes' => [],
+                'quantidade' => 0,
+                'venda' => 0,
+                'pago' => 0,
+                'vendas_vista' => 0,
+                'vendas_acima_2vagas' => 0,
+                'vendas_ativas' => 0
+            ];
+        }
+
+        $por_consultor[$nome]['vendas_detalhes'][] = [
+            'num_vagas' => $venda['num_vagas'],
+            'e_vista' => $venda['e_vista'],
+            'data_venda' => $venda['data_para_pontuacao'],
+            'id_venda' => $venda['id'],
+            'valor_total' => $venda['valor_total'],
+            'valor_pago' => $venda['valor_pago']
+        ];
+
+        $por_consultor[$nome]['quantidade']++;
+        $por_consultor[$nome]['venda'] += $venda['valor_total'];
+        $por_consultor[$nome]['pago'] += $venda['valor_pago'];
+
+        if ($venda['e_vista']) {
+            $por_consultor[$nome]['vendas_vista']++;
+        }
+
+        if ($venda['num_vagas'] > 2) {
+            $por_consultor[$nome]['vendas_acima_2vagas']++;
+        }
+
+        // Conta vendas ativas
+        if (strcasecmp($venda['status'], 'Ativo') === 0) {
+            $por_consultor[$nome]['vendas_ativas']++;
+        }
+    }
+
+    // Calcula pontos para cada consultor
+    foreach ($por_consultor as &$consultor) {
+        $calculo_pontos = calcularPontosComRanges($consultor['vendas_detalhes'], $consultor['consultor']);
+        $consultor['pontos'] = $calculo_pontos['pontos_total'];
+
+        // Calcula SAPs
+        $pontos_por_sap = $_SESSION['config_premiacoes']['pontos_por_sap'] ?? 21;
+        $consultor['saps'] = floor($consultor['pontos'] / $pontos_por_sap);
+
+        // Calcula DIPs
+        $vendas_para_dip = $_SESSION['config_premiacoes']['vendas_para_dip'] ?? 200;
+        $vendas_acima_2vagas_para_dip = $_SESSION['config_premiacoes']['vendas_acima_2vagas_para_dip'] ?? 200;
+        $consultor['dips'] = 0;
+
+        if ($consultor['quantidade'] >= $vendas_para_dip) {
+            $consultor['dips'] = 1;
+            $consultor['criterio_dip'] = 'vendas_total';
+        } elseif ($consultor['vendas_acima_2vagas'] >= $vendas_acima_2vagas_para_dip) {
+            $consultor['dips'] = 1;
+            $consultor['criterio_dip'] = 'vendas_acima_2vagas';
+        }
+    }
+    unset($consultor);
+
+    return [
+        'vendas' => $vendas_consolidadas,
+        'por_consultor' => array_values($por_consultor),
+        'multifile' => true,
+        'arquivos' => $nomes_arquivos,
+        'total_arquivos' => count($arquivos)
+    ];
+}
+
+/**
  * Processa vendas e calcula pontos com ranges (NOVA FUNÃO)
  */
 /**
@@ -1132,26 +1588,85 @@ function identificarRange($data_venda) {
 function processarVendasComRanges($arquivo, $filtros = []) {
     // Processa vendas normalmente
     $resultado = processarVendasCSV($arquivo, $filtros);
-    
+
+    // ===== PROCESSA COTAS DESCONSIDERADAS =====
+    $cotas_desconsideradas = carregarCotasDesconsideradas();
+    $vendas_desconsideradas = [];
+    $vendas_desconsideradas_por_consultor = [];
+
+    if (!empty($cotas_desconsideradas)) {
+        // Separa vendas desconsideradas
+        foreach ($resultado['vendas'] as $key => $venda) {
+            if (in_array($venda['id'], $cotas_desconsideradas)) {
+                $vendas_desconsideradas[] = $venda;
+
+                // Agrupa por consultor
+                $nome_consultor = $venda['consultor'];
+                if (!isset($vendas_desconsideradas_por_consultor[$nome_consultor])) {
+                    $vendas_desconsideradas_por_consultor[$nome_consultor] = [
+                        'quantidade' => 0,
+                        'cotas' => [],
+                        'pontos' => 0
+                    ];
+                }
+
+                $vendas_desconsideradas_por_consultor[$nome_consultor]['quantidade']++;
+                $vendas_desconsideradas_por_consultor[$nome_consultor]['cotas'][] = $venda['id'];
+
+                // Remove da lista de vendas processadas
+                unset($resultado['vendas'][$key]);
+            }
+        }
+
+        // Reindexar array de vendas
+        $resultado['vendas'] = array_values($resultado['vendas']);
+
+        // Recalcula por_consultor sem as cotas desconsideradas
+        if (!empty($vendas_desconsideradas)) {
+            // Precisa recalcular todos os consultores
+            $resultado = processarVendasCSV($arquivo, $filtros);
+
+            // Remove vendas desconsideradas novamente
+            foreach ($resultado['vendas'] as $key => $venda) {
+                if (in_array($venda['id'], $cotas_desconsideradas)) {
+                    unset($resultado['vendas'][$key]);
+                }
+            }
+            $resultado['vendas'] = array_values($resultado['vendas']);
+
+            // Reagrupa por consultor
+            $resultado = reagruparVendasPorConsultor($resultado['vendas']);
+        }
+    }
+
     // Detecta duplicados
     $duplicados = detectarDuplicados($resultado['vendas']);
-    
+
     // Marca duplicados nas vendas
     marcarDuplicados($resultado['vendas'], $duplicados);
-    
+
     // Adiciona informação de duplicados aos consultores
     $por_consultor = [];
     
     foreach ($resultado['por_consultor'] as $consultor) {
         $consultor_nome = $consultor['consultor'];
-        
-        // Calcula pontos com ranges
-        $calculo_pontos = calcularPontosComRanges($consultor['vendas_detalhes']);
-        
+
+        // Calcula pontos com ranges (passa nome do consultor para debug)
+        $calculo_pontos = calcularPontosComRanges($consultor['vendas_detalhes'], $consultor_nome);
+
         $consultor['pontos'] = $calculo_pontos['pontos_total'];
         $consultor['detalhamento_pontos'] = $calculo_pontos['detalhamento'];
         $consultor['detalhamento_por_range'] = $calculo_pontos['detalhamento_por_range'];
-        
+
+        // DEBUG: Verifica se pontos estão sendo preservados
+        if (isGodMode() && stripos($consultor_nome, 'LUCIANA') !== false) {
+            echo '<div class="alert alert-danger mt-2">';
+            echo '<strong>⚠️ DEBUG VERIFICAÇÃO FINAL:</strong><br>';
+            echo "Pontos calculados pela função: <strong>{$calculo_pontos['pontos_total']}</strong><br>";
+            echo "Pontos atribuídos ao consultor: <strong>{$consultor['pontos']}</strong><br>";
+            echo '</div>';
+        }
+
         $por_consultor[] = $consultor;
     }
     
@@ -1163,28 +1678,79 @@ function processarVendasComRanges($arquivo, $filtros = []) {
     // Adiciona premiações
     adicionarPremiacoes($por_consultor);
 
-    // Calcula impacto das cotas desconsideradas (pontos removidos por consultor)
-    $impacto_desconsideradas = [];
-    foreach ($resultado['por_consultor_desconsideradas'] as $cn => $dados) {
-        $calculo = calcularPontosComRanges($dados['vendas_detalhes']);
-        $impacto_desconsideradas[$cn] = [
-            'consultor'       => $cn,
-            'pontos_removidos'=> $calculo['pontos_total'],
-            'cotas_ids'       => $dados['ids'],
-            'vendas_detalhes' => $dados['vendas_detalhes']
-        ];
+    // Calcula pontos perdidos por cotas desconsideradas
+    foreach ($vendas_desconsideradas as $venda_desc) {
+        $nome_consultor = $venda_desc['consultor'];
+        if (isset($vendas_desconsideradas_por_consultor[$nome_consultor])) {
+            // Calcula pontos que essa venda teria gerado
+            $pontos_venda = calcularPontosComRanges([
+                [
+                    'num_vagas' => $venda_desc['num_vagas'],
+                    'e_vista' => $venda_desc['e_vista'],
+                    'data_venda' => $venda_desc['data_para_pontuacao'],
+                    'id_venda' => $venda_desc['id'],
+                    'valor_total' => $venda_desc['valor_total'],
+                    'valor_pago' => $venda_desc['valor_pago']
+                ]
+            ], $nome_consultor);
+
+            $vendas_desconsideradas_por_consultor[$nome_consultor]['pontos'] += $pontos_venda['pontos_total'];
+        }
     }
 
     return [
-        'vendas'                        => $resultado['vendas'],
-        'por_consultor'                 => $por_consultor,
-        'duplicados'                    => $duplicados,
-        'vendas_desconsideradas'        => $resultado['vendas_desconsideradas'],
-        'cotas_desconsideradas_impacto' => $impacto_desconsideradas
+        'vendas' => $resultado['vendas'],
+        'por_consultor' => $por_consultor,
+        'duplicados' => $duplicados,
+        'vendas_ignoradas_cartao' => $resultado['vendas_ignoradas_cartao'] ?? [],
+        'vendas_ignoradas_pix' => $resultado['vendas_ignoradas_pix'] ?? [],
+        'cotas_desconsideradas' => $vendas_desconsideradas,
+        'cotas_desconsideradas_por_consultor' => $vendas_desconsideradas_por_consultor
     ];
 }
 
+/**
+ * Reagrupa vendas por consultor
+ */
+function reagruparVendasPorConsultor($vendas) {
+    $por_consultor = [];
 
+    foreach ($vendas as $venda) {
+        $nome = $venda['consultor'];
+
+        if (!isset($por_consultor[$nome])) {
+            $por_consultor[$nome] = [
+                'consultor' => $nome,
+                'quantidade' => 0,
+                'venda' => 0,
+                'pago' => 0,
+                'vendas_detalhes' => [],
+                'vendas_acima_2vagas' => 0
+            ];
+        }
+
+        $por_consultor[$nome]['quantidade']++;
+        $por_consultor[$nome]['venda'] += $venda['valor_total'];
+        $por_consultor[$nome]['pago'] += $venda['valor_pago'];
+        $por_consultor[$nome]['vendas_detalhes'][] = [
+            'num_vagas' => $venda['num_vagas'],
+            'e_vista' => $venda['e_vista'],
+            'data_venda' => $venda['data_para_pontuacao'],
+            'id_venda' => $venda['id'],
+            'valor_total' => $venda['valor_total'],
+            'valor_pago' => $venda['valor_pago']
+        ];
+
+        if ($venda['num_vagas'] > 2) {
+            $por_consultor[$nome]['vendas_acima_2vagas']++;
+        }
+    }
+
+    return [
+        'vendas' => $vendas,
+        'por_consultor' => array_values($por_consultor)
+    ];
+}
 
 /**
  * Formata nome de categoria para exibiço
@@ -1202,6 +1768,386 @@ function formatarNomeCategoria($categoria) {
     ];
     
     return $mapa[$categoria] ?? $categoria;
+}
+
+/**
+ * Carrega apelidos/nomes alternativos de consultores
+ */
+function carregarApelidosConsultores() {
+    $arquivo = DATA_DIR . '/consultores_apelidos.json';
+
+    if (!file_exists($arquivo)) {
+        return [];
+    }
+
+    $conteudo = file_get_contents($arquivo);
+    $apelidos = json_decode($conteudo, true);
+
+    return $apelidos ?: [];
+}
+
+/**
+ * Salva apelidos/nomes alternativos de consultores
+ */
+function salvarApelidosConsultores($apelidos) {
+    $arquivo = DATA_DIR . '/consultores_apelidos.json';
+
+    $json = json_encode($apelidos, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    file_put_contents($arquivo, $json);
+}
+
+/**
+ * Obtém nome de exibição do consultor (apelido se existir, senão nome original)
+ */
+function obterNomeExibicaoConsultor($nome_original) {
+    static $apelidos = null;
+
+    if ($apelidos === null) {
+        $apelidos = carregarApelidosConsultores();
+    }
+
+    return $apelidos[$nome_original]['apelido'] ?? $nome_original;
+}
+
+/**
+ * Adiciona ou atualiza apelido de um consultor
+ */
+function adicionarApelidoConsultor($nome_original, $apelido) {
+    $apelidos = carregarApelidosConsultores();
+
+    $apelidos[$nome_original] = [
+        'nome_original' => $nome_original,
+        'apelido' => $apelido,
+        'data_alteracao' => date('Y-m-d H:i:s')
+    ];
+
+    salvarApelidosConsultores($apelidos);
+}
+
+/**
+ * Remove apelido de um consultor
+ */
+function removerApelidoConsultor($nome_original) {
+    $apelidos = carregarApelidosConsultores();
+
+    if (isset($apelidos[$nome_original])) {
+        unset($apelidos[$nome_original]);
+        salvarApelidosConsultores($apelidos);
+    }
+}
+
+/**
+ * Carrega mapeamento de nomes amigáveis personalizados
+ */
+function carregarMapeamentoNomes() {
+    $arquivo = DATA_DIR . '/nomes_amigaveis.json';
+
+    if (!file_exists($arquivo)) {
+        return [];
+    }
+
+    $conteudo = file_get_contents($arquivo);
+    $mapeamento = json_decode($conteudo, true);
+
+    return $mapeamento ?: [];
+}
+
+/**
+ * Salva mapeamento de nomes amigáveis personalizados
+ */
+function salvarMapeamentoNomes($mapeamento) {
+    $arquivo = DATA_DIR . '/nomes_amigaveis.json';
+
+    $json = json_encode($mapeamento, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    file_put_contents($arquivo, $json);
+}
+
+/**
+ * Define um nome amigável personalizado para um arquivo CSV
+ */
+function definirNomeAmigavel($nome_arquivo, $nome_amigavel) {
+    $mapeamento = carregarMapeamentoNomes();
+
+    // Remove a extensão .csv se foi passada
+    $nome_arquivo = basename($nome_arquivo);
+
+    $mapeamento[$nome_arquivo] = [
+        'nome_amigavel' => $nome_amigavel,
+        'nome_arquivo' => $nome_arquivo,
+        'data_definicao' => date('Y-m-d H:i:s')
+    ];
+
+    salvarMapeamentoNomes($mapeamento);
+}
+
+/**
+ * Gera nome amigável para arquivo CSV baseado na data
+ * Ex: 2025-12-01_034017_vendas.csv → vendas-novembro25
+ * Verifica primeiro se há mapeamento personalizado
+ */
+function gerarNomeAmigavel($nome_arquivo) {
+    // Remove caminho se tiver
+    $nome_arquivo = basename($nome_arquivo);
+
+    // Verifica se há mapeamento personalizado
+    $mapeamento = carregarMapeamentoNomes();
+    if (isset($mapeamento[$nome_arquivo])) {
+        return $mapeamento[$nome_arquivo]['nome_amigavel'];
+    }
+
+    // Tenta extrair a data do nome do arquivo (formato: YYYY-MM-DD_HHMMSS_vendas.csv)
+    if (preg_match('/(\d{4})-(\d{2})-(\d{2})_/', $nome_arquivo, $matches)) {
+        $ano = $matches[1];
+        $mes = intval($matches[2]);
+
+        // Meses em português
+        $meses = [
+            1 => 'janeiro', 2 => 'fevereiro', 3 => 'marco', 4 => 'abril',
+            5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
+            9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
+        ];
+
+        $nome_mes = $meses[$mes] ?? 'desconhecido';
+        $ano_curto = substr($ano, 2, 2);
+
+        return "vendas-{$nome_mes}{$ano_curto}";
+    }
+
+    // Fallback: retorna o nome do arquivo sem extensão
+    return pathinfo($nome_arquivo, PATHINFO_FILENAME);
+}
+
+/**
+ * Converte nome amigável de volta para arquivo CSV real
+ * Ex: vendas-novembro25 → 2025-12-01_034017_vendas.csv (procura no diretório)
+ * Verifica primeiro se há mapeamento personalizado
+ */
+function obterArquivoRealPorNomeAmigavel($nome_amigavel) {
+    // Verifica primeiro se há mapeamento personalizado
+    $mapeamento = carregarMapeamentoNomes();
+    foreach ($mapeamento as $nome_arquivo => $dados) {
+        if ($dados['nome_amigavel'] === $nome_amigavel) {
+            // Encontrou mapeamento personalizado, retorna o caminho completo
+            return VENDAS_DIR . '/' . $nome_arquivo;
+        }
+    }
+
+    // Se não encontrou mapeamento personalizado, tenta extrair pelo padrão de nome
+    // Extrai mês e ano do nome amigável (ex: vendas-novembro25)
+    if (preg_match('/vendas-(\w+)(\d{2})/', $nome_amigavel, $matches)) {
+        $nome_mes = $matches[1];
+        $ano_curto = $matches[2];
+
+        // Mapeia nome do mês para número
+        $meses = [
+            'janeiro' => '01', 'fevereiro' => '02', 'marco' => '03', 'abril' => '04',
+            'maio' => '05', 'junho' => '06', 'julho' => '07', 'agosto' => '08',
+            'setembro' => '09', 'outubro' => '10', 'novembro' => '11', 'dezembro' => '12'
+        ];
+
+        if (!isset($meses[$nome_mes])) {
+            return null;
+        }
+
+        $mes = $meses[$nome_mes];
+        $ano = '20' . $ano_curto;
+
+        // Lista todos os CSVs e procura por um que corresponda ao mês/ano
+        $arquivos = listarCSVs('vendas');
+        foreach ($arquivos as $arquivo) {
+            if (preg_match("/{$ano}-{$mes}-/", $arquivo['nome'])) {
+                return $arquivo['caminho'];
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Carrega mensagens de parabéns para relatórios finais
+ */
+function carregarMensagensParabens() {
+    $arquivo = DATA_DIR . '/mensagens_parabens.json';
+
+    if (!file_exists($arquivo)) {
+        // Cria arquivo com 3 mensagens padrão
+        $mensagens_padrao = [
+            [
+                'id' => uniqid('msg_', true),
+                'titulo' => 'Parabéns aos Campeões!',
+                'mensagem' => 'Parabéns a todos os consultores que alcançaram o TOP 20! Seu esforço e dedicação são inspiradores! 🏆',
+                'ativo' => true,
+                'data_criacao' => date('Y-m-d H:i:s')
+            ],
+            [
+                'id' => uniqid('msg_', true),
+                'titulo' => 'Celebrando o Sucesso!',
+                'mensagem' => 'Este é o ranking oficial final! Parabéns aos vencedores e a todos que se esforçaram para chegar até aqui! 🎉',
+                'ativo' => true,
+                'data_criacao' => date('Y-m-d H:i:s')
+            ],
+            [
+                'id' => uniqid('msg_', true),
+                'titulo' => 'Você é Incrível!',
+                'mensagem' => 'Resultado oficial disponível! Parabéns aos TOP 20 e a todos que fizeram parte desta jornada incrível! 🌟',
+                'ativo' => true,
+                'data_criacao' => date('Y-m-d H:i:s')
+            ]
+        ];
+        salvarMensagensParabens($mensagens_padrao);
+        return $mensagens_padrao;
+    }
+
+    $conteudo = file_get_contents($arquivo);
+    $mensagens = json_decode($conteudo, true);
+
+    return $mensagens ?: [];
+}
+
+/**
+ * Salva mensagens de parabéns
+ */
+function salvarMensagensParabens($mensagens) {
+    $arquivo = DATA_DIR . '/mensagens_parabens.json';
+
+    $json = json_encode($mensagens, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    file_put_contents($arquivo, $json);
+}
+
+/**
+ * Adiciona nova mensagem de parabéns
+ */
+function adicionarMensagemParabens($titulo, $mensagem) {
+    $mensagens = carregarMensagensParabens();
+
+    $mensagens[] = [
+        'id' => uniqid('msg_', true),
+        'titulo' => $titulo,
+        'mensagem' => $mensagem,
+        'ativo' => true,
+        'data_criacao' => date('Y-m-d H:i:s')
+    ];
+
+    salvarMensagensParabens($mensagens);
+}
+
+/**
+ * Remove mensagem de parabéns
+ */
+function removerMensagemParabens($id) {
+    $mensagens = carregarMensagensParabens();
+
+    $mensagens = array_filter($mensagens, function($msg) use ($id) {
+        return $msg['id'] !== $id;
+    });
+
+    // Reindexar array
+    $mensagens = array_values($mensagens);
+
+    salvarMensagensParabens($mensagens);
+}
+
+/**
+ * Alterna status ativo/inativo de uma mensagem
+ */
+function alternarStatusMensagem($id) {
+    $mensagens = carregarMensagensParabens();
+
+    foreach ($mensagens as &$msg) {
+        if ($msg['id'] === $id) {
+            $msg['ativo'] = !$msg['ativo'];
+            break;
+        }
+    }
+
+    salvarMensagensParabens($mensagens);
+}
+
+/**
+ * Obtém uma mensagem aleatória de parabéns (apenas ativas)
+ */
+function obterMensagemAleatoriaParabens() {
+    $mensagens = carregarMensagensParabens();
+
+    // Filtra apenas mensagens ativas
+    $mensagens_ativas = array_filter($mensagens, function($msg) {
+        return $msg['ativo'] ?? true;
+    });
+
+    if (empty($mensagens_ativas)) {
+        return [
+            'titulo' => 'Parabéns!',
+            'mensagem' => 'Ranking oficial disponível! Parabéns a todos! 🎉'
+        ];
+    }
+
+    // Seleciona uma mensagem aleatória
+    $mensagem = $mensagens_ativas[array_rand($mensagens_ativas)];
+
+    return $mensagem;
+}
+
+/**
+ * Verifica se é dia 08 ou posterior do mês seguinte ao período do relatório
+ * E filtra/conta vendas canceladas e sem primeira parcela paga
+ */
+function aplicarRegraDia08(&$vendas, $data_inicio_periodo, $data_fim_periodo) {
+    // Verifica se é dia 08 ou posterior do mês seguinte
+    $hoje = new DateTime();
+    $fim_periodo = new DateTime($data_fim_periodo);
+
+    // Calcula o dia 08 do mês seguinte ao período
+    $mes_seguinte = clone $fim_periodo;
+    $mes_seguinte->modify('first day of next month');
+    $mes_seguinte->setDate(
+        (int)$mes_seguinte->format('Y'),
+        (int)$mes_seguinte->format('m'),
+        8
+    );
+
+    // Se ainda não chegou no dia 08, não aplica filtro
+    if ($hoje < $mes_seguinte) {
+        return [
+            'aplicar_filtro' => false,
+            'removidas_canceladas' => 0,
+            'removidas_sem_pagamento' => 0
+        ];
+    }
+
+    // É dia 08 ou posterior, aplica filtro
+    $canceladas = 0;
+    $sem_pagamento = 0;
+    $vendas_filtradas = [];
+
+    foreach ($vendas as $venda) {
+        $remover = false;
+
+        // Remove vendas com status Cancelado
+        if (strcasecmp($venda['status'], 'Cancelado') === 0 ||
+            strcasecmp($venda['status'], 'Cancelada') === 0) {
+            $canceladas++;
+            $remover = true;
+        }
+
+        // Remove vendas sem primeira parcela paga
+        if (!$remover && !($venda['primeira_parcela_paga'] ?? false)) {
+            $sem_pagamento++;
+            $remover = true;
+        }
+
+        if (!$remover) {
+            $vendas_filtradas[] = $venda;
+        }
+    }
+
+    $vendas = $vendas_filtradas;
+
+    return [
+        'aplicar_filtro' => true,
+        'removidas_canceladas' => $canceladas,
+        'removidas_sem_pagamento' => $sem_pagamento
+    ];
 }
 
 ?>

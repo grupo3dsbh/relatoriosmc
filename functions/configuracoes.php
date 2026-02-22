@@ -117,7 +117,6 @@ function obterConfigPadrao() {
             'apenas_primeira_parcela' => false,
             'apenas_vista' => false
         ],
-        'cotas_desconsideradas' => [],
         'ultima_atualizacao' => date('Y-m-d H:i:s')
     ];
 }
@@ -288,5 +287,112 @@ function importarConfiguracoes($arquivo_json) {
 function resetarConfiguracoes() {
     $config = obterConfigPadrao();
     return salvarConfiguracoes($config);
+}
+
+/**
+ * Carrega lista de cotas desconsideradas
+ */
+function carregarCotasDesconsideradas() {
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+
+    if (isset($config['cotas_desconsideradas'])) {
+        $cotas_config = $config['cotas_desconsideradas'];
+
+        // Se está ativo e tem lista
+        if (!empty($cotas_config['ativo']) && !empty($cotas_config['lista'])) {
+            return $cotas_config['lista'];
+        }
+    }
+
+    return [];
+}
+
+/**
+ * Salva lista de cotas desconsideradas
+ */
+function salvarCotasDesconsideradas($lista_cotas) {
+    $config = carregarConfiguracoes();
+
+    if (!isset($config['cotas_desconsideradas'])) {
+        $config['cotas_desconsideradas'] = [
+            'ativo' => true,
+            'lista' => []
+        ];
+    }
+
+    $config['cotas_desconsideradas']['lista'] = $lista_cotas;
+
+    return salvarConfiguracoes($config);
+}
+
+/**
+ * Adiciona cotas à lista de desconsideradas
+ * @param string|array $cotas - Cota única ou lista de cotas
+ */
+function adicionarCotasDesconsideradas($cotas) {
+    $lista_atual = carregarCotasDesconsideradas();
+
+    // Se recebeu string separada por vírgula, converte para array
+    if (is_string($cotas)) {
+        $cotas = array_map('trim', explode(',', $cotas));
+    }
+
+    // Garante que é array
+    if (!is_array($cotas)) {
+        $cotas = [$cotas];
+    }
+
+    // Remove vazios e adiciona à lista
+    $cotas = array_filter($cotas, function($c) {
+        return !empty(trim($c));
+    });
+
+    // Adiciona timestamp a cada cota
+    foreach ($cotas as $cota) {
+        $cota = trim($cota);
+        if (!isset($lista_atual[$cota])) {
+            $lista_atual[$cota] = [
+                'data_exclusao' => date('Y-m-d H:i:s'),
+                'cota' => $cota
+            ];
+        }
+    }
+
+    return salvarCotasDesconsideradas($lista_atual);
+}
+
+/**
+ * Remove uma cota da lista de desconsideradas
+ * @param string $cota - Número da cota
+ */
+function removerCotaDesconsiderada($cota) {
+    $lista_atual = carregarCotasDesconsideradas();
+
+    if (isset($lista_atual[$cota])) {
+        unset($lista_atual[$cota]);
+        return salvarCotasDesconsideradas($lista_atual);
+    }
+
+    return [
+        'sucesso' => false,
+        'mensagem' => 'Cota não encontrada na lista de exclusão!'
+    ];
+}
+
+/**
+ * Verifica se uma cota está na lista de desconsideradas
+ * @param string $cota - Número da cota
+ */
+function isCotaDesconsiderada($cota) {
+    $lista = carregarCotasDesconsideradas();
+    return isset($lista[$cota]);
+}
+
+/**
+ * Obtém total de cotas desconsideradas
+ */
+function getTotalCotasDesconsideradas() {
+    $lista = carregarCotasDesconsideradas();
+    return count($lista);
 }
 ?>
