@@ -149,6 +149,9 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 $consultor['detalhamento_pontos'] = $resultado_pontos['detalhamento_por_range'];
             }
 
+            // Adiciona premiações (SAPs e DIPs)
+            adicionarPremiacoes($resultado_vendas['por_consultor']);
+
             // Calcula impacto das cotas desconsideradas (caminho banco)
             $impacto_desc_rel = [];
             foreach (($resultado_vendas['por_consultor_desconsideradas'] ?? []) as $cn => $dados) {

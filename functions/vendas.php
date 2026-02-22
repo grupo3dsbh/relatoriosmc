@@ -1724,6 +1724,7 @@ function reagruparVendasPorConsultor($vendas) {
                 'quantidade' => 0,
                 'venda' => 0,
                 'pago' => 0,
+                'vendas_ativas' => 0,
                 'vendas_detalhes' => [],
                 'vendas_acima_2vagas' => 0
             ];
@@ -1743,6 +1744,11 @@ function reagruparVendasPorConsultor($vendas) {
 
         if ($venda['num_vagas'] > 2) {
             $por_consultor[$nome]['vendas_acima_2vagas']++;
+        }
+
+        // Conta vendas com status "Ativo"
+        if (isset($venda['status']) && $venda['status'] === 'Ativo') {
+            $por_consultor[$nome]['vendas_ativas']++;
         }
     }
 
