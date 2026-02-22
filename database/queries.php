@@ -67,6 +67,13 @@ function buscarVendasDoBanco($mes_referencia = null, $filtros = []) {
     $vendas = [];
     $por_consultor = [];
     $log_ignorados = [];
+    $vendas_desconsideradas = [];
+    $por_consultor_desconsideradas = [];
+
+    // Carrega lista de cotas desconsideradas
+    $cotas_desconsideradas = function_exists('obterCotasDesconsideradas')
+        ? obterCotasDesconsideradas()
+        : [];
 
     foreach ($vendas_db as $venda_db) {
         // Converte tipos booleanos
@@ -76,6 +83,29 @@ function buscarVendasDoBanco($mes_referencia = null, $filtros = []) {
 
         // Renomeia campo id para titulo_id (compatibilidade)
         $venda_db['id'] = $venda_db['titulo_id'];
+
+        // Verifica se a cota está na lista de desconsideradas
+        if (!empty($cotas_desconsideradas) && in_array(strtoupper($venda_db['id']), $cotas_desconsideradas)) {
+            $vendas_desconsideradas[] = $venda_db;
+            $cn = $venda_db['consultor'];
+            if (!isset($por_consultor_desconsideradas[$cn])) {
+                $por_consultor_desconsideradas[$cn] = [
+                    'consultor'      => $cn,
+                    'vendas_detalhes'=> [],
+                    'ids'            => []
+                ];
+            }
+            $por_consultor_desconsideradas[$cn]['vendas_detalhes'][] = [
+                'id'         => $venda_db['id'],
+                'num_vagas'  => $venda_db['num_vagas'],
+                'e_vista'    => $venda_db['e_vista'],
+                'data_venda' => $venda_db['data_para_pontuacao'] ?? $venda_db['data_cadastro'],
+                'valor_total'=> $venda_db['valor_total'],
+                'valor_pago' => $venda_db['valor_pago']
+            ];
+            $por_consultor_desconsideradas[$cn]['ids'][] = $venda_db['id'];
+            continue;
+        }
 
         $vendas[] = $venda_db;
 
@@ -121,13 +151,12 @@ function buscarVendasDoBanco($mes_referencia = null, $filtros = []) {
     }
 
     return [
-        'vendas' => $vendas,
-        'por_consultor' => array_values($por_consultor),
-        'log_ignorados' => $log_ignorados,
-        'duplicados' => [
-            'total' => 0,
-            'detalhes' => []
-        ]
+        'vendas'                        => $vendas,
+        'por_consultor'                 => array_values($por_consultor),
+        'log_ignorados'                 => $log_ignorados,
+        'duplicados'                    => ['total' => 0, 'detalhes' => []],
+        'vendas_desconsideradas'        => $vendas_desconsideradas,
+        'por_consultor_desconsideradas' => $por_consultor_desconsideradas
     ];
 }
 

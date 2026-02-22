@@ -149,6 +149,19 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 $consultor['detalhamento_pontos'] = $resultado_pontos['detalhamento_por_range'];
             }
 
+            // Calcula impacto das cotas desconsideradas (caminho banco)
+            $impacto_desc_rel = [];
+            foreach (($resultado_vendas['por_consultor_desconsideradas'] ?? []) as $cn => $dados) {
+                $calculo = calcularPontosComRanges($dados['vendas_detalhes']);
+                $impacto_desc_rel[$cn] = [
+                    'consultor'       => $cn,
+                    'pontos_removidos'=> $calculo['pontos_total'],
+                    'cotas_ids'       => $dados['ids'],
+                    'vendas_detalhes' => $dados['vendas_detalhes']
+                ];
+            }
+            $resultado_vendas['cotas_desconsideradas_impacto'] = $impacto_desc_rel;
+
             $vendas_processadas = $resultado_vendas;
 
             if (isGodMode()) {
@@ -240,6 +253,28 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 echo "</div>";
             }
             
+            // Cotas desconsideradas
+            $cotas_config_debug = $config['cotas_desconsideradas'] ?? [];
+            $impacto_debug      = $vendas_processadas['cotas_desconsideradas_impacto'] ?? [];
+            echo "<br><strong>🚫 Cotas Desconsideradas:</strong><br>";
+            if (empty($cotas_config_debug)) {
+                echo "<span class='text-muted'>Nenhuma cota configurada para desconsiderar.</span><br>";
+            } else {
+                echo "Configuradas: <strong>" . count($cotas_config_debug) . "</strong> (" . implode(', ', array_map('htmlspecialchars', $cotas_config_debug)) . ")<br>";
+                if (empty($impacto_debug)) {
+                    echo "<span class='text-success'>✅ Nenhuma das cotas desconsideradas estava neste período.</span><br>";
+                } else {
+                    echo "<span class='text-danger'>⚠️ " . count($impacto_debug) . " consultor(es) afetado(s):</span><br>";
+                    echo "<ul class='mb-0'>";
+                    foreach ($impacto_debug as $cn => $info) {
+                        echo "<li><strong>" . htmlspecialchars($info['consultor']) . "</strong>: ";
+                        echo implode(', ', array_map('htmlspecialchars', $info['cotas_ids']));
+                        echo " → <span class='text-danger font-weight-bold'>-" . $info['pontos_removidos'] . " pts</span></li>";
+                    }
+                    echo "</ul>";
+                }
+            }
+
             echo "</div>"; // Fecha alert-info
         }
         // ===== FIM DEBUG =====
@@ -828,6 +863,66 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     </div>
 </div>
 
+<?php endif; ?>
+
+<?php
+// Painel godmode: cotas desconsideradas
+if (isGodMode() && isset($vendas_processadas)):
+    $cotas_config_rel = $config['cotas_desconsideradas'] ?? [];
+    $impacto_rel      = $vendas_processadas['cotas_desconsideradas_impacto'] ?? [];
+?>
+<!-- CARD COTAS DESCONSIDERADAS -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-eye-slash"></i> GODMODE — Cotas Desconsideradas
+                </h5>
+            </div>
+            <div class="card-body">
+                <?php if (empty($cotas_config_rel)): ?>
+                    <p class="text-muted mb-0">Nenhuma cota configurada para desconsiderar. Adicione IDs (ex: SFA-10001) em <strong>Configurações → Cotas Desconsideradas</strong>.</p>
+                <?php else: ?>
+                    <p><strong>Cotas configuradas para desconsiderar (<?= count($cotas_config_rel) ?>):</strong><br>
+                    <?php foreach ($cotas_config_rel as $cid): ?>
+                        <span class="badge badge-secondary mr-1"><?= htmlspecialchars($cid) ?></span>
+                    <?php endforeach; ?>
+                    </p>
+                    <?php if (empty($impacto_rel)): ?>
+                        <p class="text-success mb-0"><i class="fas fa-check-circle"></i> Nenhuma das cotas desconsideradas estava presente neste relatório (ou não passaram nos filtros).</p>
+                    <?php else: ?>
+                        <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> As cotas abaixo <strong>foram removidas</strong> do ranking:</p>
+                        <table class="table table-sm table-bordered">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Consultor</th>
+                                    <th>Cotas Removidas</th>
+                                    <th class="text-center">Pontos Removidos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($impacto_rel as $cn => $info): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($info['consultor']) ?></strong></td>
+                                    <td>
+                                        <?php foreach ($info['cotas_ids'] as $cid): ?>
+                                            <span class="badge badge-danger mr-1"><?= htmlspecialchars($cid) ?></span>
+                                        <?php endforeach; ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-warning badge-lg"><?= $info['pontos_removidos'] ?> pts</span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php if (isGodMode() && isset($vendas_processadas['duplicados']) && $vendas_processadas['duplicados']['total'] > 0): ?>

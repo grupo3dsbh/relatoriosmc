@@ -50,6 +50,19 @@ if (!empty($arquivos_vendas)) {
                 $consultor['detalhamento_pontos'] = $resultado_pontos['detalhamento_por_range'];
             }
 
+            // Calcula impacto das cotas desconsideradas (caminho banco)
+            $impacto_desc = [];
+            foreach (($resultado_vendas['por_consultor_desconsideradas'] ?? []) as $cn => $dados) {
+                $calculo = calcularPontosComRanges($dados['vendas_detalhes']);
+                $impacto_desc[$cn] = [
+                    'consultor'       => $cn,
+                    'pontos_removidos'=> $calculo['pontos_total'],
+                    'cotas_ids'       => $dados['ids'],
+                    'vendas_detalhes' => $dados['vendas_detalhes']
+                ];
+            }
+            $resultado_vendas['cotas_desconsideradas_impacto'] = $impacto_desc;
+
             $vendas_processadas = $resultado_vendas;
 
             if (isGodMode()) {
@@ -276,6 +289,62 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     
     
     
+    <?php
+    // Painel godmode: cotas desconsideradas
+    if (isGodMode()):
+        $cotas_config = $config['cotas_desconsideradas'] ?? [];
+        $impacto = $vendas_processadas['cotas_desconsideradas_impacto'] ?? [];
+    ?>
+    <div class="card mt-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="fas fa-eye-slash"></i> GODMODE — Cotas Desconsideradas
+            </h5>
+        </div>
+        <div class="card-body">
+            <?php if (empty($cotas_config)): ?>
+                <p class="text-muted mb-0">Nenhuma cota configurada para desconsiderar. Adicione IDs (ex: SFA-10001) em <strong>Configurações → Cotas Desconsideradas</strong>.</p>
+            <?php else: ?>
+                <p><strong>Cotas configuradas para desconsiderar (<?= count($cotas_config) ?>):</strong><br>
+                <?php foreach ($cotas_config as $cid): ?>
+                    <span class="badge badge-secondary mr-1"><?= htmlspecialchars($cid) ?></span>
+                <?php endforeach; ?>
+                </p>
+
+                <?php if (empty($impacto)): ?>
+                    <p class="text-success mb-0"><i class="fas fa-check-circle"></i> Nenhuma das cotas desconsideradas estava presente neste relatório (ou não passaram nos filtros).</p>
+                <?php else: ?>
+                    <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> As cotas abaixo <strong>foram removidas</strong> do ranking:</p>
+                    <table class="table table-sm table-bordered">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Consultor</th>
+                                <th>Cotas Removidas</th>
+                                <th class="text-center">Pontos Removidos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($impacto as $cn => $info): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($info['consultor']) ?></strong></td>
+                                <td>
+                                    <?php foreach ($info['cotas_ids'] as $cid): ?>
+                                        <span class="badge badge-danger mr-1"><?= htmlspecialchars($cid) ?></span>
+                                    <?php endforeach; ?>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-warning badge-lg"><?= $info['pontos_removidos'] ?> pts</span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php endif; ?>
 
 </div>

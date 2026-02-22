@@ -2,6 +2,17 @@
 // functions/vendas.php - Funções para processar vendas
 
 /**
+ * Retorna a lista de cotas desconsideradas configurada no sistema
+ * @return array Lista de IDs de cotas (ex: ['SFA-10001', 'SFA-9999'])
+ */
+function obterCotasDesconsideradas() {
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+    $lista = $config['cotas_desconsideradas'] ?? [];
+    // Normaliza para maiúsculas e remove espaços
+    return array_map('strtoupper', array_map('trim', $lista));
+}
+
+/**
  * Extrai número de vagas do nome do produto
  */
 function extrairNumeroVagas($produto) {
@@ -134,6 +145,9 @@ function processarVendasCSV($arquivo, $filtros = []) {
     $vendas = [];
     $por_consultor = [];
     $log_ignorados = [];
+    $vendas_desconsideradas = [];
+    $por_consultor_desconsideradas = [];
+    $cotas_desconsideradas = obterCotasDesconsideradas();
     
     if (($handle = fopen($arquivo, "r")) !== false) {
         // ===== REMOVE BOM UTF-8 DO INÍCIO DO ARQUIVO =====
@@ -292,7 +306,7 @@ function processarVendasCSV($arquivo, $filtros = []) {
 
             // Aplica filtros
             $resultado_filtro = aplicarFiltros($venda, $filtros);
-            
+
             if (!$resultado_filtro['passa']) {
                 $log_ignorados[] = [
                     'linha' => $linha_num,
@@ -301,7 +315,30 @@ function processarVendasCSV($arquivo, $filtros = []) {
                 ];
                 continue;
             }
-            
+
+            // Verifica se a cota está na lista de desconsideradas
+            if (!empty($cotas_desconsideradas) && in_array(strtoupper($venda['id']), $cotas_desconsideradas)) {
+                $vendas_desconsideradas[] = $venda;
+                $cn = $venda['consultor'];
+                if (!isset($por_consultor_desconsideradas[$cn])) {
+                    $por_consultor_desconsideradas[$cn] = [
+                        'consultor' => $cn,
+                        'vendas_detalhes' => [],
+                        'ids' => []
+                    ];
+                }
+                $por_consultor_desconsideradas[$cn]['vendas_detalhes'][] = [
+                    'id'         => $venda['id'],
+                    'num_vagas'  => $venda['num_vagas'],
+                    'e_vista'    => $venda['e_vista'],
+                    'data_venda' => $venda['data_para_pontuacao'],
+                    'valor_total'=> $venda['valor_total'],
+                    'valor_pago' => $venda['valor_pago']
+                ];
+                $por_consultor_desconsideradas[$cn]['ids'][] = $venda['id'];
+                continue;
+            }
+
             $vendas[] = $venda;
             
             // Consolida por consultor (código existente...)
@@ -354,9 +391,11 @@ function processarVendasCSV($arquivo, $filtros = []) {
     }
     
     return [
-        'vendas' => $vendas,
-        'por_consultor' => array_values($por_consultor),
-        'log_ignorados' => $log_ignorados
+        'vendas'                       => $vendas,
+        'por_consultor'                => array_values($por_consultor),
+        'log_ignorados'                => $log_ignorados,
+        'vendas_desconsideradas'       => $vendas_desconsideradas,
+        'por_consultor_desconsideradas'=> $por_consultor_desconsideradas
     ];
 }
 /**
@@ -1123,11 +1162,25 @@ function processarVendasComRanges($arquivo, $filtros = []) {
     
     // Adiciona premiações
     adicionarPremiacoes($por_consultor);
-    
+
+    // Calcula impacto das cotas desconsideradas (pontos removidos por consultor)
+    $impacto_desconsideradas = [];
+    foreach ($resultado['por_consultor_desconsideradas'] as $cn => $dados) {
+        $calculo = calcularPontosComRanges($dados['vendas_detalhes']);
+        $impacto_desconsideradas[$cn] = [
+            'consultor'       => $cn,
+            'pontos_removidos'=> $calculo['pontos_total'],
+            'cotas_ids'       => $dados['ids'],
+            'vendas_detalhes' => $dados['vendas_detalhes']
+        ];
+    }
+
     return [
-        'vendas' => $resultado['vendas'],
-        'por_consultor' => $por_consultor,
-        'duplicados' => $duplicados
+        'vendas'                        => $resultado['vendas'],
+        'por_consultor'                 => $por_consultor,
+        'duplicados'                    => $duplicados,
+        'vendas_desconsideradas'        => $resultado['vendas_desconsideradas'],
+        'cotas_desconsideradas_impacto' => $impacto_desconsideradas
     ];
 }
 

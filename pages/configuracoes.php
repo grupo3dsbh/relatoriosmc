@@ -76,9 +76,18 @@ if (isset($_POST['salvar_configuracoes'])) {
         'apenas_vista' => isset($_POST['periodo_apenas_vista'])
     ];
     
+    // Atualiza cotas desconsideradas
+    $cotas_raw = trim($_POST['cotas_desconsideradas'] ?? '');
+    if ($cotas_raw !== '') {
+        $cotas_lista = array_filter(array_map('trim', explode(',', $cotas_raw)));
+        $config['cotas_desconsideradas'] = array_values(array_map('strtoupper', $cotas_lista));
+    } else {
+        $config['cotas_desconsideradas'] = [];
+    }
+
     // Salva configurações
     $resultado = salvarConfiguracoes($config);
-    
+
     if ($resultado['sucesso']) {
         $mensagem_sucesso = $resultado['mensagem'];
         // Recarrega configurações
@@ -439,6 +448,39 @@ if (isset($_POST['resetar_config'])) {
                 </div>
             </div>
             
+            <!-- Card: Cotas Desconsideradas -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-eye-slash"></i> Cotas Desconsideradas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Informe os IDs das cotas (títulos) que devem ser <strong>ignorados</strong> nos cálculos do Top 20 e dos Relatórios.
+                        Separe os IDs por vírgula. Exemplo: <code>SFA-10001, SFA-9999</code>
+                    </p>
+                    <div class="form-group">
+                        <label for="cotas_desconsideradas"><strong>IDs das Cotas a Desconsiderar:</strong></label>
+                        <textarea class="form-control" id="cotas_desconsideradas" name="cotas_desconsideradas"
+                                  rows="3" placeholder="Ex: SFA-10001, SFA-9999, SFA-12345"><?= htmlspecialchars(implode(', ', $config['cotas_desconsideradas'] ?? [])) ?></textarea>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Cotas desconsideradas são removidas dos cálculos de pontos e do ranking.
+                            Com <code>?godmode=sign@3DS</code> na URL, estas cotas são exibidas com os pontos removidos por consultor.
+                        </small>
+                    </div>
+                    <?php if (!empty($config['cotas_desconsideradas'])): ?>
+                        <div class="alert alert-warning py-2">
+                            <strong><?= count($config['cotas_desconsideradas']) ?> cota(s) atualmente desconsiderada(s):</strong><br>
+                            <?php foreach ($config['cotas_desconsideradas'] as $cid): ?>
+                                <span class="badge badge-secondary mr-1"><?= htmlspecialchars($cid) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- Card: Pontos Padrão -->
             <div class="card mb-3">
                 <div class="card-header bg-success text-white">
