@@ -1612,11 +1612,11 @@ if (!verificarAdmin()):
                             <div class="form-group mb-0">
                                 <label><strong>Adicionar Cotas (separadas por vírgula)</strong></label>
                                 <input type="text" class="form-control" name="cotas_desconsiderar"
-                                       placeholder="Ex: 12345, 67890, 11111"
-                                       pattern="[\d\s,]+"
-                                       title="Apenas números separados por vírgula">
+                                       placeholder="Ex: SFA-10001, SFA-9999, SFA-12345"
+                                       pattern="[A-Z0-9\-\s,]+"
+                                       title="Formato: SFA-XXXXX separados por vírgula">
                                 <small class="form-text text-muted">
-                                    Digite os números das cotas separados por vírgula
+                                    Digite as cotas no formato SFA-XXXXX separadas por vírgula
                                 </small>
                             </div>
                         </div>
