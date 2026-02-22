@@ -265,6 +265,9 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
         }
 
+        // Processa cotas desconsideradas
+        $cotas_desconsideradas_info = $vendas_processadas['cotas_desconsideradas_por_consultor'] ?? [];
+
         // ===== APLICA REGRA DO DIA 08 (remove canceladas e sem 1ª parcela) =====
         $regra_dia08 = aplicarRegraDia08(
             $vendas_processadas['vendas'],
@@ -376,6 +379,26 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             echo "</div>"; // Fecha alert-info
         }
         // ===== FIM DEBUG =====
+
+        // DEBUG: Cotas Desconsideradas (apenas com godmode=sign@3DS na URL)
+        if (isset($_GET['godmode']) && $_GET['godmode'] === 'sign@3DS' && !empty($cotas_desconsideradas_info)) {
+            echo "<div class='alert alert-warning mt-3'>";
+            echo "<h5><i class='fas fa-ban'></i> Cotas Desconsideradas</h5>";
+            echo "<p class='mb-2'><strong>As seguintes cotas foram desconsideradas do ranking:</strong></p>";
+            echo "<div style='max-height: 400px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px;'>";
+
+            foreach ($cotas_desconsideradas_info as $consultor => $info) {
+                echo "<div class='mb-2'>";
+                echo "<strong>" . htmlspecialchars($consultor) . ":</strong> ";
+                echo "<span class='badge badge-danger'>" . $info['quantidade'] . " cotas</span> ";
+                echo "<span class='badge badge-warning'>-" . $info['pontos'] . " pontos</span><br>";
+                echo "<small class='text-muted'>Cotas: " . implode(', ', $info['cotas']) . "</small>";
+                echo "</div>";
+            }
+
+            echo "</div>";
+            echo "</div>";
+        }
 
         // Parâmetro de ordenação (pontos ou quantidade)
         $ordem_por = $_POST['ordenar_por'] ?? 'pontos';

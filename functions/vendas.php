@@ -1577,13 +1577,63 @@ function processarMultiplosArquivosCSV($arquivos, $filtros = []) {
 function processarVendasComRanges($arquivo, $filtros = []) {
     // Processa vendas normalmente
     $resultado = processarVendasCSV($arquivo, $filtros);
-    
+
+    // ===== PROCESSA COTAS DESCONSIDERADAS =====
+    $cotas_desconsideradas = carregarCotasDesconsideradas();
+    $vendas_desconsideradas = [];
+    $vendas_desconsideradas_por_consultor = [];
+
+    if (!empty($cotas_desconsideradas)) {
+        // Separa vendas desconsideradas
+        foreach ($resultado['vendas'] as $key => $venda) {
+            if (in_array($venda['id'], $cotas_desconsideradas)) {
+                $vendas_desconsideradas[] = $venda;
+
+                // Agrupa por consultor
+                $nome_consultor = $venda['consultor'];
+                if (!isset($vendas_desconsideradas_por_consultor[$nome_consultor])) {
+                    $vendas_desconsideradas_por_consultor[$nome_consultor] = [
+                        'quantidade' => 0,
+                        'cotas' => [],
+                        'pontos' => 0
+                    ];
+                }
+
+                $vendas_desconsideradas_por_consultor[$nome_consultor]['quantidade']++;
+                $vendas_desconsideradas_por_consultor[$nome_consultor]['cotas'][] = $venda['id'];
+
+                // Remove da lista de vendas processadas
+                unset($resultado['vendas'][$key]);
+            }
+        }
+
+        // Reindexar array de vendas
+        $resultado['vendas'] = array_values($resultado['vendas']);
+
+        // Recalcula por_consultor sem as cotas desconsideradas
+        if (!empty($vendas_desconsideradas)) {
+            // Precisa recalcular todos os consultores
+            $resultado = processarVendasCSV($arquivo, $filtros);
+
+            // Remove vendas desconsideradas novamente
+            foreach ($resultado['vendas'] as $key => $venda) {
+                if (in_array($venda['id'], $cotas_desconsideradas)) {
+                    unset($resultado['vendas'][$key]);
+                }
+            }
+            $resultado['vendas'] = array_values($resultado['vendas']);
+
+            // Reagrupa por consultor
+            $resultado = reagruparVendasPorConsultor($resultado['vendas']);
+        }
+    }
+
     // Detecta duplicados
     $duplicados = detectarDuplicados($resultado['vendas']);
-    
+
     // Marca duplicados nas vendas
     marcarDuplicados($resultado['vendas'], $duplicados);
-    
+
     // Adiciona informação de duplicados aos consultores
     $por_consultor = [];
     
@@ -1617,16 +1667,79 @@ function processarVendasComRanges($arquivo, $filtros = []) {
     // Adiciona premiações
     adicionarPremiacoes($por_consultor);
 
+    // Calcula pontos perdidos por cotas desconsideradas
+    foreach ($vendas_desconsideradas as $venda_desc) {
+        $nome_consultor = $venda_desc['consultor'];
+        if (isset($vendas_desconsideradas_por_consultor[$nome_consultor])) {
+            // Calcula pontos que essa venda teria gerado
+            $pontos_venda = calcularPontosComRanges([
+                [
+                    'num_vagas' => $venda_desc['num_vagas'],
+                    'e_vista' => $venda_desc['e_vista'],
+                    'data_venda' => $venda_desc['data_para_pontuacao'],
+                    'id_venda' => $venda_desc['id'],
+                    'valor_total' => $venda_desc['valor_total'],
+                    'valor_pago' => $venda_desc['valor_pago']
+                ]
+            ], $nome_consultor);
+
+            $vendas_desconsideradas_por_consultor[$nome_consultor]['pontos'] += $pontos_venda['pontos_total'];
+        }
+    }
+
     return [
         'vendas' => $resultado['vendas'],
         'por_consultor' => $por_consultor,
         'duplicados' => $duplicados,
         'vendas_ignoradas_cartao' => $resultado['vendas_ignoradas_cartao'] ?? [],
-        'vendas_ignoradas_pix' => $resultado['vendas_ignoradas_pix'] ?? []
+        'vendas_ignoradas_pix' => $resultado['vendas_ignoradas_pix'] ?? [],
+        'cotas_desconsideradas' => $vendas_desconsideradas,
+        'cotas_desconsideradas_por_consultor' => $vendas_desconsideradas_por_consultor
     ];
 }
 
+/**
+ * Reagrupa vendas por consultor
+ */
+function reagruparVendasPorConsultor($vendas) {
+    $por_consultor = [];
 
+    foreach ($vendas as $venda) {
+        $nome = $venda['consultor'];
+
+        if (!isset($por_consultor[$nome])) {
+            $por_consultor[$nome] = [
+                'consultor' => $nome,
+                'quantidade' => 0,
+                'venda' => 0,
+                'pago' => 0,
+                'vendas_detalhes' => [],
+                'vendas_acima_2vagas' => 0
+            ];
+        }
+
+        $por_consultor[$nome]['quantidade']++;
+        $por_consultor[$nome]['venda'] += $venda['valor_total'];
+        $por_consultor[$nome]['pago'] += $venda['valor_pago'];
+        $por_consultor[$nome]['vendas_detalhes'][] = [
+            'num_vagas' => $venda['num_vagas'],
+            'e_vista' => $venda['e_vista'],
+            'data_venda' => $venda['data_para_pontuacao'],
+            'id_venda' => $venda['id'],
+            'valor_total' => $venda['valor_total'],
+            'valor_pago' => $venda['valor_pago']
+        ];
+
+        if ($venda['num_vagas'] > 2) {
+            $por_consultor[$nome]['vendas_acima_2vagas']++;
+        }
+    }
+
+    return [
+        'vendas' => $vendas,
+        'por_consultor' => array_values($por_consultor)
+    ];
+}
 
 /**
  * Formata nome de categoria para exibiço

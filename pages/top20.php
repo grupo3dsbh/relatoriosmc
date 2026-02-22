@@ -65,6 +65,9 @@ if (!empty($arquivos_vendas)) {
         // Salva o resultado completo
         $vendas_processadas_original = $vendas_todas;
 
+        // Processa cotas desconsideradas
+        $cotas_desconsideradas_info = $vendas_todas['cotas_desconsideradas_por_consultor'] ?? [];
+
         // Salva pontos originais por consultor (ANTES de remover vendas)
         $pontos_originais = [];
         $vendas_removidas_por_consultor = [];
@@ -243,6 +246,17 @@ if (!empty($arquivos_vendas)) {
                 $consultor['vendas_sem_pagamento'] = $vendas_removidas_detalhes[$nome]['sem_pagamento'] ?? 0;
                 $consultor['vendas_cartao_duplicado'] = $vendas_cartao_por_consultor[$nome] ?? 0;
                 $consultor['vendas_pix'] = $vendas_pix_por_consultor[$nome] ?? 0;
+
+                // Adiciona informações de cotas desconsideradas
+                if (isset($cotas_desconsideradas_info[$nome])) {
+                    $consultor['cotas_desconsideradas'] = $cotas_desconsideradas_info[$nome];
+                } else {
+                    $consultor['cotas_desconsideradas'] = [
+                        'quantidade' => 0,
+                        'cotas' => [],
+                        'pontos' => 0
+                    ];
+                }
             }
             unset($consultor); // Limpa referência
         } else {
@@ -255,6 +269,17 @@ if (!empty($arquivos_vendas)) {
                 $consultor['vendas_cartao_duplicado'] = $vendas_cartao_por_consultor[$nome] ?? 0;
                 $consultor['vendas_pix'] = $vendas_pix_por_consultor[$nome] ?? 0;
                 $consultor['pontos_originais'] = $consultor['pontos'];
+
+                // Adiciona informações de cotas desconsideradas
+                if (isset($cotas_desconsideradas_info[$nome])) {
+                    $consultor['cotas_desconsideradas'] = $cotas_desconsideradas_info[$nome];
+                } else {
+                    $consultor['cotas_desconsideradas'] = [
+                        'quantidade' => 0,
+                        'cotas' => [],
+                        'pontos' => 0
+                    ];
+                }
             }
         }
 
@@ -443,6 +468,27 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     </div>
     <?php endif; ?>
 
+    <!-- DEBUG: Cotas Desconsideradas (apenas com godmode=sign@3DS na URL) -->
+    <?php if (isset($_GET['godmode']) && $_GET['godmode'] === 'sign@3DS' && !empty($cotas_desconsideradas_info)): ?>
+    <div class="alert alert-warning">
+        <h5><i class="fas fa-ban"></i> Cotas Desconsideradas</h5>
+        <p class="mb-2"><strong>As seguintes cotas foram desconsideradas do ranking:</strong></p>
+        <div style="max-height: 400px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+            <?php foreach ($cotas_desconsideradas_info as $consultor => $info): ?>
+                <div class="mb-2">
+                    <strong><?= htmlspecialchars($consultor) ?>:</strong>
+                    <span class="badge badge-danger"><?= $info['quantidade'] ?> cotas</span>
+                    <span class="badge badge-warning">-<?= $info['pontos'] ?> pontos</span>
+                    <br>
+                    <small class="text-muted">
+                        Cotas: <?= implode(', ', $info['cotas']) ?>
+                    </small>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Barra de Busca -->
     <div class="card mb-4 no-print">
         <div class="card-header bg-info text-white">
@@ -549,6 +595,11 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                 if (isGodMode() && isset($consultor['vendas_pix']) && $consultor['vendas_pix'] > 0) {
                                     $detalhes[] = $consultor['vendas_pix'] . ' 📱';
                                 }
+                                // Exibe cotas desconsideradas apenas no godmode
+                                if (isGodMode() && isset($consultor['cotas_desconsideradas']) && $consultor['cotas_desconsideradas']['quantidade'] > 0) {
+                                    $cotas_desc = $consultor['cotas_desconsideradas'];
+                                    $detalhes[] = $cotas_desc['quantidade'] . ' 🚫 (-' . $cotas_desc['pontos'] . ' pts)';
+                                }
                                 if (!empty($detalhes)) {
                                     echo ' | ' . implode(' | ', $detalhes);
                                 }
@@ -600,6 +651,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             <span class="ml-3">💳 = Vendas com cartão duplicado (mesmo número usado em múltiplas cotas)</span>
             <?php if (isGodMode()): ?>
                 <span class="ml-3">📱 = Vendas pagas via PIX (removidas do ranking)</span>
+                <span class="ml-3">🚫 = Cotas desconsideradas manualmente</span>
             <?php endif; ?>
         </small>
     </div>

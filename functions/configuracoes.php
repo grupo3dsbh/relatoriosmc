@@ -288,4 +288,40 @@ function resetarConfiguracoes() {
     $config = obterConfigPadrao();
     return salvarConfiguracoes($config);
 }
+
+/**
+ * Carrega lista de cotas desconsideradas
+ */
+function carregarCotasDesconsideradas() {
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+
+    if (isset($config['cotas_desconsideradas'])) {
+        $cotas_config = $config['cotas_desconsideradas'];
+
+        // Se está ativo e tem lista
+        if (!empty($cotas_config['ativo']) && !empty($cotas_config['lista'])) {
+            return $cotas_config['lista'];
+        }
+    }
+
+    return [];
+}
+
+/**
+ * Salva lista de cotas desconsideradas
+ */
+function salvarCotasDesconsideradas($lista_cotas) {
+    $config = carregarConfiguracoes();
+
+    if (!isset($config['cotas_desconsideradas'])) {
+        $config['cotas_desconsideradas'] = [
+            'ativo' => true,
+            'lista' => []
+        ];
+    }
+
+    $config['cotas_desconsideradas']['lista'] = $lista_cotas;
+
+    return salvarConfiguracoes($config);
+}
 ?>
