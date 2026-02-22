@@ -302,6 +302,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             </h5>
         </div>
         <div class="card-body">
+            <div id="godmodeFilterInfo" class="alert alert-info mb-3" style="display: none;">
+                <i class="fas fa-filter"></i> <strong>Filtro ativo:</strong> Mostrando apenas cotas desconsideradas do consultor pesquisado.
+            </div>
             <?php if (empty($cotas_config)): ?>
                 <p class="text-muted mb-0">Nenhuma cota configurada para desconsiderar. Adicione IDs (ex: SFA-10001) em <strong>Configurações → Cotas Desconsideradas</strong>.</p>
             <?php else: ?>
@@ -325,7 +328,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                         </thead>
                         <tbody>
                         <?php foreach ($impacto as $cn => $info): ?>
-                            <tr>
+                            <tr class="godmode-row" data-consultor="<?= strtolower(htmlspecialchars($info['consultor'])) ?>">
                                 <td><strong><?= htmlspecialchars($info['consultor']) ?></strong></td>
                                 <td>
                                     <?php foreach ($info['cotas_ids'] as $cid): ?>
@@ -360,6 +363,8 @@ $(document).ready(function() {
     const $clearBtn = $('#clearSearch');
     const $searchResult = $('#searchResult');
     const $tableRows = $('#rankingTable tbody tr');
+    const $godmodeRows = $('.godmode-row');
+    const $godmodeFilterInfo = $('#godmodeFilterInfo');
 
     // Função de busca
     function performSearch() {
@@ -367,11 +372,14 @@ $(document).ready(function() {
 
         // Remove destaques anteriores
         $tableRows.removeClass('search-highlight');
+        $godmodeRows.removeClass('search-highlight');
 
         if (searchTerm === '') {
             // Mostra todas as linhas
             $tableRows.show();
+            $godmodeRows.show();
             $searchResult.html('');
+            $godmodeFilterInfo.hide();
             return;
         }
 
@@ -395,14 +403,42 @@ $(document).ready(function() {
             }
         });
 
+        // Filtra também as linhas do painel godmode
+        let godmodeFoundCount = 0;
+        $godmodeRows.each(function() {
+            const $row = $(this);
+            const consultorName = $row.data('consultor');
+
+            if (consultorName.indexOf(searchTerm) !== -1) {
+                $row.show();
+                $row.addClass('search-highlight');
+                godmodeFoundCount++;
+            } else {
+                $row.hide();
+            }
+        });
+
+        // Mostra/oculta alerta de filtro no godmode
+        if ($godmodeRows.length > 0) {
+            $godmodeFilterInfo.show();
+        }
+
         // Atualiza mensagem de resultado
         if (foundCount > 0) {
-            $searchResult.html(
-                `<div class="alert alert-success mb-0">
+            let resultHtml = `<div class="alert alert-success mb-0">
                     <i class="fas fa-check-circle"></i>
-                    <strong>${foundCount}</strong> consultor(es) encontrado(s)
-                </div>`
-            );
+                    <strong>${foundCount}</strong> consultor(es) encontrado(s)`;
+
+            if ($godmodeRows.length > 0) {
+                if (godmodeFoundCount > 0) {
+                    resultHtml += `<br><i class="fas fa-eye-slash"></i> <strong>${godmodeFoundCount}</strong> cota(s) desconsiderada(s) encontrada(s) para este consultor`;
+                } else {
+                    resultHtml += `<br><i class="fas fa-check"></i> Nenhuma cota desconsiderada para este consultor`;
+                }
+            }
+
+            resultHtml += `</div>`;
+            $searchResult.html(resultHtml);
 
             // Scroll até o primeiro resultado
             if (firstMatch) {

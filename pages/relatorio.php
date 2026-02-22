@@ -881,6 +881,9 @@ if (isGodMode() && isset($vendas_processadas)):
                 </h5>
             </div>
             <div class="card-body">
+                <div id="godmodeFilterInfo" class="alert alert-info mb-3" style="display: none;">
+                    <i class="fas fa-filter"></i> <strong>Filtro ativo:</strong> Mostrando apenas cotas desconsideradas do consultor pesquisado.
+                </div>
                 <?php if (empty($cotas_config_rel)): ?>
                     <p class="text-muted mb-0">Nenhuma cota configurada para desconsiderar. Adicione IDs (ex: SFA-10001) em <strong>Configurações → Cotas Desconsideradas</strong>.</p>
                 <?php else: ?>
@@ -903,7 +906,7 @@ if (isGodMode() && isset($vendas_processadas)):
                             </thead>
                             <tbody>
                             <?php foreach ($impacto_rel as $cn => $info): ?>
-                                <tr>
+                                <tr class="godmode-row" data-consultor="<?= strtolower(htmlspecialchars($info['consultor'])) ?>">
                                     <td><strong><?= htmlspecialchars($info['consultor']) ?></strong></td>
                                     <td>
                                         <?php foreach ($info['cotas_ids'] as $cid): ?>
