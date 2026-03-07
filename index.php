@@ -3,11 +3,25 @@
 ob_start(); // Inicia buffer de saída para permitir header() redirects
 require_once 'config.php';
 
-// ===== LÓGICA DE GODMODE PARA MANUTENÇÃO =====
+// ===== LÓGICA DE MANUTENÇÃO =====
 // Inicia sessão se não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// ===== CRIA DIRETÓRIO DATA SE NÃO EXISTIR =====
+if (!file_exists(DATA_DIR)) {
+    mkdir(DATA_DIR, 0755, true);
+}
+
+// ===== CRIA config.json se não existir =====
+if (!file_exists(CONFIG_FILE)) {
+    $config_padrao = obterConfigPadrao();
+    file_put_contents(CONFIG_FILE, json_encode($config_padrao, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+}
+
+// Carrega configurações primeiro para verificar modo manutenção
+inicializarConfiguracoes();
 
 // Verifica se tem godmode na URL
 if (isset($_GET['godmode'])) {
@@ -21,23 +35,16 @@ if (isset($_GET['godmode'])) {
 // Verifica se tem godmode ativo (na sessão ou na URL)
 $godmode_ativo = isset($_SESSION['godmode_ativo']) && $_SESSION['godmode_ativo'] === true;
 
-// Se não tiver godmode ativo, mostra página de manutenção
-if (!$godmode_ativo) {
+// Verifica se modo manutenção está ativo
+$manutencao_ativa = isModoManutencaoAtivo();
+$permitir_godmode_bypass = !empty($_SESSION['config_sistema']['manutencao']['permitir_godmode']);
+
+// Se manutenção ativa E (não permite godmode OU não tem godmode ativo)
+if ($manutencao_ativa && (!$permitir_godmode_bypass || !$godmode_ativo)) {
     include 'manutencao.php';
     die();
 }
-// ===== FIM LÓGICA DE GODMODE =====
-
-// ===== CRIA DIRETÓRIO DATA SE NO EXISTIR =====
-if (!file_exists(DATA_DIR)) {
-    mkdir(DATA_DIR, 0755, true);
-}
-
-// ===== CRIA config.json se não existir =====
-if (!file_exists(CONFIG_FILE)) {
-    $config_padrao = obterConfigPadrao();
-    file_put_contents(CONFIG_FILE, json_encode($config_padrao, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-}
+// ===== FIM LÓGICA DE MANUTENÇÃO =====
 
 // ===== LIMPAR CACHE/SESSÃO =====
 if (isset($_GET['limpar_cache'])) {

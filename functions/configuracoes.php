@@ -100,6 +100,10 @@ function obterConfigPadrao() {
             'senha_godmode' => 'admin123', // Senha para modo admin
             'senha_admin_setores' => 'aquabeat' // Senha para setores acessarem dados de consultores
         ],
+        'manutencao' => [
+            'ativo' => false, // Define se o modo manutenção está ativo
+            'permitir_godmode' => true // Permite bypass via godmode mesmo em manutenção
+        ],
         'premiacoes' => [
             'pontos_por_sap' => 21,
             'vendas_para_dip' => 30,
@@ -394,5 +398,31 @@ function isCotaDesconsiderada($cota) {
 function getTotalCotasDesconsideradas() {
     $lista = carregarCotasDesconsideradas();
     return count($lista);
+}
+
+/**
+ * Verifica se o modo manutenção está ativo
+ */
+function isModoManutencaoAtivo() {
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+    return !empty($config['manutencao']['ativo']);
+}
+
+/**
+ * Ativa ou desativa o modo manutenção
+ */
+function setModoManutencao($ativo) {
+    $config = carregarConfiguracoes();
+
+    if (!isset($config['manutencao'])) {
+        $config['manutencao'] = [
+            'ativo' => false,
+            'permitir_godmode' => true
+        ];
+    }
+
+    $config['manutencao']['ativo'] = (bool)$ativo;
+
+    return salvarConfiguracoes($config);
 }
 ?>

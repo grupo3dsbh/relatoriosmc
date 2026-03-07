@@ -291,8 +291,11 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         // 3. Desempate final por quantidade
         usort($vendas_processadas['por_consultor'], function($a, $b) use ($ordem_por) {
             // Prioridade 1: Consultores com vendas ativas no topo
-            if ($a['vendas_ativas'] > 0 && $b['vendas_ativas'] == 0) return -1;
-            if ($a['vendas_ativas'] == 0 && $b['vendas_ativas'] > 0) return 1;
+            $vendas_ativas_a = $a['vendas_ativas'] ?? 0;
+            $vendas_ativas_b = $b['vendas_ativas'] ?? 0;
+
+            if ($vendas_ativas_a > 0 && $vendas_ativas_b == 0) return -1;
+            if ($vendas_ativas_a == 0 && $vendas_ativas_b > 0) return 1;
 
             // Prioridade 2: Ordena por pontos ou quantidade
             if ($ordem_por === 'quantidade') {

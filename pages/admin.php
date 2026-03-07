@@ -108,6 +108,19 @@ if (isset($_POST['alterar_senha_mestre'])) {
     }
 }
 
+// Processa ativação/desativação do modo manutenção
+if (isset($_POST['toggle_manutencao'])) {
+    $ativar = isset($_POST['manutencao_ativo']) && $_POST['manutencao_ativo'] == '1';
+    $resultado = setModoManutencao($ativar);
+
+    if ($resultado['sucesso']) {
+        $status = $ativar ? 'ativado' : 'desativado';
+        $mensagem_sucesso = "Modo manutenção {$status} com sucesso!";
+    } else {
+        $erro_upload = "Erro ao alterar modo manutenção: " . $resultado['mensagem'];
+    }
+}
+
 // Processa upload de CSV de vendas
 if (isset($_POST['upload_vendas']) && isset($_FILES['csv_vendas'])) {
     if ($_FILES['csv_vendas']['error'] === UPLOAD_ERR_OK) {
@@ -1160,6 +1173,58 @@ if (!verificarAdmin()):
                             <label>&nbsp;</label>
                             <button type="submit" name="alterar_senha_mestre" class="btn btn-danger btn-block">
                                 <i class="fas fa-save"></i> Alterar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modo Manutenção -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools"></i> Modo Manutenção
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="form-group mb-0">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" class="custom-control-input"
+                                           id="manutencao_ativo" name="manutencao_ativo" value="1"
+                                           <?= isModoManutencaoAtivo() ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="manutencao_ativo">
+                                        <strong>Ativar Modo Manutenção</strong>
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    Quando ativado, o sistema exibirá uma tela de manutenção para todos os usuários.
+                                    Administradores com godmode ainda poderão acessar o sistema.
+                                </small>
+                                <?php if (isModoManutencaoAtivo()): ?>
+                                    <div class="alert alert-warning mt-2 mb-0">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <strong>Modo manutenção está ATIVO!</strong>
+                                        O sistema está bloqueado para usuários sem godmode.
+                                    </div>
+                                <?php else: ?>
+                                    <div class="alert alert-success mt-2 mb-0">
+                                        <i class="fas fa-check-circle"></i>
+                                        <strong>Sistema operando normalmente.</strong>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" name="toggle_manutencao" class="btn btn-dark btn-lg btn-block">
+                                <i class="fas fa-save"></i> Salvar Alteração
                             </button>
                         </div>
                     </div>
