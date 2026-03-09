@@ -59,7 +59,13 @@ if (isset($_POST['salvar_configuracoes'])) {
         'senha_godmode' => trim($_POST['senha_godmode'] ?? 'admin123'),
         'senha_admin_setores' => trim($_POST['senha_admin_setores'] ?? 'aquabeat')
     ];
-    
+
+    // Atualiza configurações de manutenção
+    $config['manutencao'] = [
+        'ativo' => isset($_POST['manutencao_ativo']),
+        'permitir_godmode' => isset($_POST['manutencao_permitir_godmode'])
+    ];
+
     // Atualiza configurações de premiação
     $config['premiacao'] = [
         'mensagem' => trim($_POST['mensagem_premiacao'] ?? ''),
@@ -349,6 +355,55 @@ if (isset($_POST['resetar_config'])) {
                                     <?php else: ?>
                                         Configure uma senha para gerar URL com filtros liberados
                                     <?php endif; ?>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Modo Manutenção -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h6 class="text-danger">
+                                <i class="fas fa-tools"></i> Modo Manutenção
+                            </h6>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="manutencao_ativo"
+                                           name="manutencao_ativo"
+                                           <?= !empty($config['manutencao']['ativo']) ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="manutencao_ativo">
+                                        <strong>Ativar Modo Manutenção</strong>
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    Quando ativo, apenas usuários com godmode poderão acessar o sistema
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="manutencao_permitir_godmode"
+                                           name="manutencao_permitir_godmode"
+                                           <?= !empty($config['manutencao']['permitir_godmode']) ? 'checked' : '' ?>>
+                                    <label class="custom-control-label" for="manutencao_permitir_godmode">
+                                        <strong>Permitir Bypass com GodMode</strong>
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    Permite que usuários com godmode acessem durante manutenção
                                 </small>
                             </div>
                         </div>
