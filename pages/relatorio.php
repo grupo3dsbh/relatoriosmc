@@ -120,9 +120,10 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         $data_final_config = $periodo_config['data_final'] ?? date('Y-m-t');
 
         // Verifica se deve aplicar filtro automático (acesso via GET + após dia 08)
+        // IMPORTANTE: Só aplica filtro automático se NÃO houver parâmetros na URL
         $aplicar_filtro_automatico = false;
-        if (!isset($_POST['data_inicial'])) {
-            // Acesso via GET - verifica se já passou do dia 08
+        if (!isset($_POST['data_inicial']) && !isset($_GET['arquivo']) && !isset($_GET['data_inicial']) && !isset($_GET['data_final'])) {
+            // Acesso via GET SEM parâmetros - verifica se já passou do dia 08
             $hoje = new DateTime();
             $fim_periodo = new DateTime($data_final_config);
             $mes_seguinte = clone $fim_periodo;
