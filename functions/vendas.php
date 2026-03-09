@@ -589,12 +589,116 @@ function processarVendasCSV($arquivo, $filtros = []) {
         }
     }
 
+    // === FILTRO DE COTAS DESCONSIDERADAS (IGNORADAS) ===
+    $vendas_ignoradas_cotas = [];
+
+    // Carrega configurações para obter lista de cotas ignoradas
+    require_once __DIR__ . '/configuracoes.php';
+    $config = $_SESSION['config_sistema'] ?? carregarConfiguracoes();
+
+    // Suporta múltiplas estruturas de cotas_desconsideradas
+    $cotas_ignoradas = [];
+    if (isset($config['cotas_desconsideradas'])) {
+        if (is_string($config['cotas_desconsideradas'])) {
+            // Formato antigo: string separada por vírgulas
+            $cotas_ignoradas = array_map('trim', explode(',', $config['cotas_desconsideradas']));
+        } elseif (is_array($config['cotas_desconsideradas'])) {
+            // Formato novo: array de strings ou objetos
+            foreach ($config['cotas_desconsideradas'] as $item) {
+                if (is_string($item)) {
+                    $cotas_ignoradas[] = trim($item);
+                } elseif (is_array($item) && isset($item['id'])) {
+                    $cotas_ignoradas[] = trim($item['id']);
+                }
+            }
+        }
+    }
+
+    // Aplica filtro se houver cotas para ignorar
+    if (!empty($cotas_ignoradas)) {
+        $vendas_filtradas = [];
+
+        foreach ($vendas as $venda) {
+            $id_cota = trim($venda['id'] ?? '');
+
+            // Verifica se a cota deve ser ignorada
+            if (in_array($id_cota, $cotas_ignoradas)) {
+                $vendas_ignoradas_cotas[] = [
+                    'id' => $venda['id'],
+                    'titular' => $venda['titular'],
+                    'consultor' => $venda['consultor'],
+                    'produto' => $venda['produto_atual'],
+                    'valor_total' => $venda['valor_total'],
+                    'data_venda' => $venda['data_venda'],
+                    'motivo' => 'Cota na lista de desconsideradas'
+                ];
+
+                $log_ignorados[] = [
+                    'linha' => '-',
+                    'motivo' => 'FILTRADO PÓS-PROCESSAMENTO: Cota desconsiderada',
+                    'id' => $venda['id']
+                ];
+            } else {
+                $vendas_filtradas[] = $venda;
+            }
+        }
+
+        $vendas = $vendas_filtradas;
+
+        // Reprocessa por_consultor com vendas filtradas
+        $por_consultor = [];
+        foreach ($vendas as $venda) {
+            $consultor_nome = $venda['consultor'];
+
+            if (!isset($por_consultor[$consultor_nome])) {
+                $por_consultor[$consultor_nome] = [
+                    'consultor' => $consultor_nome,
+                    'venda' => 0,
+                    'devido' => 0,
+                    'pago' => 0,
+                    'quantidade' => 0,
+                    'vendas_ativas' => 0,
+                    'contagem_vagas' => [],
+                    'vendas_detalhes' => [],
+                    'vendas_ids' => [],
+                    'vendas_acima_2vagas' => 0
+                ];
+            }
+
+            $por_consultor[$consultor_nome]['venda'] += $venda['valor_total'];
+            $por_consultor[$consultor_nome]['devido'] += $venda['valor_restante'];
+            $por_consultor[$consultor_nome]['pago'] += $venda['valor_pago'];
+            $por_consultor[$consultor_nome]['quantidade']++;
+            $por_consultor[$consultor_nome]['vendas_ids'][] = $venda['id'];
+
+            if ($venda['status'] === 'Ativo') {
+                $por_consultor[$consultor_nome]['vendas_ativas']++;
+            }
+
+            if ($venda['num_vagas'] > 2) {
+                $por_consultor[$consultor_nome]['vendas_acima_2vagas']++;
+            }
+
+            $por_consultor[$consultor_nome]['vendas_detalhes'][] = [
+                'num_vagas' => $venda['num_vagas'],
+                'e_vista' => $venda['e_vista'],
+                'data_venda' => $venda['data_para_pontuacao'],
+                'data_cadastro_original' => $venda['data_cadastro'],
+                'data_venda_original' => $venda['data_venda'],
+                'id_venda' => $venda['id'],
+                'valor_total' => $venda['valor_total'],
+                'valor_pago' => $venda['valor_pago']
+            ];
+        }
+    }
+
     return [
         'vendas' => $vendas,
         'por_consultor' => array_values($por_consultor),
         'log_ignorados' => $log_ignorados,
         'vendas_ignoradas_cartao' => $vendas_ignoradas_cartao,
-        'vendas_ignoradas_pix' => $vendas_ignoradas_pix
+        'vendas_ignoradas_pix' => $vendas_ignoradas_pix,
+        'vendas_ignoradas_cotas' => $vendas_ignoradas_cotas
     ];
 }
 /**
