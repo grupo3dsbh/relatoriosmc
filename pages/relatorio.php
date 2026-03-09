@@ -186,7 +186,7 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 'apenas_vista' => isset($_POST['apenas_vista']) || isset($_GET['apenas_vista']),
                 'ignorar_cartao_duplicado' => $ignorar_cartao,
                 'ignorar_vendas_pix' => $ignorar_pix,
-                'status' => $_POST['filtro_status'] ?? $_GET['status'] ?? ''
+                'status' => $_POST['filtro_status'] ?? $_GET['filtro_status'] ?? ''
             ];
         }
         
