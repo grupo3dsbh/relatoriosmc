@@ -121,6 +121,10 @@ function obterConfigPadrao() {
             'apenas_primeira_parcela' => false,
             'apenas_vista' => false
         ],
+        'cotas_desconsideradas' => [
+            'ativo' => true,
+            'lista' => []
+        ],
         'ultima_atualizacao' => date('Y-m-d H:i:s')
     ];
 }
