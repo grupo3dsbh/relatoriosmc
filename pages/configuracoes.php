@@ -1188,4 +1188,272 @@ function validarFormRange() {
 
     return true;
 }
+
+// ===== AUTO-SAVE =====
+// Sistema de salvamento automático para cada campo
+
+// Elementos para feedback visual
+const autoSaveIndicator = document.createElement('div');
+autoSaveIndicator.id = 'autosave-indicator';
+autoSaveIndicator.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    border-radius: 5px;
+    background: #28a745;
+    color: white;
+    display: none;
+    z-index: 9999;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+`;
+document.body.appendChild(autoSaveIndicator);
+
+// Função para mostrar feedback
+function showSaveStatus(message, success = true) {
+    autoSaveIndicator.textContent = message;
+    autoSaveIndicator.style.background = success ? '#28a745' : '#dc3545';
+    autoSaveIndicator.style.display = 'block';
+
+    setTimeout(() => {
+        autoSaveIndicator.style.display = 'none';
+    }, 2000);
+}
+
+// Função genérica de auto-save
+function autoSave(fieldType, fieldName, fieldValue, element) {
+    // Adiciona classe visual de salvando
+    if (element) {
+        element.classList.add('border-warning');
+    }
+
+    showSaveStatus('💾 Salvando...', true);
+
+    fetch('ajax/auto_save_config.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            field_type: fieldType,
+            field_name: fieldName,
+            field_value: fieldValue
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSaveStatus('✅ Salvo!', true);
+            if (element) {
+                element.classList.remove('border-warning');
+                element.classList.add('border-success');
+                setTimeout(() => {
+                    element.classList.remove('border-success');
+                }, 1000);
+            }
+        } else {
+            showSaveStatus('❌ Erro: ' + data.message, false);
+            if (element) {
+                element.classList.remove('border-warning');
+                element.classList.add('border-danger');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro no auto-save:', error);
+        showSaveStatus('❌ Erro de comunicação', false);
+        if (element) {
+            element.classList.remove('border-warning');
+            element.classList.add('border-danger');
+        }
+    });
+}
+
+// Configurar auto-save para campos de acesso
+document.addEventListener('DOMContentLoaded', function() {
+    // Campos de texto - acesso
+    const acessoFields = {
+        'senha_godmode': 'senha_godmode',
+        'senha_admin_setores': 'senha_admin_setores',
+        'senha_filtro': 'senha_filtro'
+    };
+
+    Object.keys(acessoFields).forEach(inputName => {
+        const input = document.querySelector(`input[name="${inputName}"]`);
+        if (input) {
+            let originalValue = input.value;
+
+            input.addEventListener('blur', function() {
+                if (this.value !== originalValue) {
+                    autoSave('acesso', acessoFields[inputName], this.value, this);
+                    originalValue = this.value;
+                }
+            });
+
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (this.value !== originalValue) {
+                        autoSave('acesso', acessoFields[inputName], this.value, this);
+                        originalValue = this.value;
+                    }
+                }
+            });
+        }
+    });
+
+    // Select - relatório padrão
+    const relPadrao = document.querySelector('select[name="relatorio_padrao"]');
+    if (relPadrao) {
+        relPadrao.addEventListener('change', function() {
+            autoSave('acesso', 'relatorio_padrao', this.value, this);
+        });
+    }
+
+    // Checkboxes - acesso
+    const acessoCheckboxes = {
+        'manutencao_ativo': 'manutencao_ativo',
+        'manutencao_permitir_godmode': 'manutencao_permitir_godmode'
+    };
+
+    Object.keys(acessoCheckboxes).forEach(checkName => {
+        const checkbox = document.querySelector(`input[name="${checkName}"]`);
+        if (checkbox) {
+            checkbox.addEventListener('change', function() {
+                autoSave('acesso', acessoCheckboxes[checkName], this.checked, this);
+            });
+        }
+    });
+
+    // Campos de período
+    const periodoFields = {
+        'periodo_data_inicial': 'data_inicial',
+        'periodo_data_final': 'data_final',
+        'periodo_status': 'status'
+    };
+
+    Object.keys(periodoFields).forEach(inputName => {
+        const input = document.querySelector(`[name="${inputName}"]`);
+        if (input) {
+            let originalValue = input.value;
+
+            const saveIfChanged = function() {
+                if (this.value !== originalValue) {
+                    autoSave('periodo', periodoFields[inputName], this.value, this);
+                    originalValue = this.value;
+                }
+            };
+
+            input.addEventListener('blur', saveIfChanged);
+            input.addEventListener('change', saveIfChanged);
+
+            if (input.type !== 'select-one') {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveIfChanged.call(this);
+                    }
+                });
+            }
+        }
+    });
+
+    // Checkboxes de período
+    const periodoCheckboxes = {
+        'periodo_primeira_parcela': 'primeira_parcela',
+        'periodo_apenas_vista': 'apenas_vista'
+    };
+
+    Object.keys(periodoCheckboxes).forEach(checkName => {
+        const checkbox = document.querySelector(`input[name="${checkName}"]`);
+        if (checkbox) {
+            checkbox.addEventListener('change', function() {
+                autoSave('periodo', periodoCheckboxes[checkName], this.checked, this);
+            });
+        }
+    });
+
+    // Pontos padrão
+    const pontosPadraoFields = [
+        '1vaga', '2vagas', '3vagas', '4vagas', '5vagas', '6vagas',
+        '7vagas', '8vagas', '9vagas', '10vagas', 'acima_10', 'vista_acima_5'
+    ];
+
+    pontosPadraoFields.forEach(field => {
+        const input = document.querySelector(`input[name="pontos_${field}"]`);
+        if (input) {
+            let originalValue = input.value;
+
+            const saveIfChanged = function() {
+                if (this.value !== originalValue) {
+                    autoSave('pontos_padrao', field, this.value, this);
+                    originalValue = this.value;
+                }
+            };
+
+            input.addEventListener('blur', saveIfChanged);
+            input.addEventListener('change', saveIfChanged);
+
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveIfChanged.call(this);
+                }
+            });
+        }
+    });
+
+    // Premiação
+    const premiacaoFields = {
+        'mensagem_premiacao': 'mensagem',
+        'dia_limite_primeira_parcela': 'dia_limite_primeira_parcela'
+    };
+
+    Object.keys(premiacaoFields).forEach(inputName => {
+        const input = document.querySelector(`[name="${inputName}"]`);
+        if (input) {
+            let originalValue = input.value;
+
+            const saveIfChanged = function() {
+                if (this.value !== originalValue) {
+                    autoSave('premiacao', premiacaoFields[inputName], this.value, this);
+                    originalValue = this.value;
+                }
+            };
+
+            input.addEventListener('blur', saveIfChanged);
+
+            if (input.tagName !== 'TEXTAREA') {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveIfChanged.call(this);
+                    }
+                });
+            }
+        }
+    });
+
+    // Checkbox de premiação
+    const premiacaoCheck = document.querySelector('input[name="exibir_aviso_premiacao"]');
+    if (premiacaoCheck) {
+        premiacaoCheck.addEventListener('change', function() {
+            autoSave('premiacao', 'exibir_aviso', this.checked, this);
+        });
+    }
+
+    // Campos visíveis para consultores
+    const camposVisiveis = [
+        'pontos', 'vendas', 'valor_total', 'valor_pago', 'detalhamento', 'cotas_sap'
+    ];
+
+    camposVisiveis.forEach(field => {
+        const checkbox = document.querySelector(`input[name="campo_${field}"]`);
+        if (checkbox) {
+            checkbox.addEventListener('change', function() {
+                autoSave('campos_visiveis', field, this.checked, this);
+            });
+        }
+    });
+});
 </script>
