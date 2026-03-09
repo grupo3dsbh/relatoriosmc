@@ -716,8 +716,8 @@ function marcarDuplicados(&$vendas, $duplicados) {
  * Retorna array ['passa' => bool, 'motivo' => string]
  */
 function aplicarFiltros($venda, $filtros) {
-    // Filtro de status
-    if (!empty($filtros['status']) && $venda['status'] !== $filtros['status']) {
+    // Filtro de status (comparação case-insensitive)
+    if (!empty($filtros['status']) && strcasecmp($venda['status'], $filtros['status']) !== 0) {
         return ['passa' => false, 'motivo' => 'Status não corresponde (' . $venda['status'] . ' != ' . $filtros['status'] . ')'];
     }
     
