@@ -3,11 +3,20 @@
 
 require_once 'functions/vendas.php';
 
-// Tenta carregar banco de dados (se disponível)
-$usar_banco = false;
-if (file_exists(BASE_DIR . '/database/queries.php')) {
-    require_once BASE_DIR . '/database/queries.php';
-    $usar_banco = bancoDadosDisponivel();
+/**
+ * Exibe nome do consultor com apelido (se existir) e tooltip com nome original
+ */
+function exibirNomeConsultor($nome_original) {
+    $apelidos = carregarApelidosConsultores();
+
+    if (isset($apelidos[$nome_original])) {
+        $apelido = $apelidos[$nome_original]['apelido'];
+        return '<span title="' . htmlspecialchars($nome_original) . '" data-toggle="tooltip" style="cursor: help; border-bottom: 1px dotted #999;">'
+               . htmlspecialchars($apelido)
+               . '</span>';
+    }
+
+    return htmlspecialchars($nome_original);
 }
 
 // Carrega configurações para obter período padrão
@@ -46,27 +55,140 @@ if (!isset($_SESSION['campos_visiveis_consultores'])) {
 
 $campos_visiveis = $_SESSION['campos_visiveis_consultores'];
 
+// PRÉ-VERIFICAÇÃO: Detecta se é relatório FINAL ANTES de processar
+// Isso permite marcar o checkbox automaticamente no formulário
+$e_relatorio_final_pre_check = false;
+$data_inicial_check = $_POST['data_inicial'] ?? $periodo_padrao['data_inicial'];
+$data_final_check = $_POST['data_final'] ?? $periodo_padrao['data_final'];
+
+if (!empty($data_final_check)) {
+    $hoje = new DateTime();
+    $fim_periodo = new DateTime($data_final_check);
+
+    // Calcula o dia 08 do mês seguinte ao período
+    $mes_seguinte = clone $fim_periodo;
+    $mes_seguinte->modify('first day of next month');
+    $mes_seguinte->setDate(
+        (int)$mes_seguinte->format('Y'),
+        (int)$mes_seguinte->format('m'),
+        8
+    );
+
+    // Se já é dia 08 ou posterior, é relatório FINAL
+    if ($hoje >= $mes_seguinte) {
+        $e_relatorio_final_pre_check = true;
+    }
+}
+
 // Processa relatório
 if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
-    
+
     // Determina qual arquivo usar
     if (isset($_GET['arquivo'])) {
         $nome_arquivo = $_GET['arquivo'];
-        $arquivo_selecionado = VENDAS_DIR . '/' . $nome_arquivo;
+
+        // Verifica se é nome amigável (vendas-novembro25) ou arquivo real
+        if (strpos($nome_arquivo, 'vendas-') === 0 && !strpos($nome_arquivo, '.csv')) {
+            // É nome amigável, converte para arquivo real
+            $arquivo_selecionado = obterArquivoRealPorNomeAmigavel($nome_arquivo);
+            if (!$arquivo_selecionado) {
+                $mensagem_erro = "Relatório '{$nome_arquivo}' não encontrado!";
+            }
+        } else {
+            // É arquivo real (.csv)
+            $arquivo_selecionado = VENDAS_DIR . '/' . $nome_arquivo;
+        }
     } elseif (isset($_POST['arquivo_vendas'])) {
-        $arquivo_selecionado = $_POST['arquivo_vendas'];
+        // Verifica se é array (múltiplos arquivos - godmode)
+        if (is_array($_POST['arquivo_vendas'])) {
+            $arquivos_selecionados = $_POST['arquivo_vendas'];
+            $arquivo_selecionado = $arquivos_selecionados[0]; // Primeiro arquivo para compatibilidade
+        } else {
+            $arquivo_selecionado = $_POST['arquivo_vendas'];
+            $arquivos_selecionados = [$arquivo_selecionado]; // Array com 1 elemento
+        }
     }
-    
-    if ($arquivo_selecionado && file_exists($arquivo_selecionado)) {
-        
+
+    // Suporte para múltiplos arquivos (godmode)
+    $e_multifile = isset($arquivos_selecionados) && count($arquivos_selecionados) > 1;
+
+    if ($arquivo_selecionado && (file_exists($arquivo_selecionado) || $e_multifile)) {
+
+        // Busca configurações do período para obter datas
+        $periodo_config = $_SESSION['config_sistema']['periodo_relatorio'] ?? [];
+        $data_inicial_config = $periodo_config['data_inicial'] ?? date('Y-m-01');
+        $data_final_config = $periodo_config['data_final'] ?? date('Y-m-t');
+
+        // Verifica se deve aplicar filtro automático (acesso via GET + após dia 08)
+        // IMPORTANTE: Só aplica filtro automático se NÃO houver parâmetros na URL
+        $aplicar_filtro_automatico = false;
+        if (!isset($_POST['data_inicial']) && !isset($_GET['arquivo']) && !isset($_GET['data_inicial']) && !isset($_GET['data_final'])) {
+            // Acesso via GET SEM parâmetros - verifica se já passou do dia 08
+            $hoje = new DateTime();
+            $fim_periodo = new DateTime($data_final_config);
+            $mes_seguinte = clone $fim_periodo;
+            $mes_seguinte->modify('first day of next month');
+            $mes_seguinte->setDate(
+                (int)$mes_seguinte->format('Y'),
+                (int)$mes_seguinte->format('m'),
+                8
+            );
+
+            if ($hoje >= $mes_seguinte) {
+                $aplicar_filtro_automatico = true;
+            }
+        }
+
         // Monta filtros
-        $filtros = [
-            'data_inicial' => $_POST['data_inicial'] ?? '',
-            'data_final' => $_POST['data_final'] ?? '',
-            'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']),
-            'apenas_vista' => isset($_POST['apenas_vista']),
-            'status' => $_POST['filtro_status'] ?? ''
-        ];
+        if ($aplicar_filtro_automatico) {
+            // Acesso direto em relatório FINAL - aplica filtros automaticamente
+            $filtros = [
+                'data_inicial' => $data_inicial_config,
+                'data_final' => $data_final_config,
+                'primeira_parcela_paga' => true,  // OBRIGATÓRIO em relatórios finais
+                'apenas_vista' => false,
+                'status' => 'Ativo'  // Apenas vendas ativas
+            ];
+        } else {
+            // Formulário enviado via POST ou relatório temporário
+            // Verifica POST primeiro, depois GET, depois config
+
+            // Processa filtros da URL (tem prioridade)
+            $filtros_url = processarFiltrosURL();
+
+            // IGNORAR_CARTAO_DUPLICADO: Por padrão TRUE, só pode desativar com godmode
+            $ignorar_cartao = true; // PADRÃO: ATIVO
+            if (isset($_POST['processar_relatorio'])) {
+                // Se o formulário foi submetido, verifica se o checkbox foi marcado
+                // Checkbox só é desmarcável no godmode
+                if (isset($_SESSION['godmode_ativo']) && $_SESSION['godmode_ativo'] === true) {
+                    $ignorar_cartao = isset($_POST['ignorar_cartao_duplicado']);
+                }
+            } elseif (isset($_GET['ignorar_cartao_duplicado'])) {
+                // Via GET (apenas godmode pode passar false)
+                $ignorar_cartao = $_GET['ignorar_cartao_duplicado'] !== 'false';
+            }
+
+            // Aplica filtros da URL se existirem (tem prioridade máxima)
+            if (isset($_GET['include'])) {
+                // URL ?include parameter tem prioridade absoluta
+                $ignorar_cartao = $filtros_url['ignorar_cartao_duplicado'];
+                $ignorar_pix = $filtros_url['ignorar_vendas_pix'];
+            } else {
+                // Sem URL parameter, processa filtro PIX de POST/GET
+                $ignorar_pix = isset($_POST['ignorar_vendas_pix']) || isset($_GET['ignorar_vendas_pix']);
+            }
+
+            $filtros = [
+                'data_inicial' => $_POST['data_inicial'] ?? $_GET['data_inicial'] ?? $data_inicial_config,
+                'data_final' => $_POST['data_final'] ?? $_GET['data_final'] ?? $data_final_config,
+                'primeira_parcela_paga' => isset($_POST['primeira_parcela_paga']) || isset($_GET['primeira_parcela']),
+                'apenas_vista' => isset($_POST['apenas_vista']) || isset($_GET['apenas_vista']),
+                'ignorar_cartao_duplicado' => $ignorar_cartao,
+                'ignorar_vendas_pix' => $ignorar_pix,
+                'status' => $_POST['filtro_status'] ?? $_GET['status'] ?? ''
+            ];
+        }
         
         // ===== DEBUG DETALHADO - INÍCIO =====
         if (isGodMode()) {
@@ -136,48 +258,47 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         // ===== DEBUG DETALHADO - FIM =====
 
         // Processa vendas COM RANGES DE PONTUAÇÃO
-        // Usa banco de dados se disponível e tiver mês de referência
-        if ($usar_banco && !empty($mes_referencia_arquivo)) {
-            // Busca do banco de dados
-            $resultado_vendas = buscarVendasDoBanco($mes_referencia_arquivo, $filtros);
-
-            // Calcula pontos com ranges
-            require_once BASE_DIR . '/functions/vendas.php';
-            foreach ($resultado_vendas['por_consultor'] as &$consultor) {
-                $resultado_pontos = calcularPontosComRanges($consultor['vendas_detalhes']);
-                $consultor['pontos'] = $resultado_pontos['pontos_total'];
-                $consultor['detalhamento_pontos'] = $resultado_pontos['detalhamento_por_range'];
-            }
-
-            // Adiciona premiações (SAPs e DIPs)
-            adicionarPremiacoes($resultado_vendas['por_consultor']);
-
-            // Calcula impacto das cotas desconsideradas (caminho banco)
-            $impacto_desc_rel = [];
-            foreach (($resultado_vendas['por_consultor_desconsideradas'] ?? []) as $cn => $dados) {
-                $calculo = calcularPontosComRanges($dados['vendas_detalhes']);
-                $impacto_desc_rel[$cn] = [
-                    'consultor'       => $cn,
-                    'pontos_removidos'=> $calculo['pontos_total'],
-                    'cotas_ids'       => $dados['ids'],
-                    'vendas_detalhes' => $dados['vendas_detalhes']
-                ];
-            }
-            $resultado_vendas['cotas_desconsideradas_impacto'] = $impacto_desc_rel;
-
-            $vendas_processadas = $resultado_vendas;
-
-            if (isGodMode()) {
-                echo "<div class='alert alert-success'><strong>📊 Usando BANCO DE DADOS</strong> (mês: $mes_referencia_arquivo)</div>";
-            }
+        if ($e_multifile) {
+            // GODMODE: Múltiplos arquivos
+            $vendas_processadas = processarMultiplosArquivosCSV($arquivos_selecionados, $filtros);
         } else {
-            // Processa do CSV (modo legado)
+            // Arquivo único
             $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
-
-            if (isGodMode()) {
-                echo "<div class='alert alert-warning'><strong>📄 Usando CSV</strong> (modo legado)</div>";
-            }
         }
+
+        // Processa cotas desconsideradas
+        $cotas_desconsideradas_info = $vendas_processadas['cotas_desconsideradas_por_consultor'] ?? [];
+
+        // ===== APLICA REGRA DO DIA 08 (remove canceladas e sem 1ª parcela) =====
+        $regra_dia08 = aplicarRegraDia08(
+            $vendas_processadas['vendas'],
+            $filtros['data_inicial'],
+            $filtros['data_final']
+        );
+
+        // Se aplicou filtro, recalcula pontuação dos consultores
+        if ($regra_dia08['aplicar_filtro']) {
+            // Reagrupa vendas por consultor
+            if ($e_multifile) {
+                // GODMODE: Múltiplos arquivos
+                $vendas_processadas = processarMultiplosArquivosCSV($arquivos_selecionados, $filtros);
+            } else {
+                // Arquivo único
+                $vendas_processadas = processarVendasComRanges($arquivo_selecionado, $filtros);
+            }
+
+            // Filtra novamente as vendas processadas
+            $regra_dia08 = aplicarRegraDia08(
+                $vendas_processadas['vendas'],
+                $filtros['data_inicial'],
+                $filtros['data_final']
+            );
+        }
+
+        // Determina se é relatório FINAL ou TEMPORÁRIO
+        $nome_arquivo_base = basename($arquivo_selecionado);
+        $nome_amigavel = gerarNomeAmigavel($nome_arquivo_base);
+        $tipo_relatorio = $regra_dia08['aplicar_filtro'] ? 'FINAL' : 'TEMPORÁRIO';
 
         // ===== DEBUG: RESULTADO DO PROCESSAMENTO =====
         if (isGodMode()) {
@@ -256,31 +377,29 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
                 echo "</div>";
             }
             
-            // Cotas desconsideradas
-            $cotas_config_debug = $config['cotas_desconsideradas'] ?? [];
-            $impacto_debug      = $vendas_processadas['cotas_desconsideradas_impacto'] ?? [];
-            echo "<br><strong>🚫 Cotas Desconsideradas:</strong><br>";
-            if (empty($cotas_config_debug)) {
-                echo "<span class='text-muted'>Nenhuma cota configurada para desconsiderar.</span><br>";
-            } else {
-                echo "Configuradas: <strong>" . count($cotas_config_debug) . "</strong> (" . implode(', ', array_map('htmlspecialchars', $cotas_config_debug)) . ")<br>";
-                if (empty($impacto_debug)) {
-                    echo "<span class='text-success'>✅ Nenhuma das cotas desconsideradas estava neste período.</span><br>";
-                } else {
-                    echo "<span class='text-danger'>⚠️ " . count($impacto_debug) . " consultor(es) afetado(s):</span><br>";
-                    echo "<ul class='mb-0'>";
-                    foreach ($impacto_debug as $cn => $info) {
-                        echo "<li><strong>" . htmlspecialchars($info['consultor']) . "</strong>: ";
-                        echo implode(', ', array_map('htmlspecialchars', $info['cotas_ids']));
-                        echo " → <span class='text-danger font-weight-bold'>-" . $info['pontos_removidos'] . " pts</span></li>";
-                    }
-                    echo "</ul>";
-                }
-            }
-
             echo "</div>"; // Fecha alert-info
         }
         // ===== FIM DEBUG =====
+
+        // DEBUG: Cotas Desconsideradas (apenas com godmode=sign@3DS na URL)
+        if (isset($_GET['godmode']) && $_GET['godmode'] === 'sign@3DS' && !empty($cotas_desconsideradas_info)) {
+            echo "<div class='alert alert-warning mt-3'>";
+            echo "<h5><i class='fas fa-ban'></i> Cotas Desconsideradas</h5>";
+            echo "<p class='mb-2'><strong>As seguintes cotas foram desconsideradas do ranking:</strong></p>";
+            echo "<div style='max-height: 400px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px;'>";
+
+            foreach ($cotas_desconsideradas_info as $consultor => $info) {
+                echo "<div class='mb-2'>";
+                echo "<strong>" . htmlspecialchars($consultor) . ":</strong> ";
+                echo "<span class='badge badge-danger'>" . $info['quantidade'] . " cotas</span> ";
+                echo "<span class='badge badge-warning'>-" . $info['pontos'] . " pontos</span><br>";
+                echo "<small class='text-muted'>Cotas: " . implode(', ', $info['cotas']) . "</small>";
+                echo "</div>";
+            }
+
+            echo "</div>";
+            echo "</div>";
+        }
 
         // Parâmetro de ordenação (pontos ou quantidade)
         $ordem_por = $_POST['ordenar_por'] ?? 'pontos';
@@ -291,11 +410,8 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
         // 3. Desempate final por quantidade
         usort($vendas_processadas['por_consultor'], function($a, $b) use ($ordem_por) {
             // Prioridade 1: Consultores com vendas ativas no topo
-            $vendas_ativas_a = $a['vendas_ativas'] ?? 0;
-            $vendas_ativas_b = $b['vendas_ativas'] ?? 0;
-
-            if ($vendas_ativas_a > 0 && $vendas_ativas_b == 0) return -1;
-            if ($vendas_ativas_a == 0 && $vendas_ativas_b > 0) return 1;
+            if ($a['vendas_ativas'] > 0 && $b['vendas_ativas'] == 0) return -1;
+            if ($a['vendas_ativas'] == 0 && $b['vendas_ativas'] > 0) return 1;
 
             // Prioridade 2: Ordena por pontos ou quantidade
             if ($ordem_por === 'quantidade') {
@@ -315,8 +431,14 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             }
         });
         
-        $mensagem_sucesso = "Relatório processado com sucesso! " . 
-                          count($vendas_processadas['vendas']) . " vendas encontradas.";
+        if ($e_multifile && isset($vendas_processadas['multifile'])) {
+            $mensagem_sucesso = "Relatório CONSOLIDADO processado com sucesso! " .
+                              count($vendas_processadas['vendas']) . " vendas encontradas de " .
+                              $vendas_processadas['total_arquivos'] . " arquivos.";
+        } else {
+            $mensagem_sucesso = "Relatório processado com sucesso! " .
+                              count($vendas_processadas['vendas']) . " vendas encontradas.";
+        }
     } else {
         $mensagem_erro = "Arquivo não encontrado!";
     }
@@ -347,6 +469,17 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                 <?php if ($mensagem_sucesso): ?>
                     <div class="alert alert-success alert-dismissible fade show">
                         <i class="fas fa-check-circle"></i> <?= $mensagem_sucesso ?>
+
+                        <?php if (isset($vendas_processadas['multifile']) && $vendas_processadas['multifile']): ?>
+                            <hr>
+                            <strong><i class="fas fa-layer-group"></i> Arquivos Consolidados:</strong>
+                            <ul class="mb-0 mt-2">
+                                <?php foreach ($vendas_processadas['arquivos'] as $nome_arquivo): ?>
+                                    <li><?= htmlspecialchars(gerarNomeAmigavel($nome_arquivo)) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                     </div>
                 <?php endif; ?>
@@ -357,7 +490,40 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                     </div>
                 <?php endif; ?>
-                
+
+                <?php if (isset($vendas_processadas) && isset($nome_amigavel)): ?>
+                    <!-- Notificação de Relatório FINAL ou TEMPORÁRIO -->
+                    <div class="alert alert-<?= $tipo_relatorio === 'FINAL' ? 'success' : 'warning' ?> mb-3">
+                        <h5>
+                            <i class="fas fa-<?= $tipo_relatorio === 'FINAL' ? 'check-circle' : 'clock' ?>"></i>
+                            Relatório: <strong><?= htmlspecialchars($nome_amigavel) ?></strong>
+                            <span class="badge badge-<?= $tipo_relatorio === 'FINAL' ? 'success' : 'warning' ?> ml-2"><?= $tipo_relatorio ?></span>
+                        </h5>
+
+                        <?php if ($tipo_relatorio === 'FINAL'): ?>
+                            <p class="mb-0">
+                                ✅ Este é o <strong>relatório oficial final</strong> para premiação.
+                                <?php if ($regra_dia08['removidas_canceladas'] > 0 || $regra_dia08['removidas_sem_pagamento'] > 0): ?>
+                                    <br>
+                                    <strong>Cotas removidas do ranking:</strong>
+                                    <?php if ($regra_dia08['removidas_canceladas'] > 0): ?>
+                                        <span class="badge badge-danger"><?= $regra_dia08['removidas_canceladas'] ?> canceladas</span>
+                                    <?php endif; ?>
+                                    <?php if ($regra_dia08['removidas_sem_pagamento'] > 0): ?>
+                                        <span class="badge badge-warning"><?= $regra_dia08['removidas_sem_pagamento'] ?> sem 1ª parcela</span>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </p>
+                        <?php else: ?>
+                            <p class="mb-0">
+                                ⚠️ <strong>Atenção:</strong> Este relatório é <strong>temporário</strong>!
+                                As posições e pontuações <strong>podem mudar</strong> até o dia 08 do próximo mês.
+                                <br>O relatório final será disponibilizado após essa data.
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php if (empty($arquivos_vendas)): ?>
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
@@ -392,16 +558,39 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                     <div class="form-group">
                                         <label>
                                             <i class="fas fa-file-csv"></i> Arquivo de Vendas
+                                            <?php if (isGodMode()): ?>
+                                                <span class="badge badge-warning ml-2">GODMODE: Múltiplos Arquivos</span>
+                                                <small class="d-block text-muted mt-1">
+                                                    <i class="fas fa-info-circle"></i> Segure CTRL (Windows/Linux) ou CMD (Mac) para selecionar múltiplos arquivos para relatório consolidado
+                                                </small>
+                                            <?php endif; ?>
                                         </label>
-                                        <select class="form-control" name="arquivo_vendas" required>
-                                            <option value="">-- Selecione o arquivo --</option>
-                                            <?php foreach ($arquivos_vendas as $arquivo): ?>
-                                                <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
-                                                        <?= $arquivo_selecionado === $arquivo['caminho'] ? 'selected' : '' ?>>
-                                                    <?= htmlspecialchars($arquivo['nome']) ?> (<?= $arquivo['data'] ?>)
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                        <?php if (isGodMode()): ?>
+                                            <!-- GODMODE: Seleção múltipla -->
+                                            <select class="form-control" name="arquivo_vendas[]" multiple size="6" required
+                                                    style="height: auto; min-height: 150px;">
+                                                <?php foreach ($arquivos_vendas as $arquivo):
+                                                    $nome_amigavel_arquivo = gerarNomeAmigavel($arquivo['nome']);
+                                                ?>
+                                                    <option value="<?= htmlspecialchars($arquivo['caminho']) ?>">
+                                                        <?= htmlspecialchars($nome_amigavel_arquivo) ?> (<?= $arquivo['data'] ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php else: ?>
+                                            <!-- Normal: Seleção única -->
+                                            <select class="form-control" name="arquivo_vendas" required>
+                                                <option value="">-- Selecione o arquivo --</option>
+                                                <?php foreach ($arquivos_vendas as $arquivo):
+                                                    $nome_amigavel_arquivo = gerarNomeAmigavel($arquivo['nome']);
+                                                ?>
+                                                    <option value="<?= htmlspecialchars($arquivo['caminho']) ?>"
+                                                            <?= $arquivo_selecionado === $arquivo['caminho'] ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($nome_amigavel_arquivo) ?> (<?= $arquivo['data'] ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <!-- Filtros de Data -->
@@ -411,17 +600,17 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                 <label>
                                                     <i class="fas fa-calendar-alt"></i> Data Inicial
                                                 </label>
-                                                <input type="date" class="form-control" name="data_inicial"
+                                                <input type="date" class="form-control" id="data_inicial" name="data_inicial"
                                                        value="<?= $_POST['data_inicial'] ?? $periodo_padrao['data_inicial'] ?>">
                                             </div>
                                         </div>
-                                        
+
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label>
                                                     <i class="fas fa-calendar-check"></i> Data Final
                                                 </label>
-                                                <input type="date" class="form-control" name="data_final"
+                                                <input type="date" class="form-control" id="data_final" name="data_final"
                                                        value="<?= $_POST['data_final'] ?? $periodo_padrao['data_final'] ?>">
                                             </div>
                                         </div>
@@ -442,24 +631,46 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                     <option value="Inativo" <?= ($_POST['filtro_status'] ?? '') === 'Inativo' ? 'selected' : '' ?>>
                                                         Inativo
                                                     </option>
+                                                    <option value="Cancelado" <?= ($_POST['filtro_status'] ?? '') === 'Cancelado' ? 'selected' : '' ?>>
+                                                        Cancelado
+                                                    </option>
+                                                    <option value="Bloqueado" <?= ($_POST['filtro_status'] ?? '') === 'Bloqueado' ? 'selected' : '' ?>>
+                                                        Bloqueado
+                                                    </option>
                                                 </select>
                                             </div>
                                         </div>
                                         
                                         <div class="col-md-4">
                                             <div class="form-check mt-4 pt-2">
-                                                <input type="checkbox" class="form-check-input" 
+                                                <input type="checkbox" class="form-check-input"
                                                        name="primeira_parcela_paga" id="primeira_parcela_paga"
-                                                       <?= isset($_POST['primeira_parcela_paga']) ? 'checked' : '' ?>>
+                                                       <?= (isset($_POST['primeira_parcela_paga']) || $e_relatorio_final_pre_check) ? 'checked' : '' ?>
+                                                       <?= $e_relatorio_final_pre_check ? 'disabled' : '' ?>>
+                                                <!-- Campo hidden para enviar valor quando checkbox está disabled -->
+                                                <?php if ($e_relatorio_final_pre_check): ?>
+                                                    <input type="hidden" name="primeira_parcela_paga" value="on">
+                                                <?php endif; ?>
                                                 <label class="form-check-label" for="primeira_parcela_paga">
                                                     <i class="fas fa-money-bill-wave"></i> Apenas com 1ª Parcela Paga
+                                                    <?php if ($e_relatorio_final_pre_check): ?>
+                                                        <span class="badge badge-success ml-2" title="Obrigatório em relatórios finais">
+                                                            OBRIGATÓRIO (Dia 08 ou posterior)
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </label>
+                                                <?php if ($e_relatorio_final_pre_check): ?>
+                                                    <small class="form-text text-success">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)
+                                                    </small>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                         
                                         <div class="col-md-4">
                                             <div class="form-check mt-4 pt-2">
-                                                <input type="checkbox" class="form-check-input" 
+                                                <input type="checkbox" class="form-check-input"
                                                        name="apenas_vista" id="apenas_vista"
                                                        <?= isset($_POST['apenas_vista']) ? 'checked' : '' ?>>
                                                 <label class="form-check-label" for="apenas_vista">
@@ -467,6 +678,38 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                                 </label>
                                             </div>
                                         </div>
+
+                                        <?php if (isset($_SESSION['godmode_ativo']) && $_SESSION['godmode_ativo'] === true): ?>
+                                        <div class="col-md-4">
+                                            <div class="form-check mt-4 pt-2">
+                                                <input type="checkbox" class="form-check-input"
+                                                       name="ignorar_cartao_duplicado" id="ignorar_cartao_duplicado"
+                                                       checked>
+                                                <label class="form-check-label" for="ignorar_cartao_duplicado">
+                                                    <i class="fas fa-credit-card"></i> Ignorar Cartões Duplicados
+                                                    <span class="badge badge-warning ml-1" title="Apenas visível no godmode">GODMODE</span>
+                                                </label>
+                                                <small class="form-text text-muted">
+                                                    <i class="fas fa-shield-alt"></i> Ativo por padrão para evitar fraudes
+                                                </small>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <div class="form-check mt-4 pt-2">
+                                                <input type="checkbox" class="form-check-input"
+                                                       name="ignorar_vendas_pix" id="ignorar_vendas_pix"
+                                                       <?= isset($_POST['ignorar_vendas_pix']) ? 'checked' : '' ?>>
+                                                <label class="form-check-label" for="ignorar_vendas_pix">
+                                                    <i class="fas fa-mobile-alt"></i> Ignorar Vendas PIX
+                                                    <span class="badge badge-warning ml-1" title="Apenas visível no godmode">GODMODE</span>
+                                                </label>
+                                                <small class="form-text text-muted">
+                                                    <i class="fas fa-filter"></i> Remove vendas pagas via PIX do ranking
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
 
                                     <!-- Ordenação -->
@@ -561,7 +804,7 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                             <div class="card-body text-center">
                                 <i class="fas <?= $medal['icon'] ?> fa-3x <?= $medal['class'] ?> mb-3"></i>
                                 <h5 class="card-title"><?= $medal['label'] ?></h5>
-                                <h3><?= htmlspecialchars($consultor['consultor']) ?></h3>
+                                <h3><?= exibirNomeConsultor($consultor['consultor']) ?></h3>
                                 <hr class="bg-white">
                                 <div class="row">
                                     <div class="col-6">
@@ -638,9 +881,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <strong><?= htmlspecialchars($consultor['consultor']) ?></strong>
+                                    <strong><?= exibirNomeConsultor($consultor['consultor']) ?></strong>
                                 </td>
-                                
+
                                 <?php if ($campos_visiveis['pontos']): ?>
                                     <td class="text-center">
                                         <span class="badge badge-primary badge-lg" style="font-size: 1.1em;">
@@ -750,9 +993,28 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
                     </div>
                 </div>
 
+                <!-- Modo Senha Mestre (Admin) -->
+                <div id="modoSenhaMestre" style="display: none;">
+                    <p class="text-danger"><i class="fas fa-user-shield"></i> Acesso Administrativo</p>
+                    <div class="form-group">
+                        <label>Senha Mestre</label>
+                        <input type="password" class="form-control" id="inputSenhaMestre"
+                               placeholder="Digite a senha mestre">
+                        <small class="text-muted">Use a senha mestre configurada no painel administrativo</small>
+                    </div>
+                    <div class="text-center mt-2">
+                        <button type="button" class="btn btn-link btn-sm" id="btnVoltarPIN">
+                            <i class="fas fa-arrow-left"></i> Voltar ao PIN
+                        </button>
+                    </div>
+                </div>
+
                 <div id="erroValidacao" class="alert alert-danger" style="display: none;"></div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-link btn-sm" id="btnUsarSenhaMestre">
+                    <i class="fas fa-user-shield"></i> Admin
+                </button>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" id="btnValidarAcesso">
                     <i class="fas fa-check"></i> Validar
@@ -827,6 +1089,9 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
             
             <!-- Footer fixo -->
             <div class="modal-footer" style="flex-shrink: 0;">
+                <button type="button" class="btn btn-primary" id="btnExportarPDF">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                </button>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">
                     <i class="fas fa-times"></i> Fechar
                 </button>
@@ -869,69 +1134,6 @@ $dip_ativo = ($_SESSION['config_premiacoes']['vendas_para_dip'] > 0 &&
     </div>
 </div>
 
-<?php endif; ?>
-
-<?php
-// Painel godmode: cotas desconsideradas
-if (isGodMode() && isset($vendas_processadas)):
-    $cotas_config_rel = $config['cotas_desconsideradas'] ?? [];
-    $impacto_rel      = $vendas_processadas['cotas_desconsideradas_impacto'] ?? [];
-?>
-<!-- CARD COTAS DESCONSIDERADAS -->
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">
-                    <i class="fas fa-eye-slash"></i> GODMODE — Cotas Desconsideradas
-                </h5>
-            </div>
-            <div class="card-body">
-                <div id="godmodeFilterInfo" class="alert alert-info mb-3" style="display: none;">
-                    <i class="fas fa-filter"></i> <strong>Filtro ativo:</strong> Mostrando apenas cotas desconsideradas do consultor pesquisado.
-                </div>
-                <?php if (empty($cotas_config_rel)): ?>
-                    <p class="text-muted mb-0">Nenhuma cota configurada para desconsiderar. Adicione IDs (ex: SFA-10001) em <strong>Configurações → Cotas Desconsideradas</strong>.</p>
-                <?php else: ?>
-                    <p><strong>Cotas configuradas para desconsiderar (<?= count($cotas_config_rel) ?>):</strong><br>
-                    <?php foreach ($cotas_config_rel as $cid): ?>
-                        <span class="badge badge-secondary mr-1"><?= htmlspecialchars($cid) ?></span>
-                    <?php endforeach; ?>
-                    </p>
-                    <?php if (empty($impacto_rel)): ?>
-                        <p class="text-success mb-0"><i class="fas fa-check-circle"></i> Nenhuma das cotas desconsideradas estava presente neste relatório (ou não passaram nos filtros).</p>
-                    <?php else: ?>
-                        <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> As cotas abaixo <strong>foram removidas</strong> do ranking:</p>
-                        <table class="table table-sm table-bordered">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Consultor</th>
-                                    <th>Cotas Removidas</th>
-                                    <th class="text-center">Pontos Removidos</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php foreach ($impacto_rel as $cn => $info): ?>
-                                <tr class="godmode-row" data-consultor="<?= strtolower(htmlspecialchars($info['consultor'])) ?>">
-                                    <td><strong><?= htmlspecialchars($info['consultor']) ?></strong></td>
-                                    <td>
-                                        <?php foreach ($info['cotas_ids'] as $cid): ?>
-                                            <span class="badge badge-danger mr-1"><?= htmlspecialchars($cid) ?></span>
-                                        <?php endforeach; ?>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge badge-warning badge-lg"><?= $info['pontos_removidos'] ?> pts</span>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php endif; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</div>
 <?php endif; ?>
 
 <?php if (isGodMode() && isset($vendas_processadas['duplicados']) && $vendas_processadas['duplicados']['total'] > 0): ?>
@@ -1031,7 +1233,7 @@ body.modal-open {
     width: 100%;
 }
 
-/* Garante que o backdrop no permita scroll */
+/* Garante que o backdrop não permita scroll */
 .modal-backdrop {
     position: fixed;
 }
@@ -1040,6 +1242,118 @@ body.modal-open {
 #modalDetalhamentoConsultor .modal-body {
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
+}
+
+/* Estilos para impressão/PDF */
+@media print {
+    /* Apenas quando estiver imprimindo o modal */
+    body.modal-printing {
+        background: white !important;
+    }
+
+    /* Oculta TUDO quando estiver imprimindo modal */
+    body.modal-printing > * {
+        display: none !important;
+    }
+
+    /* Mostra APENAS o modal */
+    body.modal-printing #modalDetalhamentoConsultor {
+        display: block !important;
+        position: static !important;
+        padding: 0 !important;
+    }
+
+    body.modal-printing .modal-backdrop {
+        display: none !important;
+    }
+
+    body.modal-printing .modal-dialog {
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+
+    body.modal-printing .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+        background: white !important;
+    }
+
+    /* Oculta header e footer */
+    body.modal-printing .modal-header,
+    body.modal-printing .modal-footer {
+        display: none !important;
+    }
+
+    /* Mostra o body */
+    body.modal-printing .modal-body {
+        display: block !important;
+        padding: 15px !important;
+        overflow: visible !important;
+    }
+
+    /* Oculta filtros */
+    body.modal-printing #buscaTitulo,
+    body.modal-printing #filtroTipoPagamento,
+    body.modal-printing #filtroStatus,
+    body.modal-printing #filtroPrimeiraParcela,
+    body.modal-printing #btnLimparFiltrosModal,
+    body.modal-printing .row.mb-3:has(#buscaTitulo) {
+        display: none !important;
+    }
+
+    /* Garante que a tabela seja totalmente visível */
+    body.modal-printing .table-responsive {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    /* Força expansão do collapse */
+    #collapseDetalhamento {
+        display: block !important;
+        height: auto !important;
+    }
+
+    /* Ajusta tabelas */
+    #modalDetalhamentoConsultor table {
+        font-size: 10px !important;
+        page-break-inside: auto;
+    }
+
+    #modalDetalhamentoConsultor tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    /* Remove scroll da tabela */
+    .table-responsive {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    /* Ajusta badges e ícones */
+    .badge {
+        border: 1px solid #000;
+        padding: 2px 4px;
+    }
+
+    /* Remove cores de background */
+    .card {
+        border: 1px solid #ddd !important;
+        page-break-inside: avoid;
+    }
+
+    /* Mantém cores do card de total */
+    .bg-success {
+        background-color: #28a745 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .text-white {
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
 }
 </style>
 <!-- Inicializar DataTables -->
@@ -1121,6 +1435,7 @@ jQuery(document).ready(function($) {
     $('#btnUsarCPF').click(function() {
         $('#modoPin').hide();
         $('#modoCPF').show();
+        $('#modoSenhaMestre').hide();
         $('#erroValidacao').hide();
         setTimeout(function() { $('#inputValidacaoConsultor').focus(); }, 100);
     });
@@ -1128,6 +1443,23 @@ jQuery(document).ready(function($) {
     $('#btnUsarPIN').click(function() {
         $('#modoCPF').hide();
         $('#modoPin').show();
+        $('#modoSenhaMestre').hide();
+        $('#erroValidacao').hide();
+        setTimeout(function() { $('#inputPIN').focus(); }, 100);
+    });
+
+    $('#btnUsarSenhaMestre').click(function() {
+        $('#modoPin').hide();
+        $('#modoCPF').hide();
+        $('#modoSenhaMestre').show();
+        $('#erroValidacao').hide();
+        setTimeout(function() { $('#inputSenhaMestre').focus(); }, 100);
+    });
+
+    $('#btnVoltarPIN').click(function() {
+        $('#modoSenhaMestre').hide();
+        $('#modoPin').show();
+        $('#modoCPF').hide();
         $('#erroValidacao').hide();
         setTimeout(function() { $('#inputPIN').focus(); }, 100);
     });
@@ -1135,7 +1467,7 @@ jQuery(document).ready(function($) {
     // ========================================
     // EVENTO: Enter nos campos
     // ========================================
-    $('#inputPIN, #inputValidacaoConsultor').keypress(function(e) {
+    $('#inputPIN, #inputValidacaoConsultor, #inputSenhaMestre').keypress(function(e) {
         if (e.which === 13) { // Enter
             $('#btnValidarAcesso').click();
         }
@@ -1148,7 +1480,42 @@ jQuery(document).ready(function($) {
         $('#erroValidacao').hide();
 
         // Verifica qual modo está ativo
-        if ($('#modoPin').is(':visible')) {
+        if ($('#modoSenhaMestre').is(':visible')) {
+            // Validação com Senha Mestre
+            const senhaMestre = $('#inputSenhaMestre').val();
+
+            if (!senhaMestre) {
+                $('#erroValidacao').text('Digite a senha mestre').show();
+                return;
+            }
+
+            console.log('Validando Senha Mestre...');
+
+            $.ajax({
+                url: 'ajax/validar_senha_mestre.php',
+                method: 'POST',
+                data: {
+                    senha_mestre: senhaMestre
+                },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Resposta Senha Mestre:', response);
+
+                    if (response.success && response.valido) {
+                        $('#modalValidarConsultor').modal('hide');
+                        mostrarDetalhamento(consultorParaValidar);
+                    } else {
+                        $('#erroValidacao').text(response.mensagem || 'Senha mestre incorreta!').show();
+                        $('#inputSenhaMestre').val('').focus();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erro na validação Senha Mestre:', error);
+                    $('#erroValidacao').text('Erro ao validar. Tente novamente.').show();
+                }
+            });
+
+        } else if ($('#modoPin').is(':visible')) {
             // Validação com PIN
             const pin = $('#inputPIN').val().replace(/\D/g, '');
 
@@ -1468,6 +1835,28 @@ jQuery(document).ready(function($) {
                         <h5 class="mb-0">
                             <i class="fas fa-trophy"></i> TOTAL: ${consultor.pontos} pontos
                         </h5>
+            `;
+
+            // Se tem pontos perdidos (relatório final), mostra o detalhamento
+            if (consultor.pontos_perdidos && consultor.pontos_perdidos > 0) {
+                html += `
+                        <hr class="bg-white my-2">
+                        <p class="mb-0">
+                            <small>
+                                <i class="fas fa-info-circle"></i>
+                                <strong>-${consultor.pontos_perdidos} pontos perdidos</strong><br>
+                                por cancelamento ou falta de pagamento da primeira parcela
+                            </small>
+                        </p>
+                        <p class="mb-0 mt-1">
+                            <small>
+                                Pontos antes das penalidades: <strong>${consultor.pontos_originais || consultor.pontos} pontos</strong>
+                            </small>
+                        </p>
+                `;
+            }
+
+            html += `
                     </div>
                 </div>
             `;
@@ -1539,6 +1928,8 @@ jQuery(document).ready(function($) {
                             <option value="">Status</option>
                             <option value="Ativo">Ativo</option>
                             <option value="Inativo">Inativo</option>
+                            <option value="Cancelado">Cancelado</option>
+                            <option value="Bloqueado">Bloqueado</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -1568,12 +1959,13 @@ jQuery(document).ready(function($) {
                                 <th>Forma Pag.</th>
                                 <th class="text-center">Parc.</th>
                                 <th class="text-center">1ª?</th>
+                                <th class="text-center">Pontos</th>
                                 <th class="text-right">Vlr. Pago</th>
                             </tr>
                         </thead>
                         <tbody id="corpoTabelaVendas">
                             <tr>
-                                <td colspan="10" class="text-center">
+                                <td colspan="11" class="text-center">
                                     <i class="fas fa-spinner fa-spin"></i> Carregando vendas...
                                 </td>
                             </tr>
@@ -1588,7 +1980,97 @@ jQuery(document).ready(function($) {
         // Atualiza modal e abre
         $('#modalDetalhamentoBody').html(html);
         $('#modalDetalhamentoConsultor').modal('show');
-        
+
+        // Configura botão de exportar PDF
+        $('#btnExportarPDF').off('click').on('click', function() {
+            // Expande o collapse de detalhamento
+            $('#collapseDetalhamento').collapse('show');
+
+            setTimeout(function() {
+                // Clona o modal body para manipular
+                const clone = $('#modalDetalhamentoBody').clone();
+
+                // Remove elementos de filtro
+                clone.find('#buscaTitulo').closest('.row').remove();
+                clone.find('#contadorVendasModal').remove();
+
+                // Remove inline styles que limitam altura
+                clone.find('.table-responsive').removeAttr('style');
+
+                // Pega o HTML limpo
+                const conteudo = clone.html();
+
+                // Cria uma nova janela
+                const printWindow = window.open('', '_blank', 'width=1024,height=768');
+
+                if (!printWindow) {
+                    alert('Por favor, permita popups para exportar o PDF');
+                    return;
+                }
+
+                // Escreve o HTML na nova janela
+                const htmlContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Detalhamento de Pontos - ${$('#modalDetalhamentoConsultor').data('consultor-nome') || 'Consultor'}</title>
+                        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+                        <style>
+                            body {
+                                padding: 20px;
+                                font-family: Arial, sans-serif;
+                            }
+                            .table-responsive {
+                                overflow: visible !important;
+                                max-height: none !important;
+                                height: auto !important;
+                            }
+                            table {
+                                page-break-inside: auto;
+                            }
+                            tr {
+                                page-break-inside: avoid;
+                                page-break-after: auto;
+                            }
+                            thead {
+                                display: table-header-group;
+                            }
+                            @media print {
+                                body { padding: 10px; }
+                                .table-responsive {
+                                    overflow: visible !important;
+                                    max-height: none !important;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${conteudo}
+                    </body>
+                    </html>
+                `;
+
+                printWindow.document.write(htmlContent);
+                printWindow.document.close();
+
+                // Adiciona o script de impressão depois que o documento está fechado
+                const script = printWindow.document.createElement('script');
+                script.textContent = `
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                            setTimeout(function() {
+                                window.close();
+                            }, 1000);
+                        }, 800);
+                    };
+                `;
+                printWindow.document.body.appendChild(script);
+            }, 500);
+        });
+
         // Configura evento de collapse DEPOIS de inserir o HTML
         setTimeout(function() {
             // Evento de clique no header
@@ -1677,9 +2159,15 @@ jQuery(document).ready(function($) {
                                 </td>
                                 <td class="text-center"><small>${venda.num_parcelas}x</small></td>
                                 <td class="text-center">
-                                    ${venda.primeira_parcela_paga ? 
-                                        '<i class="fas fa-check text-success"></i>' : 
+                                    ${venda.primeira_parcela_paga ?
+                                        '<i class="fas fa-check text-success"></i>' :
                                         '<i class="fas fa-times text-danger"></i>'}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-primary">${venda.pontos || 0} pts</span>
+                                    ${venda.produto_alterado && venda.pontos_original !== null && venda.pontos_original !== venda.pontos ?
+                                        `<br><small class="text-danger"><del>${venda.pontos_original} pts</del></small>` :
+                                        ''}
                                 </td>
                                 <td class="text-right">
                                     <small><strong>R$ ${parseFloat(venda.valor_pago).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong></small>
@@ -1696,7 +2184,7 @@ jQuery(document).ready(function($) {
                     configurarFiltrosModal();
                 } else {
                     $('#corpoTabelaVendas').html(
-                        '<tr><td colspan="9" class="text-center text-warning">Nenhuma venda encontrada</td></tr>'
+                        '<tr><td colspan="11" class="text-center text-warning">Nenhuma venda encontrada</td></tr>'
                     );
                 }
             },
@@ -1704,7 +2192,7 @@ jQuery(document).ready(function($) {
                 console.error('Erro ao carregar vendas:', error);
                 console.error('Response:', xhr.responseText);
                 $('#corpoTabelaVendas').html(
-                    '<tr><td colspan="9" class="text-center text-danger">Erro ao carregar vendas. Tente novamente.</td></tr>'
+                    '<tr><td colspan="11" class="text-center text-danger">Erro ao carregar vendas. Tente novamente.</td></tr>'
                 );
             }
         });
@@ -1891,7 +2379,355 @@ jQuery(document).ready(function($) {
 </script>
 
 
+<!-- Fogos de Artifício e Mensagem para Relatório FINAL -->
+<?php if (isset($tipo_relatorio) && $tipo_relatorio === 'FINAL'): ?>
+    <?php $mensagem_parabens = obterMensagemAleatoriaParabens(); ?>
+
+    <style>
+        #fireworksCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        #congratsModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 600px;
+            animation: modalBounce 0.8s ease-out;
+        }
+
+        @keyframes modalBounce {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        #congratsModal h2 {
+            font-size: 2.5em;
+            color: #28a745;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #congratsModal p {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .trophy-animation {
+            font-size: 5em;
+            animation: trophyFloat 2s ease-in-out infinite;
+        }
+
+        @keyframes trophyFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* Ajustes para mobile */
+        @media (max-width: 768px) {
+            #congratsModal {
+                max-width: 95%;
+                margin: 0 auto;
+                padding: 15px 8px;
+                border-radius: 8px;
+                left: 50%;
+                right: auto;
+                width: 95%;
+            }
+
+            #congratsModal h2 {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+
+            #congratsModal p {
+                font-size: 0.9em;
+                margin-bottom: 15px;
+                line-height: 1.4;
+            }
+
+            .trophy-animation {
+                font-size: 2.5em;
+                margin-bottom: 5px;
+            }
+
+            #congratsModal .btn {
+                font-size: 0.95em;
+                padding: 8px 20px;
+            }
+        }
+    </style>
+
+    <canvas id="fireworksCanvas"></canvas>
+    <div id="congratsModal" style="display: none;">
+        <div class="trophy-animation">🏆</div>
+        <h2><?= htmlspecialchars($mensagem_parabens['titulo']) ?></h2>
+        <p><?= htmlspecialchars($mensagem_parabens['mensagem']) ?></p>
+        <button onclick="closeCongratsModal()" class="btn btn-success btn-lg">
+            <i class="fas fa-check"></i> Continuar
+        </button>
+    </div>
+
+    <script>
+        // Classe para Partícula de Fogo de Artifício
+        class FireworkParticle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.velocity = {
+                    x: (Math.random() - 0.5) * 8,
+                    y: (Math.random() - 0.5) * 8
+                };
+                this.gravity = 0.15;
+                this.opacity = 1;
+                this.decay = Math.random() * 0.015 + 0.010;
+            }
+
+            update() {
+                this.velocity.y += this.gravity;
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.opacity -= this.decay;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Configuração do Canvas
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let particles = [];
+        let fireworksActive = true;
+        let animationId;
+
+        // Cores vibrantes para fogos
+        const colors = ['#ff0844', '#ffb900', '#00e5ff', '#00ff88', '#b900ff', '#ff006e'];
+
+        // Criar explosão de fogos
+        function createFirework(x, y) {
+            const particleCount = 50;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new FireworkParticle(x, y, color));
+            }
+        }
+
+        // Animação dos fogos
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Atualizar e desenhar partículas
+            particles = particles.filter(particle => {
+                particle.update();
+                particle.draw(ctx);
+                return particle.opacity > 0;
+            });
+
+            // Criar novos fogos aleatoriamente
+            if (fireworksActive && Math.random() < 0.08) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height * 0.5;
+                createFirework(x, y);
+            }
+
+            if (fireworksActive) {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+
+        // Fechar modal e parar fogos
+        function closeCongratsModal() {
+            document.getElementById('congratsModal').style.display = 'none';
+            fireworksActive = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            // Fade out do canvas
+            setTimeout(() => {
+                canvas.style.transition = 'opacity 1s';
+                canvas.style.opacity = '0';
+                setTimeout(() => canvas.remove(), 1000);
+            }, 100);
+        }
+
+        // Iniciar animação quando página carregar
+        window.addEventListener('load', function() {
+            // Aguarda 500ms para garantir que a página carregou
+            setTimeout(() => {
+                // Mostrar modal
+                document.getElementById('congratsModal').style.display = 'block';
+
+                // Iniciar fogos
+                animate();
+
+                // Fechar automaticamente após 8 segundos
+                setTimeout(closeCongratsModal, 8000);
+            }, 500);
+        });
+
+        // Redimensionar canvas
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+<?php endif; ?>
+
+
 
 <?php endif; ?>
 
 
+<!-- Verificação Dinâmica de Relatório FINAL - SEMPRE PRESENTE -->
+<script>
+// Aguarda DOM carregar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', iniciarVerificacaoDinamica);
+} else {
+    iniciarVerificacaoDinamica();
+}
+
+function iniciarVerificacaoDinamica() {
+    // Busca elementos
+    const campoDataInicial = document.getElementById('data_inicial');
+    const campoDataFinal = document.getElementById('data_final');
+    const checkbox = document.getElementById('primeira_parcela_paga');
+
+    if (!campoDataFinal || !checkbox) {
+        return; // Elementos não encontrados, abortar silenciosamente
+    }
+
+    // VERIFICA PARÂMETRO temp=on NA URL (permite desbloquear checkbox mesmo em relatório FINAL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const modoTemporario = urlParams.get('temp') === 'on';
+
+    /**
+     * Verifica se as datas selecionadas caracterizam um relatório FINAL
+     */
+    function verificarRelatorioFinal() {
+        // Se modo temporário está ON, sempre desbloquear
+        if (modoTemporario) {
+            desbloquearCheckbox();
+            return;
+        }
+
+        const dataFinal = campoDataFinal.value;
+
+        if (!dataFinal) {
+            desbloquearCheckbox();
+            return;
+        }
+
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        const fimPeriodo = new Date(dataFinal + 'T00:00:00');
+
+        const mesSeguinte = new Date(fimPeriodo);
+        mesSeguinte.setMonth(mesSeguinte.getMonth() + 1);
+        mesSeguinte.setDate(8);
+        mesSeguinte.setHours(0, 0, 0, 0);
+
+        if (hoje >= mesSeguinte) {
+            bloquearCheckbox();
+        } else {
+            desbloquearCheckbox();
+        }
+    }
+
+    /**
+     * Bloqueia checkbox (relatório FINAL)
+     */
+    function bloquearCheckbox() {
+        const formCheck = checkbox.closest('.form-check');
+
+        checkbox.checked = true;
+        checkbox.disabled = true;
+
+        // Remove hidden anterior
+        const hiddenAntigo = formCheck.querySelector('input[type="hidden"][name="primeira_parcela_paga"]');
+        if (hiddenAntigo) hiddenAntigo.remove();
+
+        // Adiciona hidden
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'primeira_parcela_paga';
+        hidden.value = 'on';
+        formCheck.appendChild(hidden);
+
+        // Remove badges/textos antigos
+        formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
+
+        // Adiciona badge
+        const label = formCheck.querySelector('label');
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-success ml-2';
+        badge.title = 'Obrigatório em relatórios finais';
+        badge.textContent = 'OBRIGATÓRIO (Dia 08 ou posterior)';
+        label.appendChild(badge);
+
+        // Adiciona texto explicativo
+        const small = document.createElement('small');
+        small.className = 'form-text text-success';
+        small.innerHTML = '<i class="fas fa-info-circle"></i> Este filtro é obrigatório em relatórios FINAIS (após dia 08 do mês seguinte)';
+        formCheck.appendChild(small);
+    }
+
+    /**
+     * Desbloqueia checkbox (relatório TEMPORÁRIO)
+     */
+    function desbloquearCheckbox() {
+        const formCheck = checkbox.closest('.form-check');
+
+        checkbox.disabled = false;
+
+        // Remove hidden
+        const hidden = formCheck.querySelector('input[type="hidden"][name="primeira_parcela_paga"]');
+        if (hidden) hidden.remove();
+
+        // Remove badges e textos
+        formCheck.querySelectorAll('.badge, .form-text').forEach(el => el.remove());
+    }
+
+    // Listeners
+    if (campoDataInicial) {
+        campoDataInicial.addEventListener('change', verificarRelatorioFinal);
+    }
+
+    if (campoDataFinal) {
+        campoDataFinal.addEventListener('change', verificarRelatorioFinal);
+    }
+
+    // Verificação inicial
+    verificarRelatorioFinal();
+}
+</script>
