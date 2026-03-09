@@ -98,7 +98,9 @@ function obterConfigPadrao() {
             'relatorio_padrao' => 'top20', // 'top20' ou 'ranking_completo'
             'senha_filtro' => '', // Senha encode/decode para liberar filtros
             'senha_godmode' => 'admin123', // Senha para modo admin
-            'senha_admin_setores' => 'aquabeat' // Senha para setores acessarem dados de consultores
+            'senha_admin_setores' => 'aquabeat', // Senha para setores acessarem dados de consultores
+            'manutencao_ativo' => false, // Ativa/desativa modo manutenção
+            'manutencao_permitir_godmode' => true // Permite godmode fazer bypass da manutenção
         ],
         'premiacoes' => [
             'pontos_por_sap' => 21,
