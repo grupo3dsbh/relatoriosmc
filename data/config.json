@@ -44,7 +44,10 @@
     "acesso": {
         "relatorio_padrao": "ranking_completo",
         "senha_filtro": "liberarfiltros",
-        "senha_godmode": "sign@3DS"
+        "senha_godmode": "sign@3DS",
+        "senha_admin_setores": "aquabeat",
+        "manutencao_ativo": false,
+        "manutencao_permitir_godmode": true
     },
     "premiacao": {
         "mensagem": "Para premiação Top 20, só serão contabilizadas as vendas com primeira parcela paga até dia 07 do mês posterior. Ex: vendas de Novembro até 07 de Dezembro.",

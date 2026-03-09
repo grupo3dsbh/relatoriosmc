@@ -21,8 +21,16 @@ if (isset($_GET['godmode'])) {
 // Verifica se tem godmode ativo (na sessão ou na URL)
 $godmode_ativo = isset($_SESSION['godmode_ativo']) && $_SESSION['godmode_ativo'] === true;
 
-// Se não tiver godmode ativo, mostra página de manutenção
-if (!$godmode_ativo) {
+// Carrega configurações para verificar modo manutenção
+require_once 'functions/configuracoes.php';
+$config_sistema = carregarConfiguracoes();
+
+// Verifica se modo manutenção está ativo
+$manutencao_ativo = !empty($config_sistema['acesso']['manutencao_ativo']);
+$permitir_godmode = !empty($config_sistema['acesso']['manutencao_permitir_godmode']);
+
+// Se manutenção estiver ativa E não tiver godmode (quando permitido), mostra página de manutenção
+if ($manutencao_ativo && !($permitir_godmode && $godmode_ativo)) {
     include 'manutencao.php';
     die();
 }
