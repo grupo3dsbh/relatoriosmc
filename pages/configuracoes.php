@@ -586,8 +586,8 @@ if (isset($_POST['resetar_config'])) {
                 </div>
             </div>
 
-            <!-- Card: Tipos de Premiação -->
-            <div class="card mb-3">
+        <!-- Card: Tipos de Premiação -->
+        <div class="card mb-3">
                 <div class="card-header bg-success text-white">
                     <h5 class="mb-0">
                         <i class="fas fa-trophy"></i> Tipos de Premiação
@@ -641,21 +641,21 @@ if (isset($_POST['resetar_config'])) {
                     <hr>
 
                     <h6>Adicionar Novo Tipo de Premiação</h6>
-                    <form method="post">
+                    <form method="post" id="form-adicionar-tipo" onsubmit="return validarFormTipo()">
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Nome *</label>
-                                    <input type="text" class="form-control" name="tipo_nome"
-                                           placeholder="Ex: SAP, DIP, CONVITES" required>
+                                    <input type="text" class="form-control" name="tipo_nome" id="tipo_nome"
+                                           placeholder="Ex: SAP, DIP, CONVITES">
                                 </div>
                             </div>
 
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label>Pontos Necessários *</label>
-                                    <input type="number" class="form-control" name="tipo_pontos"
-                                           value="21" min="1" required>
+                                    <input type="number" class="form-control" name="tipo_pontos" id="tipo_pontos"
+                                           value="21" min="1">
                                 </div>
                             </div>
 
@@ -790,7 +790,7 @@ if (isset($_POST['resetar_config'])) {
                 </div>
             </div>
 
-            <!-- Card: Ranges de Pontuação -->
+        <!-- Card: Ranges de Pontuação -->
             <div class="card mb-3">
                 <div class="card-header bg-dark text-white">
                     <h5 class="mb-0">
@@ -864,27 +864,27 @@ if (isset($_POST['resetar_config'])) {
                     <hr>
 
                     <h6><i class="fas fa-plus-circle"></i> Adicionar Novo Range</h6>
-                    <form method="post">
+                    <form method="post" id="form-adicionar-range" onsubmit="return validarFormRange()">
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label>Nome do Range *</label>
-                                    <input type="text" class="form-control" name="range_nome"
-                                           placeholder="Ex: Black Friday 2025" required>
+                                    <input type="text" class="form-control" name="range_nome" id="range_nome"
+                                           placeholder="Ex: Black Friday 2025">
                                 </div>
                             </div>
 
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Data Início *</label>
-                                    <input type="date" class="form-control" name="range_data_inicio" required>
+                                    <input type="date" class="form-control" name="range_data_inicio" id="range_data_inicio">
                                 </div>
                             </div>
 
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Data Fim *</label>
-                                    <input type="date" class="form-control" name="range_data_fim" required>
+                                    <input type="date" class="form-control" name="range_data_fim" id="range_data_fim">
                                 </div>
                             </div>
 
@@ -998,7 +998,7 @@ if (isset($_POST['resetar_config'])) {
                     </button>
                 </div>
             </div>
-            
+
         </form>
     </div>
 </div>
@@ -1060,3 +1060,56 @@ if (isset($_POST['resetar_config'])) {
         </div>
     </div>
 </div>
+
+<script>
+function validarFormTipo() {
+    var nome = document.getElementById('tipo_nome').value.trim();
+    var pontos = document.getElementById('tipo_pontos').value;
+
+    if (nome === '') {
+        alert('Por favor, preencha o nome do tipo de premiação.');
+        document.getElementById('tipo_nome').focus();
+        return false;
+    }
+
+    if (pontos === '' || pontos < 1) {
+        alert('Por favor, preencha os pontos necessários (mínimo 1).');
+        document.getElementById('tipo_pontos').focus();
+        return false;
+    }
+
+    return true;
+}
+
+function validarFormRange() {
+    var nome = document.getElementById('range_nome').value.trim();
+    var dataInicio = document.getElementById('range_data_inicio').value;
+    var dataFim = document.getElementById('range_data_fim').value;
+
+    if (nome === '') {
+        alert('Por favor, preencha o nome do range.');
+        document.getElementById('range_nome').focus();
+        return false;
+    }
+
+    if (dataInicio === '') {
+        alert('Por favor, preencha a data de início.');
+        document.getElementById('range_data_inicio').focus();
+        return false;
+    }
+
+    if (dataFim === '') {
+        alert('Por favor, preencha a data de fim.');
+        document.getElementById('range_data_fim').focus();
+        return false;
+    }
+
+    if (dataInicio > dataFim) {
+        alert('A data de início não pode ser posterior à data de fim.');
+        document.getElementById('range_data_inicio').focus();
+        return false;
+    }
+
+    return true;
+}
+</script>
