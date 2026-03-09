@@ -276,6 +276,12 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             $filtros['data_final']
         );
 
+        // Preserva os contadores originais para exibição
+        $contadores_originais = [
+            'removidas_canceladas' => $regra_dia08['removidas_canceladas'],
+            'removidas_sem_pagamento' => $regra_dia08['removidas_sem_pagamento']
+        ];
+
         // Se aplicou filtro, recalcula pontuação dos consultores
         if ($regra_dia08['aplicar_filtro']) {
             // Reagrupa vendas por consultor
@@ -288,11 +294,18 @@ if (isset($_POST['processar_relatorio']) || isset($_GET['arquivo'])) {
             }
 
             // Filtra novamente as vendas processadas
-            $regra_dia08 = aplicarRegraDia08(
+            $regra_dia08_temp = aplicarRegraDia08(
                 $vendas_processadas['vendas'],
                 $filtros['data_inicial'],
                 $filtros['data_final']
             );
+
+            // Mantém aplicar_filtro, mas preserva contadores originais para exibição
+            $regra_dia08 = [
+                'aplicar_filtro' => $regra_dia08_temp['aplicar_filtro'],
+                'removidas_canceladas' => $contadores_originais['removidas_canceladas'],
+                'removidas_sem_pagamento' => $contadores_originais['removidas_sem_pagamento']
+            ];
         }
 
         // Determina se é relatório FINAL ou TEMPORÁRIO
