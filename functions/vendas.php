@@ -1589,11 +1589,26 @@ function processarVendasComRanges($arquivo, $filtros = []) {
         $cotas_desconsideradas_ids[] = $item['cota'];
     }
 
+    // DEBUG: Mostra cotas desconsideradas carregadas
+    if (isGodMode() && !empty($cotas_desconsideradas_ids)) {
+        echo '<div class="alert alert-warning mt-2">';
+        echo '<strong>🔍 DEBUG - Cotas Desconsideradas:</strong><br>';
+        echo 'Total de cotas a desconsiderar: ' . count($cotas_desconsideradas_ids) . '<br>';
+        echo 'IDs: ' . implode(', ', array_slice($cotas_desconsideradas_ids, 0, 10));
+        if (count($cotas_desconsideradas_ids) > 10) {
+            echo ' ... (e mais ' . (count($cotas_desconsideradas_ids) - 10) . ')';
+        }
+        echo '</div>';
+    }
+
     if (!empty($cotas_desconsideradas_ids)) {
+        $vendas_removidas_count = 0;
+
         // Separa vendas desconsideradas
         foreach ($resultado['vendas'] as $key => $venda) {
             if (in_array($venda['id'], $cotas_desconsideradas_ids)) {
                 $vendas_desconsideradas[] = $venda;
+                $vendas_removidas_count++;
 
                 // Agrupa por consultor
                 $nome_consultor = $venda['consultor'];
@@ -1611,6 +1626,17 @@ function processarVendasComRanges($arquivo, $filtros = []) {
                 // Remove da lista de vendas processadas
                 unset($resultado['vendas'][$key]);
             }
+        }
+
+        // DEBUG: Mostra quantas vendas foram removidas
+        if (isGodMode()) {
+            echo '<div class="alert alert-info mt-2">';
+            echo '<strong>📊 DEBUG - Vendas Removidas:</strong><br>';
+            echo "Vendas removidas do ranking: <strong>$vendas_removidas_count</strong><br>";
+            if (!empty($vendas_desconsideradas_por_consultor)) {
+                echo 'Consultores afetados: ' . implode(', ', array_keys($vendas_desconsideradas_por_consultor));
+            }
+            echo '</div>';
         }
 
         // Reindexar array de vendas

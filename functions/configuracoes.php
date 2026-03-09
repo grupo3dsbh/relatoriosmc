@@ -317,9 +317,16 @@ function carregarCotasDesconsideradas() {
     if (isset($config['cotas_desconsideradas'])) {
         $cotas_config = $config['cotas_desconsideradas'];
 
-        // Se está ativo e tem lista
-        if (!empty($cotas_config['ativo']) && !empty($cotas_config['lista'])) {
-            return $cotas_config['lista'];
+        // Suporta estrutura nova: {"ativo": true, "lista": [...]}
+        if (is_array($cotas_config) && isset($cotas_config['ativo']) && isset($cotas_config['lista'])) {
+            // Se está ativo e tem lista
+            if (!empty($cotas_config['ativo']) && !empty($cotas_config['lista'])) {
+                return $cotas_config['lista'];
+            }
+        }
+        // Suporta estrutura antiga/simples: [...]
+        else if (is_array($cotas_config) && !isset($cotas_config['ativo'])) {
+            return $cotas_config;
         }
     }
 
