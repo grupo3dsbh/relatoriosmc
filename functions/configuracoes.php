@@ -129,21 +129,38 @@ function obterConfigPadrao() {
 function salvarConfiguracoes($config) {
     // Atualiza timestamp
     $config['ultima_atualizacao'] = date('Y-m-d H:i:s');
-    
+
+    // Verifica se o diretório existe
+    $dir = dirname(CONFIG_FILE);
+    if (!file_exists($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
     // Salva no arquivo
     $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    $resultado = file_put_contents(CONFIG_FILE, $json);
-    
-    if ($resultado === false) {
+
+    if ($json === false) {
+        error_log("Erro ao codificar JSON: " . json_last_error_msg());
         return [
             'sucesso' => false,
-            'mensagem' => 'Erro ao salvar arquivo de configuração!'
+            'mensagem' => 'Erro ao codificar dados: ' . json_last_error_msg()
         ];
     }
-    
+
+    $resultado = file_put_contents(CONFIG_FILE, $json);
+
+    if ($resultado === false) {
+        $erro = error_get_last();
+        error_log("Erro ao salvar arquivo: " . ($erro['message'] ?? 'desconhecido'));
+        return [
+            'sucesso' => false,
+            'mensagem' => 'Erro ao salvar arquivo de configuração! Verifique as permissões.'
+        ];
+    }
+
     // Atualiza sessão também
     $_SESSION['config_sistema'] = $config;
-    
+
     return [
         'sucesso' => true,
         'mensagem' => 'Configuraçes salvas com sucesso!'

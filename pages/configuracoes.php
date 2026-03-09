@@ -10,6 +10,14 @@ $mensagem_erro = null;
 // ===== CARREGA CONFIGURAÇÕES DO ARQUIVO =====
 $config = carregarConfiguracoes();
 
+// Garante que os arrays necessários existam
+if (!isset($config['ranges'])) {
+    $config['ranges'] = [];
+}
+if (!isset($config['tipos_premiacao'])) {
+    $config['tipos_premiacao'] = [];
+}
+
 // ===== DEBUG TEMPORÁRIO =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     error_log("POST recebido em configuracoes.php");
@@ -107,33 +115,40 @@ if (isset($_POST['salvar_configuracoes'])) {
 
 // ===== PROCESSAR RANGES =====
 if (isset($_POST['adicionar_range'])) {
-    $novo_range = [
-        'nome' => $_POST['range_nome'],
-        'data_inicio' => $_POST['range_data_inicio'],
-        'data_fim' => $_POST['range_data_fim'],
-        'ativo' => isset($_POST['range_ativo']),
-        'pontos' => [
-            '1vaga' => intval($_POST['range_pontos_1vaga'] ?? 1),
-            '2vagas' => intval($_POST['range_pontos_2vagas'] ?? 2),
-            '3vagas' => intval($_POST['range_pontos_3vagas'] ?? 2),
-            '4vagas' => intval($_POST['range_pontos_4vagas'] ?? 3),
-            '5vagas' => intval($_POST['range_pontos_5vagas'] ?? 3),
-            '6vagas' => intval($_POST['range_pontos_6vagas'] ?? 3),
-            '7vagas' => intval($_POST['range_pontos_7vagas'] ?? 3),
-            '8vagas' => intval($_POST['range_pontos_8vagas'] ?? 4),
-            '9vagas' => intval($_POST['range_pontos_9vagas'] ?? 4),
-            '10vagas' => intval($_POST['range_pontos_10vagas'] ?? 4),
-            'acima_10' => intval($_POST['range_pontos_acima_10'] ?? 4),
-            'vista_acima_5' => intval($_POST['range_pontos_vista_acima_5'] ?? 5)
-        ]
-    ];
+    // Validação dos campos obrigatórios
+    if (empty($_POST['range_nome']) || empty($_POST['range_data_inicio']) || empty($_POST['range_data_fim'])) {
+        $mensagem_erro = "Preencha todos os campos obrigatórios do range (Nome, Data Início e Data Fim)!";
+    } else {
+        $novo_range = [
+            'nome' => $_POST['range_nome'],
+            'data_inicio' => $_POST['range_data_inicio'],
+            'data_fim' => $_POST['range_data_fim'],
+            'ativo' => isset($_POST['range_ativo']),
+            'pontos' => [
+                '1vaga' => intval($_POST['range_pontos_1vaga'] ?? 1),
+                '2vagas' => intval($_POST['range_pontos_2vagas'] ?? 2),
+                '3vagas' => intval($_POST['range_pontos_3vagas'] ?? 2),
+                '4vagas' => intval($_POST['range_pontos_4vagas'] ?? 3),
+                '5vagas' => intval($_POST['range_pontos_5vagas'] ?? 3),
+                '6vagas' => intval($_POST['range_pontos_6vagas'] ?? 3),
+                '7vagas' => intval($_POST['range_pontos_7vagas'] ?? 3),
+                '8vagas' => intval($_POST['range_pontos_8vagas'] ?? 4),
+                '9vagas' => intval($_POST['range_pontos_9vagas'] ?? 4),
+                '10vagas' => intval($_POST['range_pontos_10vagas'] ?? 4),
+                'acima_10' => intval($_POST['range_pontos_acima_10'] ?? 4),
+                'vista_acima_5' => intval($_POST['range_pontos_vista_acima_5'] ?? 5)
+            ]
+        ];
 
-    $config['ranges'][] = $novo_range;
+        $config['ranges'][] = $novo_range;
 
-    $resultado = salvarConfiguracoes($config);
-    if ($resultado['sucesso']) {
-        $mensagem_sucesso = "Range adicionado com sucesso!";
-        $config = carregarConfiguracoes();
+        $resultado = salvarConfiguracoes($config);
+        if ($resultado['sucesso']) {
+            $mensagem_sucesso = "Range adicionado com sucesso!";
+            $config = carregarConfiguracoes();
+        } else {
+            $mensagem_erro = $resultado['mensagem'];
+        }
     }
 }
 
@@ -153,23 +168,30 @@ if (isset($_POST['remover_range'])) {
 
 // ===== PROCESSAR TIPOS DE PREMIAÇÃO =====
 if (isset($_POST['adicionar_tipo_premiacao'])) {
-    $novo_tipo = [
-        'nome' => trim($_POST['tipo_nome']),
-        'pontos_necessarios' => intval($_POST['tipo_pontos']),
-        'ativo' => isset($_POST['tipo_ativo']),
-        'descricao' => trim($_POST['tipo_descricao'] ?? '')
-    ];
+    // Validação dos campos obrigatórios
+    if (empty($_POST['tipo_nome']) || empty($_POST['tipo_pontos']) || intval($_POST['tipo_pontos']) < 1) {
+        $mensagem_erro = "Preencha todos os campos obrigatórios do tipo de premiação (Nome e Pontos Necessários - mínimo 1)!";
+    } else {
+        $novo_tipo = [
+            'nome' => trim($_POST['tipo_nome']),
+            'pontos_necessarios' => intval($_POST['tipo_pontos']),
+            'ativo' => isset($_POST['tipo_ativo']),
+            'descricao' => trim($_POST['tipo_descricao'] ?? '')
+        ];
 
-    if (!isset($config['tipos_premiacao'])) {
-        $config['tipos_premiacao'] = [];
-    }
+        if (!isset($config['tipos_premiacao'])) {
+            $config['tipos_premiacao'] = [];
+        }
 
-    $config['tipos_premiacao'][] = $novo_tipo;
+        $config['tipos_premiacao'][] = $novo_tipo;
 
-    $resultado = salvarConfiguracoes($config);
-    if ($resultado['sucesso']) {
-        $mensagem_sucesso = "Tipo de premiação adicionado com sucesso!";
-        $config = carregarConfiguracoes();
+        $resultado = salvarConfiguracoes($config);
+        if ($resultado['sucesso']) {
+            $mensagem_sucesso = "Tipo de premiação adicionado com sucesso!";
+            $config = carregarConfiguracoes();
+        } else {
+            $mensagem_erro = $resultado['mensagem'];
+        }
     }
 }
 
@@ -680,7 +702,7 @@ if (isset($_POST['resetar_config'])) {
                                 <div class="form-group">
                                     <label>Nome *</label>
                                     <input type="text" class="form-control" name="tipo_nome" id="tipo_nome"
-                                           placeholder="Ex: SAP, DIP, CONVITES">
+                                           placeholder="Ex: SAP, DIP, CONVITES" required>
                                 </div>
                             </div>
 
@@ -688,7 +710,7 @@ if (isset($_POST['resetar_config'])) {
                                 <div class="form-group">
                                     <label>Pontos Necessários *</label>
                                     <input type="number" class="form-control" name="tipo_pontos" id="tipo_pontos"
-                                           value="21" min="1">
+                                           value="21" min="1" required>
                                 </div>
                             </div>
 
@@ -903,21 +925,21 @@ if (isset($_POST['resetar_config'])) {
                                 <div class="form-group">
                                     <label>Nome do Range *</label>
                                     <input type="text" class="form-control" name="range_nome" id="range_nome"
-                                           placeholder="Ex: Black Friday 2025">
+                                           placeholder="Ex: Black Friday 2025" required>
                                 </div>
                             </div>
 
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Data Início *</label>
-                                    <input type="date" class="form-control" name="range_data_inicio" id="range_data_inicio">
+                                    <input type="date" class="form-control" name="range_data_inicio" id="range_data_inicio" required>
                                 </div>
                             </div>
 
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label>Data Fim *</label>
-                                    <input type="date" class="form-control" name="range_data_fim" id="range_data_fim">
+                                    <input type="date" class="form-control" name="range_data_fim" id="range_data_fim" required>
                                 </div>
                             </div>
 
@@ -1140,6 +1162,27 @@ function validarFormRange() {
     if (dataInicio > dataFim) {
         alert('A data de início não pode ser posterior à data de fim.');
         document.getElementById('range_data_inicio').focus();
+        return false;
+    }
+
+    // Validação dos campos de pontuação (pelo menos um deve ser maior que 0)
+    var camposPontuacao = [
+        'range_pontos_1vaga', 'range_pontos_2vagas', 'range_pontos_3vagas', 'range_pontos_4vagas',
+        'range_pontos_5vagas', 'range_pontos_6vagas', 'range_pontos_7vagas', 'range_pontos_8vagas',
+        'range_pontos_9vagas', 'range_pontos_10vagas', 'range_pontos_acima_10', 'range_pontos_vista_acima_5'
+    ];
+
+    var temPontuacao = false;
+    for (var i = 0; i < camposPontuacao.length; i++) {
+        var valor = parseInt(document.getElementsByName(camposPontuacao[i])[0].value);
+        if (valor > 0) {
+            temPontuacao = true;
+            break;
+        }
+    }
+
+    if (!temPontuacao) {
+        alert('Configure pelo menos um campo de pontuação com valor maior que 0!');
         return false;
     }
 
